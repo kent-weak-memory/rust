@@ -2314,8 +2314,10 @@ where
     }
 
     fn pointee_info_at(this: TyAndLayout<'tcx>, cx: &C, offset: Size) -> Option<PointeeInfo> {
-        let addr_space_of_ty = |ty: Ty<'tcx>| {
-            if ty.is_fn() { cx.data_layout().instruction_address_space } else { AddressSpace::DATA }
+        let addr_space_of_ty = |ty: Ty<'tcx>| if ty.is_fn() {
+            cx.data_layout().instruction_address_space
+        } else {
+            cx.data_layout().data_address_space
         };
 
         let pointee_info = match *this.ty.kind() {

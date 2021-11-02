@@ -16,7 +16,7 @@ use rustc_middle::mir::interpret::{
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::ty::{self, Instance, Ty};
 use rustc_middle::{bug, span_bug};
-use rustc_target::abi::{AddressSpace, Align, HasDataLayout, LayoutOf, Primitive, Scalar, Size};
+use rustc_target::abi::{Align, HasDataLayout, LayoutOf, Primitive, Scalar, Size};
 use tracing::debug;
 
 pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll Value {
@@ -51,7 +51,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
 
         let address_space = match cx.tcx.global_alloc(alloc_id) {
             GlobalAlloc::Function(..) => cx.data_layout().instruction_address_space,
-            GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) => AddressSpace::DATA,
+            GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) => dl.data_address_space,
         };
 
         llvals.push(cx.scalar_to_backend(

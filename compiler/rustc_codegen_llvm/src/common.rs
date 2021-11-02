@@ -14,7 +14,7 @@ use rustc_middle::bug;
 use rustc_middle::mir::interpret::{Allocation, GlobalAlloc, Scalar};
 use rustc_middle::ty::{layout::TyAndLayout, ScalarInt};
 use rustc_span::symbol::Symbol;
-use rustc_target::abi::{self, AddressSpace, HasDataLayout, LayoutOf, Pointer, Size};
+use rustc_target::abi::{self, HasDataLayout, LayoutOf, Pointer, Size};
 
 use libc::{c_char, c_uint};
 use tracing::debug;
@@ -255,7 +255,7 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                         if !self.sess().fewer_names() {
                             llvm::set_value_name(value, format!("{:?}", alloc_id).as_bytes());
                         }
-                        (value, AddressSpace::DATA)
+                        (value, self.data_layout().data_address_space)
                     }
                     GlobalAlloc::Function(fn_instance) => (
                         self.get_fn_addr(fn_instance.polymorphize(self.tcx)),
@@ -264,7 +264,7 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                     GlobalAlloc::Static(def_id) => {
                         assert!(self.tcx.is_static(def_id));
                         assert!(!self.tcx.is_thread_local_static(def_id));
-                        (self.get_static(def_id), AddressSpace::DATA)
+                        (self.get_static(def_id), self.data_layout().data_address_space)
                     }
                 };
                 let llval = unsafe {

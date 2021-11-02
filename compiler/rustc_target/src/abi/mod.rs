@@ -36,6 +36,7 @@ pub struct TargetDataLayout {
     pub vector_align: Vec<(Size, AbiAndPrefAlign)>,
 
     pub instruction_address_space: AddressSpace,
+    pub data_address_space: AddressSpace,
 }
 
 impl Default for TargetDataLayout {
@@ -60,6 +61,7 @@ impl Default for TargetDataLayout {
                 (Size::from_bits(128), AbiAndPrefAlign::new(align(128))),
             ],
             instruction_address_space: AddressSpace::DATA,
+            data_address_space: AddressSpace::DATA,
         }
     }
 }
@@ -99,6 +101,15 @@ impl TargetDataLayout {
         };
 
         let mut dl = TargetDataLayout::default();
+        // Layout for pointers can be specified for different address spaces.
+        // I'm (seharris) not aware of any defined order in the data layout string.
+        // As a result, we may not know the data adress space until after the pointer info.
+        // To get round this, `pointer_info` is used to keep all of the info we see.
+        // Once we're done parsing we can then find the relevant entry.
+        // Using a vector implies some O(n) searching, but data layouts are typically short.
+        // (n should be small enough it doesn't matter, and this is nice and simple)
+        // Contained data: (pointer addres space, size, alignment)
+        let mut pointer_info = Vec::new();
         let mut i128_align_src = 64;
         for spec in target.data_layout.split('-') {
             let spec_parts = spec.split(':').collect::<Vec<_>>();
@@ -109,12 +120,24 @@ impl TargetDataLayout {
                 [p] if p.starts_with('P') => {
                     dl.instruction_address_space = parse_address_space(&p[1..], "P")?
                 }
+                [p] if p.starts_with('A') => {
+                    dl.data_address_space = parse_address_space(&p[1..], "A")?
+                }
                 ["a", ref a @ ..] => dl.aggregate_align = align(a, "a")?,
                 ["f32", ref a @ ..] => dl.f32_align = align(a, "f32")?,
                 ["f64", ref a @ ..] => dl.f64_align = align(a, "f64")?,
-                [p @ "p", s, ref a @ ..] | [p @ "p0", s, ref a @ ..] => {
-                    dl.pointer_size = size(s, p)?;
-                    dl.pointer_align = align(a, p)?;
+                [p, s, ref a @ ..] if p.starts_with('p') => {
+                    // The extra f appears to be an extension added in CHERI LLVM.
+                    // I (seharris) don't currently know what it means, so we just ignore it.
+                    let prefix_len = if p.starts_with("pf") { 2 } else { 1 };
+                    let address_space = if p.len() > prefix_len {
+                        parse_address_space(&p[prefix_len..], "p")?
+                    } else {
+                        AddressSpace::DATA
+                    };
+                    let size = size(s, p)?;
+                    let align = align(a, p)?;
+                    pointer_info.push((address_space, size, align));
                 }
                 [s, ref a @ ..] if s.starts_with('i') => {
                     let bits = match s[1..].parse::<u64>() {
@@ -151,6 +174,14 @@ impl TargetDataLayout {
                     dl.vector_align.push((v_size, a));
                 }
                 _ => {} // Ignore everything else.
+            }
+        }
+
+        // Look for pointer layout information to match data address space.
+        for (address_space, size, align) in pointer_info {
+            if address_space == dl.data_address_space {
+                dl.pointer_size = size;
+                dl.pointer_align = align;
             }
         }
 
