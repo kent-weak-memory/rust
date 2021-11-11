@@ -924,7 +924,7 @@ impl<'tcx, 'a, Tag: Copy, Extra> AllocRefMut<'a, 'tcx, Tag, Extra> {
         offset: Size,
         val: ScalarMaybeUninit<Tag>,
     ) -> InterpResult<'tcx> {
-        self.write_scalar(alloc_range(offset, self.tcx.data_layout().pointer_size), val)
+        self.write_scalar(alloc_range(offset, self.tcx.data_layout().pointer_range), val)
     }
 }
 
@@ -937,7 +937,7 @@ impl<'tcx, 'a, Tag: Copy, Extra> AllocRef<'a, 'tcx, Tag, Extra> {
     }
 
     pub fn read_ptr_sized(&self, offset: Size) -> InterpResult<'tcx, ScalarMaybeUninit<Tag>> {
-        self.read_scalar(alloc_range(offset, self.tcx.data_layout().pointer_size))
+        self.read_scalar(alloc_range(offset, self.tcx.data_layout().pointer_range))
     }
 
     pub fn check_bytes(&self, range: AllocRange, allow_uninit_and_ptr: bool) -> InterpResult<'tcx> {
@@ -1138,7 +1138,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
     pub fn scalar_to_ptr(&self, scalar: Scalar<M::PointerTag>) -> Pointer<Option<M::PointerTag>> {
         // We use `to_bits_or_ptr_internal` since we are just implementing the method people need to
         // call to force getting out a pointer.
-        match scalar.to_bits_or_ptr_internal(self.pointer_size()) {
+        match scalar.to_bits_or_ptr_internal(self.pointer_range()) {
             Err(ptr) => ptr.into(),
             Ok(bits) => {
                 let addr = u64::try_from(bits).unwrap();

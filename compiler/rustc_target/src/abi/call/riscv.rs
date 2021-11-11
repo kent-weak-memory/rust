@@ -328,7 +328,8 @@ where
         "ilp32d" | "lp64d" => 64,
         _ => 0,
     };
-    let xlen = cx.data_layout().pointer_size.bits();
+    // TODO(seharris): this should be checked by someone who understands this code better.
+    let xlen = cx.data_layout().pointer_width.bits();
 
     let mut avail_gprs = 8;
     let mut avail_fprs = 8;

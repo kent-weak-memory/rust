@@ -377,7 +377,7 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
                     );
                 }
 
-                let target_width = self.tcx.sess.target.pointer_width;
+                let target_width = self.tcx.sess.target.pointer_range;
 
                 let size = Size::from_bits(match switch_ty.kind() {
                     ty::Uint(uint) => uint.normalize(target_width).bit_width().unwrap(),

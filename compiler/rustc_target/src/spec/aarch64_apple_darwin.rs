@@ -17,6 +17,7 @@ pub fn target() -> Target {
 
     Target {
         llvm_target,
+        pointer_range: 64,
         pointer_width: 64,
         data_layout: "e-m:o-i64:64-i128:128-n32:64-S128".to_string(),
         arch: arch.to_string(),

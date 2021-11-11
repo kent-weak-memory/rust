@@ -3,6 +3,7 @@ use crate::spec::{CodeModel, Target, TargetOptions};
 pub fn target() -> Target {
     Target {
         llvm_target: "riscv32-unknown-linux-gnu".to_string(),
+        pointer_range: 32,
         pointer_width: 32,
         data_layout: "e-m:e-p:32:32-i64:64-n32-S128".to_string(),
         arch: "riscv32".to_string(),

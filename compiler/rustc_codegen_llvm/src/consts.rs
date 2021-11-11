@@ -22,7 +22,7 @@ use tracing::debug;
 pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll Value {
     let mut llvals = Vec::with_capacity(alloc.relocations().len() + 1);
     let dl = cx.data_layout();
-    let pointer_size = dl.pointer_size.bytes() as usize;
+    let pointer_range = dl.pointer_range.bytes() as usize;
 
     let mut next_offset = 0;
     for &(offset, alloc_id) in alloc.relocations().iter() {
@@ -44,7 +44,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
             // This `inspect` is okay since it is within the bounds of the allocation, it doesn't
             // affect interpreter execution (we inspect the result after interpreter execution),
             // and we properly interpret the relocation as a relocation pointer offset.
-            alloc.inspect_with_uninit_and_ptr_outside_interpreter(offset..(offset + pointer_size)),
+            alloc.inspect_with_uninit_and_ptr_outside_interpreter(offset..(offset + pointer_range)),
         )
         .expect("const_alloc_to_llvm: could not read relocation pointer")
             as u64;
@@ -62,7 +62,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
             &Scalar { value: Primitive::Pointer, valid_range: 0..=!0 },
             cx.type_i8p_ext(address_space),
         ));
-        next_offset = offset + pointer_size;
+        next_offset = offset + pointer_range;
     }
     if alloc.len() >= next_offset {
         let range = next_offset..alloc.len();

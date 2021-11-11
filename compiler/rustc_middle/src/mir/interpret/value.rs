@@ -184,7 +184,7 @@ impl<Tag> Scalar<Tag> {
 
     #[inline(always)]
     pub fn from_pointer(ptr: Pointer<Tag>, cx: &impl HasDataLayout) -> Self {
-        Scalar::Ptr(ptr, u8::try_from(cx.pointer_size().bytes()).unwrap())
+        Scalar::Ptr(ptr, u8::try_from(cx.pointer_range().bytes()).unwrap())
     }
 
     /// Create a Scalar from a pointer with an `Option<_>` tag (where `None` represents a plain integer).
@@ -192,14 +192,14 @@ impl<Tag> Scalar<Tag> {
         match ptr.into_parts() {
             (Some(tag), offset) => Scalar::from_pointer(Pointer::new(tag, offset), cx),
             (None, offset) => {
-                Scalar::Int(ScalarInt::try_from_uint(offset.bytes(), cx.pointer_size()).unwrap())
+                Scalar::Int(ScalarInt::try_from_uint(offset.bytes(), cx.pointer_range()).unwrap())
             }
         }
     }
 
     #[inline]
     pub fn null_ptr(cx: &impl HasDataLayout) -> Self {
-        Scalar::Int(ScalarInt::null(cx.pointer_size()))
+        Scalar::Int(ScalarInt::null(cx.pointer_range()))
     }
 
     #[inline]
@@ -246,7 +246,7 @@ impl<Tag> Scalar<Tag> {
 
     #[inline]
     pub fn from_machine_usize(i: u64, cx: &impl HasDataLayout) -> Self {
-        Self::from_uint(i, cx.data_layout().pointer_size)
+        Self::from_uint(i, cx.data_layout().pointer_range)
     }
 
     #[inline]
@@ -273,7 +273,7 @@ impl<Tag> Scalar<Tag> {
 
     #[inline]
     pub fn from_machine_isize(i: i64, cx: &impl HasDataLayout) -> Self {
-        Self::from_int(i, cx.data_layout().pointer_size)
+        Self::from_int(i, cx.data_layout().pointer_range)
     }
 
     #[inline]
@@ -402,7 +402,7 @@ impl<'tcx, Tag: Provenance> Scalar<Tag> {
     }
 
     pub fn to_machine_usize(self, cx: &impl HasDataLayout) -> InterpResult<'static, u64> {
-        let b = self.to_bits(cx.data_layout().pointer_size)?;
+        let b = self.to_bits(cx.data_layout().pointer_range)?;
         Ok(u64::try_from(b).unwrap())
     }
 
@@ -439,7 +439,7 @@ impl<'tcx, Tag: Provenance> Scalar<Tag> {
     }
 
     pub fn to_machine_isize(self, cx: &impl HasDataLayout) -> InterpResult<'static, i64> {
-        let sz = cx.data_layout().pointer_size;
+        let sz = cx.data_layout().pointer_range;
         let b = self.to_bits(sz)?;
         let b = sz.sign_extend(b) as i128;
         Ok(i64::try_from(b).unwrap())

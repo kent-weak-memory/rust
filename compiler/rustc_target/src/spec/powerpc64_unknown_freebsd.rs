@@ -9,6 +9,7 @@ pub fn target() -> Target {
 
     Target {
         llvm_target: "powerpc64-unknown-freebsd".to_string(),
+        pointer_range: 64,
         pointer_width: 64,
         data_layout: "E-m:e-i64:64-n32:64".to_string(),
         arch: "powerpc64".to_string(),

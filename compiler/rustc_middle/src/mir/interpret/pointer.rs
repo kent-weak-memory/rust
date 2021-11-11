@@ -14,25 +14,30 @@ pub trait PointerArithmetic: HasDataLayout {
     // These are not supposed to be overridden.
 
     #[inline(always)]
-    fn pointer_size(&self) -> Size {
-        self.data_layout().pointer_size
+    fn pointer_range(&self) -> Size {
+        self.data_layout().pointer_range
+    }
+
+    #[inline(always)]
+    fn pointer_width(&self) -> Size {
+        self.data_layout().pointer_width
     }
 
     #[inline]
     fn machine_usize_max(&self) -> u64 {
-        let max_usize_plus_1 = 1u128 << self.pointer_size().bits();
+        let max_usize_plus_1 = 1u128 << self.pointer_range().bits();
         u64::try_from(max_usize_plus_1 - 1).unwrap()
     }
 
     #[inline]
     fn machine_isize_min(&self) -> i64 {
-        let max_isize_plus_1 = 1i128 << (self.pointer_size().bits() - 1);
+        let max_isize_plus_1 = 1i128 << (self.pointer_range().bits() - 1);
         i64::try_from(-max_isize_plus_1).unwrap()
     }
 
     #[inline]
     fn machine_isize_max(&self) -> i64 {
-        let max_isize_plus_1 = 1u128 << (self.pointer_size().bits() - 1);
+        let max_isize_plus_1 = 1u128 << (self.pointer_range().bits() - 1);
         i64::try_from(max_isize_plus_1 - 1).unwrap()
     }
 
@@ -43,7 +48,7 @@ pub trait PointerArithmetic: HasDataLayout {
         if val > self.machine_isize_max() {
             // This can only happen the the ptr size is < 64, so we know max_usize_plus_1 fits into
             // i64.
-            let max_usize_plus_1 = 1u128 << self.pointer_size().bits();
+            let max_usize_plus_1 = 1u128 << self.pointer_range().bits();
             val - i64::try_from(max_usize_plus_1).unwrap()
         } else {
             val
@@ -56,7 +61,7 @@ pub trait PointerArithmetic: HasDataLayout {
     #[inline]
     fn truncate_to_ptr(&self, (val, over): (u64, bool)) -> (u64, bool) {
         let val = u128::from(val);
-        let max_ptr_plus_1 = 1u128 << self.pointer_size().bits();
+        let max_ptr_plus_1 = 1u128 << self.pointer_range().bits();
         (u64::try_from(val % max_ptr_plus_1).unwrap(), over || val >= max_ptr_plus_1)
     }
 

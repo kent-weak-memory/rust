@@ -28,7 +28,15 @@ pub struct TargetDataLayout {
     pub i128_align: AbiAndPrefAlign,
     pub f32_align: AbiAndPrefAlign,
     pub f64_align: AbiAndPrefAlign,
-    pub pointer_size: Size,
+    /// Size of pointer as stored in memory.
+    /// This is distinct from `pointer_range` because systems like CHERI add metadata to pointers.
+    // TODO(seharris): should this stay "size" for consistency, or "width" to highlight change?
+    pub pointer_width: Size,
+    /// Size of the part of pointers that actually contains an address.
+    /// This defines the addressable range, but not the space needed in memory layout.
+    pub pointer_range: Size,
+    /// Pointer alignment used for memory layout.
+    /// The size of the address information within the pointer may be unrelated (see above).
     pub pointer_align: AbiAndPrefAlign,
     pub aggregate_align: AbiAndPrefAlign,
 
@@ -53,7 +61,8 @@ impl Default for TargetDataLayout {
             i128_align: AbiAndPrefAlign { abi: align(32), pref: align(64) },
             f32_align: AbiAndPrefAlign::new(align(32)),
             f64_align: AbiAndPrefAlign::new(align(64)),
-            pointer_size: Size::from_bits(64),
+            pointer_width: Size::from_bits(64),
+            pointer_range: Size::from_bits(64),
             pointer_align: AbiAndPrefAlign::new(align(64)),
             aggregate_align: AbiAndPrefAlign { abi: align(0), pref: align(64) },
             vector_align: vec![
@@ -108,7 +117,7 @@ impl TargetDataLayout {
         // Once we're done parsing we can then find the relevant entry.
         // Using a vector implies some O(n) searching, but data layouts are typically short.
         // (n should be small enough it doesn't matter, and this is nice and simple)
-        // Contained data: (pointer addres space, size, alignment)
+        // Contained data: (pointer addres space, width, range, alignment)
         let mut pointer_info = Vec::new();
         let mut i128_align_src = 64;
         for spec in target.data_layout.split('-') {
@@ -135,9 +144,12 @@ impl TargetDataLayout {
                     } else {
                         AddressSpace::DATA
                     };
-                    let size = size(s, p)?;
+                    let width = size(s, p)?;
                     let align = align(a, p)?;
-                    pointer_info.push((address_space, size, align));
+                    let range = a.get(2).copied().map_or(Ok(width), |bits| {
+                    	parse_bits(bits, "range", p).map(Size::from_bits)
+                    })?;
+                    pointer_info.push((address_space, width, range, align));
                 }
                 [s, ref a @ ..] if s.starts_with('i') => {
                     let bits = match s[1..].parse::<u64>() {
@@ -178,9 +190,10 @@ impl TargetDataLayout {
         }
 
         // Look for pointer layout information to match data address space.
-        for (address_space, size, align) in pointer_info {
+        for (address_space, width, range, align) in pointer_info {
             if address_space == dl.data_address_space {
-                dl.pointer_size = size;
+                dl.pointer_width = width;
+                dl.pointer_range = range;
                 dl.pointer_align = align;
             }
         }
@@ -195,12 +208,21 @@ impl TargetDataLayout {
             ));
         }
 
-        if dl.pointer_size.bits() != target.pointer_width.into() {
+        if dl.pointer_width.bits() != target.pointer_width.into() {
             return Err(format!(
                 "inconsistent target specification: \"data-layout\" claims \
-                 pointers are {}-bit, while \"target-pointer-width\" is `{}`",
-                dl.pointer_size.bits(),
+                 pointer representation is {}-bit, while \"target-pointer-width\" is `{}`",
+                dl.pointer_width.bits(),
                 target.pointer_width
+            ));
+        }
+
+        if dl.pointer_range.bits() != target.pointer_range.into() {
+            return Err(format!(
+                "inconsistent target specification: \"data-layout\" claims \
+                 pointer addresses are {}-bit, while \"target-pointer-range\" is `{}`",
+                dl.pointer_range.bits(),
+                target.pointer_range
             ));
         }
 
@@ -219,7 +241,7 @@ impl TargetDataLayout {
     /// currently conservatively bounded to 1 << 47 as that is enough to cover the current usable
     /// address space on 64-bit ARMv8 and x86_64.
     pub fn obj_size_bound(&self) -> u64 {
-        match self.pointer_size.bits() {
+        match self.pointer_range.bits() {
             16 => 1 << 15,
             32 => 1 << 31,
             64 => 1 << 47,
@@ -227,12 +249,15 @@ impl TargetDataLayout {
         }
     }
 
+    /// Returns an integer wide enough to hold the address component of a pointer.
+    /// On architectures like x86 this means the same size as a pointer.
+    /// On architectures like CHERI this means smaller, because metadata is excluded.
     pub fn ptr_sized_integer(&self) -> Integer {
-        match self.pointer_size.bits() {
+        match self.pointer_range.bits() {
             16 => I16,
             32 => I32,
             64 => I64,
-            bits => panic!("ptr_sized_integer: unknown pointer bit size {}", bits),
+            bits => panic!("ptr_sized_integer: unknown pointer range bit size {}", bits),
         }
     }
 
@@ -667,7 +692,7 @@ impl Primitive {
             Int(i, _) => i.size(),
             F32 => Size::from_bits(32),
             F64 => Size::from_bits(64),
-            Pointer => dl.pointer_size,
+            Pointer => dl.pointer_width,
         }
     }
 

@@ -2114,6 +2114,10 @@ fn prepare_enum_metadata(
                 Int(t, _) => t,
                 F32 => Integer::I32,
                 F64 => Integer::I64,
+                // TODO(seharris): It isn't clear exactly what's going on here.
+                //                 If this is just used for comparison this is fine.
+                //                 If this is cast back to a pointer it's wrong.
+                //                 If this is meant to match the size of a pointer it's wrong.
                 Pointer => cx.data_layout().ptr_sized_integer(),
             }
             .to_ty(cx.tcx, false);

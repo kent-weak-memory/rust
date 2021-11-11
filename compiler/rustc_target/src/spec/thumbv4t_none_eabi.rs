@@ -13,6 +13,7 @@ use crate::spec::{LinkerFlavor, Target, TargetOptions};
 pub fn target() -> Target {
     Target {
         llvm_target: "thumbv4t-none-eabi".to_string(),
+        pointer_range: 32,
         pointer_width: 32,
         arch: "arm".to_string(),
         /* Data layout args are '-' separated:

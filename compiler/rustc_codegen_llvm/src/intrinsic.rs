@@ -310,7 +310,7 @@ impl IntrinsicCallMethods<'tcx> for Builder<'a, 'll, 'tcx> {
                         // For rusty ABIs, small aggregates are actually passed
                         // as `RegKind::Integer` (see `FnAbi::adjust_for_abi`),
                         // so we re-use that same threshold here.
-                        layout.size <= self.data_layout().pointer_size * 2
+                        layout.size <= self.data_layout().pointer_width * 2
                     }
                 };
 
@@ -1018,11 +1018,11 @@ fn generic_simd_intrinsic(
         let (i_xn, in_elem_bitwidth) = match in_elem.kind() {
             ty::Int(i) => (
                 args[0].immediate(),
-                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_size.bits()),
+                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_range.bits()),
             ),
             ty::Uint(i) => (
                 args[0].immediate(),
-                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_size.bits()),
+                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_range.bits()),
             ),
             _ => return_error!(
                 "vector argument `{}`'s element type `{}`, expected integer element type",
@@ -1727,7 +1727,7 @@ unsupported {} from `{}` with element `{}` of size `{}` to `{}`"#,
         let lhs = args[0].immediate();
         let rhs = args[1].immediate();
         let is_add = name == sym::simd_saturating_add;
-        let ptr_bits = bx.tcx().data_layout.pointer_size.bits() as _;
+        let ptr_bits = bx.tcx().data_layout.pointer_range.bits() as _;
         let (signed, elem_width, elem_ty) = match *in_elem.kind() {
             ty::Int(i) => (true, i.bit_width().unwrap_or(ptr_bits), bx.cx.type_int_from_ty(i)),
             ty::Uint(i) => (false, i.bit_width().unwrap_or(ptr_bits), bx.cx.type_uint_from_ty(i)),
@@ -1768,10 +1768,10 @@ unsupported {} from `{}` with element `{}` of size `{}` to `{}`"#,
 fn int_type_width_signed(ty: Ty<'_>, cx: &CodegenCx<'_, '_>) -> Option<(u64, bool)> {
     match ty.kind() {
         ty::Int(t) => {
-            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_width)), true))
+            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_range)), true))
         }
         ty::Uint(t) => {
-            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_width)), false))
+            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_range)), false))
         }
         _ => None,
     }

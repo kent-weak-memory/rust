@@ -315,8 +315,8 @@ impl BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
         use rustc_middle::ty::{IntTy::*, UintTy::*};
 
         let new_kind = match ty.kind() {
-            Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_width)),
-            Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_width)),
+            Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_range)),
+            Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_range)),
             t @ (Uint(_) | Int(_)) => t.clone(),
             _ => panic!("tried to get overflow intrinsic for op applied to non-int type"),
         };

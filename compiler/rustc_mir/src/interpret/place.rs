@@ -673,7 +673,7 @@ where
             assert!(!dest.layout.is_unsized(), "Cannot write unsized data");
             match src {
                 Immediate::Scalar(ScalarMaybeUninit::Scalar(Scalar::Ptr(..))) => assert_eq!(
-                    self.pointer_size(),
+                    self.pointer_width(),
                     dest.layout.size,
                     "Size mismatch when writing pointer"
                 ),

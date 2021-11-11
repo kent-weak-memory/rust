@@ -45,7 +45,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         vtable: Pointer<Option<M::PointerTag>>,
         idx: u64,
     ) -> InterpResult<'tcx, FnVal<'tcx, M::ExtraFnVal>> {
-        let ptr_size = self.pointer_size();
+        let ptr_size = self.pointer_range();
         let vtable_slot = vtable.offset(ptr_size * idx, self)?;
         let vtable_slot = self
             .memory
@@ -60,19 +60,19 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         &self,
         vtable: Pointer<Option<M::PointerTag>>,
     ) -> InterpResult<'tcx, (ty::Instance<'tcx>, Ty<'tcx>)> {
-        let pointer_size = self.pointer_size();
+        let pointer_range = self.pointer_range();
         // We don't care about the pointee type; we just want a pointer.
         let vtable = self
             .memory
             .get(
                 vtable,
-                pointer_size * u64::try_from(COMMON_VTABLE_ENTRIES.len()).unwrap(),
+                pointer_range * u64::try_from(COMMON_VTABLE_ENTRIES.len()).unwrap(),
                 self.tcx.data_layout.pointer_align.abi,
             )?
             .expect("cannot be a ZST");
         let drop_fn = vtable
             .read_ptr_sized(
-                pointer_size * u64::try_from(COMMON_VTABLE_ENTRIES_DROPINPLACE).unwrap(),
+                pointer_range * u64::try_from(COMMON_VTABLE_ENTRIES_DROPINPLACE).unwrap(),
             )?
             .check_init()?;
         // We *need* an instance here, no other kind of function value, to be able
@@ -95,23 +95,23 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         &self,
         vtable: Pointer<Option<M::PointerTag>>,
     ) -> InterpResult<'tcx, (Size, Align)> {
-        let pointer_size = self.pointer_size();
+        let pointer_range = self.pointer_range();
         // We check for `size = 3 * ptr_size`, which covers the drop fn (unused here),
         // the size, and the align (which we read below).
         let vtable = self
             .memory
             .get(
                 vtable,
-                pointer_size * u64::try_from(COMMON_VTABLE_ENTRIES.len()).unwrap(),
+                pointer_range * u64::try_from(COMMON_VTABLE_ENTRIES.len()).unwrap(),
                 self.tcx.data_layout.pointer_align.abi,
             )?
             .expect("cannot be a ZST");
         let size = vtable
-            .read_ptr_sized(pointer_size * u64::try_from(COMMON_VTABLE_ENTRIES_SIZE).unwrap())?
+            .read_ptr_sized(pointer_range * u64::try_from(COMMON_VTABLE_ENTRIES_SIZE).unwrap())?
             .check_init()?;
         let size = size.to_machine_usize(self)?;
         let align = vtable
-            .read_ptr_sized(pointer_size * u64::try_from(COMMON_VTABLE_ENTRIES_ALIGN).unwrap())?
+            .read_ptr_sized(pointer_range * u64::try_from(COMMON_VTABLE_ENTRIES_ALIGN).unwrap())?
             .check_init()?;
         let align = align.to_machine_usize(self)?;
         let align = Align::from_bytes(align).map_err(|e| err_ub!(InvalidVtableAlignment(e)))?;

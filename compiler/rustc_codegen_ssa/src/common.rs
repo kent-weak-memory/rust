@@ -211,7 +211,7 @@ pub fn asm_const_to_str<'tcx>(
     let value = scalar.assert_bits(ty_and_layout.size);
     match ty_and_layout.ty.kind() {
         ty::Uint(_) => value.to_string(),
-        ty::Int(int_ty) => match int_ty.normalize(tcx.sess.target.pointer_width) {
+        ty::Int(int_ty) => match int_ty.normalize(tcx.sess.target.pointer_range) {
             ty::IntTy::I8 => (value as i8).to_string(),
             ty::IntTy::I16 => (value as i16).to_string(),
             ty::IntTy::I32 => (value as i32).to_string(),

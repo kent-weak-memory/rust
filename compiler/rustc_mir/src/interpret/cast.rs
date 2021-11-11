@@ -153,8 +153,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 return Ok(**src);
             } else {
                 // Casting the metadata away from a fat ptr.
-                assert_eq!(src.layout.size, 2 * self.memory.pointer_size());
-                assert_eq!(dest_layout.size, self.memory.pointer_size());
+                assert_eq!(src.layout.size, 2 * self.memory.pointer_range());
+                assert_eq!(dest_layout.size, self.memory.pointer_range());
                 assert!(src.layout.ty.is_unsafe_ptr());
                 return match **src {
                     Immediate::ScalarPair(data, _) => Ok(data.into()),
@@ -195,7 +195,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let size = match *cast_ty.kind() {
                     Int(t) => Integer::from_int_ty(self, t).size(),
                     Uint(t) => Integer::from_uint_ty(self, t).size(),
-                    RawPtr(_) => self.pointer_size(),
+                    RawPtr(_) => self.pointer_range(),
                     _ => bug!(),
                 };
                 let v = size.truncate(v);

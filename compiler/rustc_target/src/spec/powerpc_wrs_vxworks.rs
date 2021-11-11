@@ -9,6 +9,7 @@ pub fn target() -> Target {
 
     Target {
         llvm_target: "powerpc-unknown-linux-gnu".to_string(),
+        pointer_range: 32,
         pointer_width: 32,
         data_layout: "E-m:e-p:32:32-i64:64-n32".to_string(),
         arch: "powerpc".to_string(),
