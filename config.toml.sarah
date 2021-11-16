@@ -7,13 +7,17 @@ changelog-seen = 2
 # TODO: remove "aarch64-unknown-freebsd" when it's no longer useful for testing cross-compiling
 target = ["x86_64-unknown-linux-gnu", "aarch64-unknown-freebsd"]
 
+# Replace with whatever architecture you're building and running the compiler from.
 [target.x86_64-unknown-linux-gnu]
-# Use Morello build of LLVM just to check nothing is entirely broken.
+# Use Morello build of LLVM, this seems to control what the compiler is linked with.
+# The Morello fork seems to support all the normal architectures, plus Morello-specific options.
+# We need the Morello-specific options so that we can cross compile.
+# You'll need a Morello SDK build: `cheribuild.py cheribsd-morello-purecap`
 llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
 
 [target.aarch64-unknown-freebsd]
-# Use Morello SDK build of LLVM, which should support all the normal targets too
-llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
+# This doesn't appear to do anything, presumably only the one for the host has any effect?
+# llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
 # These wrappers force clang to use the right target and system libraries.
 # Without it, the build system appears to default to host libc/libm/etc, which are the wrong arch.
 # It'd be cleaner just to pass the extra flags, but I haven't found an option for that.
@@ -33,9 +37,9 @@ ar = "/home/cheribuild/output/morello-sdk/bin/ar"
 ranlib = "/home/cheribuild/output/morello-sdk/bin/ranlib"
 
 [target.aarch64-unknown-freebsd-purecap]
-# Basically the same as FreeBSD, but you'll need a Morello CHERI BSD build:
-# `cheribuild.py cheribsd-morello-purecap`
-llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
+# This doesn't appear to do anything, presumably only the one for the host has any effect?
+# llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
+# Options needed for building the standard library, as and when that's supported.
 cc = "/home/rust-20211014/clang-morello.sh"
 cxx = "/home/rust-20211014/clang++-morello.sh"
 ar = "/home/cheribuild/output/morello-sdk/bin/ar"
