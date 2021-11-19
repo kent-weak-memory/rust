@@ -1332,7 +1332,7 @@ impl<'tcx> LateLintPass<'tcx> for VariantSizeDifferences {
                 _ => return,
             };
 
-            let tag_size = tag.value.size(&cx.tcx).bytes();
+            let tag_size = tag.value.width(&cx.tcx).bytes();
 
             debug!(
                 "enum `{}` is {} bytes large with layout:\n{:#?}",

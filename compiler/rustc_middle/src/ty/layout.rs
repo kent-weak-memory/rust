@@ -69,7 +69,7 @@ impl IntegerExt for Integer {
             attr::SignedInt(ast::IntTy::I64) | attr::UnsignedInt(ast::UintTy::U64) => I64,
             attr::SignedInt(ast::IntTy::I128) | attr::UnsignedInt(ast::UintTy::U128) => I128,
             attr::SignedInt(ast::IntTy::Isize) | attr::UnsignedInt(ast::UintTy::Usize) => {
-                dl.ptr_sized_integer()
+                dl.ptr_ranged_integer()
             }
         }
     }
@@ -81,7 +81,7 @@ impl IntegerExt for Integer {
             ty::IntTy::I32 => I32,
             ty::IntTy::I64 => I64,
             ty::IntTy::I128 => I128,
-            ty::IntTy::Isize => cx.data_layout().ptr_sized_integer(),
+            ty::IntTy::Isize => cx.data_layout().ptr_ranged_integer(),
         }
     }
     fn from_uint_ty<C: HasDataLayout>(cx: &C, ity: ty::UintTy) -> Integer {
@@ -91,7 +91,7 @@ impl IntegerExt for Integer {
             ty::UintTy::U32 => I32,
             ty::UintTy::U64 => I64,
             ty::UintTy::U128 => I128,
-            ty::UintTy::Usize => cx.data_layout().ptr_sized_integer(),
+            ty::UintTy::Usize => cx.data_layout().ptr_ranged_integer(),
         }
     }
 
@@ -279,8 +279,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         let dl = self.data_layout();
         let b_align = b.value.align(dl);
         let align = a.value.align(dl).max(b_align).max(dl.aggregate_align);
-        let b_offset = a.value.size(dl).align_to(b_align.abi);
-        let size = (b_offset + b.value.size(dl)).align_to(align.abi);
+        let b_offset = a.value.width(dl).align_to(b_align.abi);
+        let size = (b_offset + b.value.width(dl)).align_to(align.abi);
 
         // HACK(nox): We iter on `b` and then `a` because `max_by_key`
         // returns the last maximum.
@@ -506,7 +506,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         let param_env = self.param_env;
         let dl = self.data_layout();
         let scalar_unit = |value: Primitive| {
-            let bits = value.size(dl).bits();
+            let bits = value.range(dl).bits();
             assert!(bits <= 128);
             Scalar { value, valid_range: 0..=(!0 >> (128 - bits)) }
         };
@@ -566,7 +566,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     ty::Foreign(..) => {
                         return Ok(tcx.intern_layout(Layout::scalar(self, data_ptr)));
                     }
-                    ty::Slice(_) | ty::Str => scalar_unit(Int(dl.ptr_sized_integer(), false)),
+                    ty::Slice(_) | ty::Str => scalar_unit(Int(dl.ptr_ranged_integer(), false)),
                     ty::Dynamic(..) => {
                         let mut vtable = scalar_unit(Pointer);
                         vtable.valid_range = 1..=*vtable.valid_range.end();
@@ -1268,7 +1268,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     valid_range: (min as u128 & tag_mask)..=(max as u128 & tag_mask),
                 };
                 let mut abi = Abi::Aggregate { sized: true };
-                if tag.value.size(dl) == size {
+                if tag.value.width(dl) == size {
                     abi = Abi::Scalar(tag.clone());
                 } else {
                     // Try to use a ScalarPair for all tagged enums.
@@ -1842,7 +1842,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     adt_kind.into(),
                     adt_packed,
                     match tag_encoding {
-                        TagEncoding::Direct => Some(tag.value.size(self)),
+                        TagEncoding::Direct => Some(tag.value.width(self)),
                         _ => None,
                     },
                     variant_infos,
@@ -2411,7 +2411,7 @@ where
                 let mut result = None;
 
                 if let Some(variant) = data_variant {
-                    let ptr_end = offset + Pointer.size(cx);
+                    let ptr_end = offset + Pointer.width(cx);
                     for i in 0..variant.fields.count() {
                         let field_start = variant.fields.offset(i);
                         if field_start <= offset {
@@ -2965,7 +2965,7 @@ where
 
                 // Pass and return structures up to 2 pointers in size by value, matching `ScalarPair`.
                 // LLVM will usually pass these in 2 registers, which is more efficient than by-ref.
-                let max_by_val_size = Pointer.size(cx) * 2;
+                let max_by_val_size = Pointer.width(cx) * 2;
                 let size = arg.layout.size;
 
                 if arg.layout.is_unsized() || size > max_by_val_size {

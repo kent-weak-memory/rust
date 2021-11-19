@@ -496,7 +496,7 @@ impl BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
             });
             OperandValue::Immediate(self.to_immediate(llval, place.layout))
         } else if let abi::Abi::ScalarPair(ref a, ref b) = place.layout.abi {
-            let b_offset = a.value.size(self).align_to(b.value.align(self).abi);
+            let b_offset = a.value.width(self).align_to(b.value.align(self).abi);
 
             let mut load = |i, scalar: &abi::Scalar, align| {
                 let llptr = self.struct_gep(place.llval, i as u64);

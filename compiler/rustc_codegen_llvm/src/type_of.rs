@@ -336,7 +336,7 @@ impl<'tcx> LayoutLlvmExt<'tcx> for TyAndLayout<'tcx> {
         }
 
         let offset =
-            if index == 0 { Size::ZERO } else { a.value.size(cx).align_to(b.value.align(cx).abi) };
+            if index == 0 { Size::ZERO } else { a.value.width(cx).align_to(b.value.align(cx).abi) };
         self.scalar_llvm_type_at(cx, scalar, offset)
     }
 

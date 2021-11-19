@@ -252,12 +252,12 @@ impl TargetDataLayout {
     /// Returns an integer wide enough to hold the address component of a pointer.
     /// On architectures like x86 this means the same size as a pointer.
     /// On architectures like CHERI this means smaller, because metadata is excluded.
-    pub fn ptr_sized_integer(&self) -> Integer {
+    pub fn ptr_ranged_integer(&self) -> Integer {
         match self.pointer_range.bits() {
             16 => I16,
             32 => I32,
             64 => I64,
-            bits => panic!("ptr_sized_integer: unknown pointer range bit size {}", bits),
+            bits => panic!("ptr_ranged_integer: unknown pointer range bit size {}", bits),
         }
     }
 
@@ -685,7 +685,8 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub fn size<C: HasDataLayout>(self, cx: &C) -> Size {
+    /// Size of the type as represented in memory during program execution.
+    pub fn width<C: HasDataLayout>(self, cx: &C) -> Size {
         let dl = cx.data_layout();
 
         match self {
@@ -693,6 +694,19 @@ impl Primitive {
             F32 => Size::from_bits(32),
             F64 => Size::from_bits(64),
             Pointer => dl.pointer_width,
+        }
+    }
+
+    /// Size of the data-carrying part of the type.
+    /// This is currently only relevant to pointers on CHERI architectures.
+    pub fn range<C: HasDataLayout>(self, cx: &C) -> Size {
+        let dl = cx.data_layout();
+
+        match self {
+            Int(i, _) => i.size(),
+            F32 => Size::from_bits(32),
+            F64 => Size::from_bits(64),
+            Pointer => dl.pointer_range,
         }
     }
 
@@ -751,7 +765,7 @@ impl Scalar {
         // For a (max) value of -1, max will be `-1 as usize`, which overflows.
         // However, that is fine here (it would still represent the full range),
         // i.e., if the range is everything.
-        let bits = self.value.size(cx).bits();
+        let bits = self.value.range(cx).bits();
         assert!(bits <= 128);
         let mask = !0u128 >> (128 - bits);
         let start = *self.valid_range.start();
@@ -1005,7 +1019,7 @@ impl Niche {
 
     pub fn available<C: HasDataLayout>(&self, cx: &C) -> u128 {
         let Scalar { value, valid_range: ref v } = self.scalar;
-        let bits = value.size(cx).bits();
+        let bits = value.range(cx).bits();
         assert!(bits <= 128);
         let max_value = !0u128 >> (128 - bits);
 
@@ -1018,7 +1032,7 @@ impl Niche {
         assert!(count > 0);
 
         let Scalar { value, valid_range: ref v } = self.scalar;
-        let bits = value.size(cx).bits();
+        let bits = value.range(cx).bits();
         assert!(bits <= 128);
         let max_value = !0u128 >> (128 - bits);
 
@@ -1082,7 +1096,7 @@ pub struct Layout {
 impl Layout {
     pub fn scalar<C: HasDataLayout>(cx: &C, scalar: Scalar) -> Self {
         let largest_niche = Niche::from_scalar(cx, Size::ZERO, scalar.clone());
-        let size = scalar.value.size(cx);
+        let size = scalar.value.width(cx);
         let align = scalar.value.align(cx);
         Layout {
             variants: Variants::Single { index: VariantIdx::new(0) },

@@ -1624,7 +1624,7 @@ impl EnumMemberDescriptionFactory<'ll, 'tcx> {
                         let value = (i.as_u32() as u128)
                             .wrapping_sub(niche_variants.start().as_u32() as u128)
                             .wrapping_add(niche_start);
-                        let value = tag.value.size(cx).truncate(value);
+                        let value = tag.value.range(cx).truncate(value);
                         // NOTE(eddyb) do *NOT* remove this assert, until
                         // we pass the full 128-bit value to LLVM, otherwise
                         // truncation will be silent and remain undetected.
@@ -1692,7 +1692,7 @@ impl EnumMemberDescriptionFactory<'ll, 'tcx> {
                             "Discriminant$".len(),
                             unknown_file_metadata(cx),
                             UNKNOWN_LINE_NUMBER,
-                            tag.value.size(cx).bits(),
+                            tag.value.width(cx).bits(),
                             tag.value.align(cx).abi.bits() as u32,
                             create_DIArray(DIB(cx), &tags),
                             type_metadata(cx, discr_enum_ty, self.span),
@@ -1997,7 +1997,7 @@ fn prepare_enum_metadata(
         match cached_discriminant_type_metadata {
             Some(discriminant_type_metadata) => discriminant_type_metadata,
             None => {
-                let (discriminant_size, discriminant_align) = (discr.size(cx), discr.align(cx));
+                let (discriminant_size, discriminant_align) = (discr.width(cx), discr.align(cx));
                 let discriminant_base_type_metadata =
                     type_metadata(cx, discr.to_ty(tcx), rustc_span::DUMMY_SP);
 
@@ -2107,18 +2107,14 @@ fn prepare_enum_metadata(
             tag_encoding: TagEncoding::Niche { .. }, ref tag, tag_field, ..
         } => {
             // Find the integer type of the correct size.
-            let size = tag.value.size(cx);
+            let size = tag.value.width(cx);
             let align = tag.value.align(cx);
 
             let tag_type = match tag.value {
                 Int(t, _) => t,
                 F32 => Integer::I32,
                 F64 => Integer::I64,
-                // TODO(seharris): It isn't clear exactly what's going on here.
-                //                 If this is just used for comparison this is fine.
-                //                 If this is cast back to a pointer it's wrong.
-                //                 If this is meant to match the size of a pointer it's wrong.
-                Pointer => cx.data_layout().ptr_sized_integer(),
+                Pointer => cx.data_layout().ptr_ranged_integer(),
             }
             .to_ty(cx.tcx, false);
 

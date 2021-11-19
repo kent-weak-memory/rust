@@ -12,7 +12,7 @@ pub(crate) fn pointer_ty(tcx: TyCtxt<'_>) -> types::Type {
         16 => types::I16,
         32 => types::I32,
         64 => types::I64,
-        bits => bug!("ptr_sized_integer: unknown pointer range bit size {}", bits),
+        bits => bug!("ptr_ranged_integer: unknown pointer range bit size {}", bits),
     }
 }
 

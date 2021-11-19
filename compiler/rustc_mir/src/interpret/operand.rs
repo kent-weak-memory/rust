@@ -265,7 +265,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // We would anyway check against `ptr_align.restrict_for_offset(b_offset)`,
                 // which `ptr.offset(b_offset)` cannot possibly fail to satisfy.
                 let (a, b) = (&a.value, &b.value);
-                let (a_size, b_size) = (a.size(self), b.size(self));
+                let (a_size, b_size) = (a.width(self), b.width(self));
                 let b_offset = a_size.align_to(b.align(self).abi);
                 assert!(b_offset.bytes() > 0); // we later use the offset to tell apart the fields
                 let a_val = alloc.read_scalar(alloc_range(Size::ZERO, a_size))?;

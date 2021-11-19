@@ -759,7 +759,7 @@ where
                         dest.layout
                     ),
                 };
-                let (a_size, b_size) = (a.size(&tcx), b.size(&tcx));
+                let (a_size, b_size) = (a.width(&tcx), b.width(&tcx));
                 let b_offset = a_size.align_to(b.align(&tcx).abi);
 
                 // It is tempting to verify `b_offset` against `layout.fields.offset(1)`,
@@ -1013,7 +1013,7 @@ where
                 // raw discriminants for enums are isize or bigger during
                 // their computation, but the in-memory tag is the smallest possible
                 // representation
-                let size = tag_layout.value.size(self);
+                let size = tag_layout.value.range(self);
                 let tag_val = size.truncate(discr_val);
 
                 let tag_dest = self.place_field(dest, tag_field)?;
