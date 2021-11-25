@@ -346,7 +346,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
         // Now we do the actual reading.
         let bits = read_target_uint(cx.data_layout().endian, bytes).unwrap();
         // See if we got a pointer.
-        if range.size != cx.data_layout().pointer_range {
+        if range.size != cx.data_layout().pointer_width {
             // Not a pointer.
             // *Now*, we better make sure that the inside is free of relocations too.
             self.check_relocations(cx, range)?;
