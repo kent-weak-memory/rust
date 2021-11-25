@@ -297,7 +297,11 @@ impl<Tag> Scalar<Tag> {
         match self {
             Scalar::Int(int) => Ok(int.assert_bits(target_size)),
             Scalar::Ptr(ptr, sz) => {
-                assert_eq!(target_size.bytes(), u64::from(sz));
+                // This allows for cases where more space is allocated for the value than required.
+                // This happens on architectures like CHERI where pointers also have metadata.
+                // When interpreting the full width of pointers is allocated, leaving empty space.
+                // TODO(seharris): is the last line true?
+                assert!(target_size.bytes() >= u64::from(sz));
                 Err(ptr)
             }
         }
