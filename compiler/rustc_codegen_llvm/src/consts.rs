@@ -62,6 +62,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
             &Scalar { value: Primitive::Pointer, valid_range: 0..=!0 },
             cx.type_i8p_ext(address_space),
         ));
+        // TODO(seharris): this doesn't look sensible
         next_offset = offset + pointer_range;
     }
     if alloc.len() >= next_offset {

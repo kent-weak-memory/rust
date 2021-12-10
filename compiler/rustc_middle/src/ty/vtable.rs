@@ -59,6 +59,7 @@ impl<'tcx> TyCtxt<'tcx> {
         let ptr_range = tcx.data_layout.pointer_range;
         let ptr_align = tcx.data_layout.pointer_align.abi;
 
+        // TODO(seharris): this looks wrong and needs more digging
         let vtable_size = ptr_range * u64::try_from(vtable_entries.len()).unwrap();
         let mut vtable =
             Allocation::uninit(vtable_size, ptr_align, /* panic_on_fail */ true).unwrap();

@@ -10,8 +10,8 @@ use rustc_macros::HashStable;
 use rustc_middle::mir;
 use rustc_middle::ty::layout::{PrimitiveExt, TyAndLayout};
 use rustc_middle::ty::{self, Ty};
-use rustc_target::abi::{Abi, Align, FieldsShape, TagEncoding};
-use rustc_target::abi::{HasDataLayout, LayoutOf, Size, VariantIdx, Variants};
+use rustc_target::abi::{self, Abi, Align, FieldsShape, TagEncoding};
+use rustc_target::abi::{HasDataLayout, LayoutOf, Primitive, Size, VariantIdx, Variants};
 
 use super::{
     alloc_range, mir_assign_valid_types, AllocId, AllocRef, AllocRefMut, CheckInAllocMsg,
@@ -678,7 +678,11 @@ where
                     "Size mismatch when writing pointer"
                 ),
                 Immediate::Scalar(ScalarMaybeUninit::Scalar(Scalar::Int(int))) => {
-                    assert_eq!(int.size(), dest.layout.size, "Size mismatch when writing bits")
+                    if let Abi::Scalar(abi::Scalar{value: Primitive::Pointer, valid_range: _}) = dest.layout.abi {
+                        assert_eq!(int.size(), self.pointer_range(), "Size mismatch when writing bits");
+                    } else {
+                        assert_eq!(int.size(), dest.layout.size, "Size mismatch when writing bits")
+                    }
                 }
                 Immediate::Scalar(ScalarMaybeUninit::Uninit) => {} // uninit can have any size
                 Immediate::ScalarPair(_, _) => {
