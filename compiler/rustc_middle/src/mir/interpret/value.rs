@@ -295,7 +295,13 @@ impl<Tag> Scalar<Tag> {
     pub fn to_bits_or_ptr_internal(self, target_size: Size) -> Result<u128, Pointer<Tag>> {
         assert_ne!(target_size.bytes(), 0, "you should never look at the bits of a ZST");
         match self {
-            Scalar::Int(int) => Ok(int.assert_bits(target_size)),
+            Scalar::Int(int) => {
+                // This is a hack to allow platforms with 128 bit pointer
+                // representations (like CHERI) to have pointer values stored in
+                // appropriately large storage without blowing up the compiler.
+                assert!(int.size() <= target_size);
+                Ok(int.assert_bits(int.size()))
+            },
             Scalar::Ptr(ptr, sz) => {
                 // This allows for cases where more space is allocated for the value than required.
                 // This happens on architectures like CHERI where pointers also have metadata.
