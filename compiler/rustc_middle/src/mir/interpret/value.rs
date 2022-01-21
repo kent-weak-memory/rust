@@ -129,10 +129,11 @@ pub enum Scalar<Tag = AllocId> {
     /// relocations, but a `Scalar` is only large enough to contain one, so we just represent the
     /// relocation and its associated offset together as a `Pointer` here.
     ///
-    /// We also store the size of the pointer, such that a `Scalar` always knows how big it is.
+    /// We also store the range and width of the pointer, such that a `Scalar` always knows how big
+    /// it is.
     /// The size is always the pointer size of the current target, but this is not information
     /// that we always have readily available.
-    Ptr(Pointer<Tag>, u8),
+    Ptr(Pointer<Tag>, u8, u8),
 }
 
 #[cfg(all(target_arch = "x86_64", target_pointer_width = "64"))]
@@ -143,7 +144,7 @@ static_assert_size!(Scalar, 24);
 impl<Tag: Provenance> fmt::Debug for Scalar<Tag> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Scalar::Ptr(ptr, _size) => write!(f, "{:?}", ptr),
+            Scalar::Ptr(ptr, _range, _width) => write!(f, "{:?}", ptr),
             Scalar::Int(int) => write!(f, "{:?}", int),
         }
     }
@@ -152,7 +153,7 @@ impl<Tag: Provenance> fmt::Debug for Scalar<Tag> {
 impl<Tag: Provenance> fmt::Display for Scalar<Tag> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Scalar::Ptr(ptr, _size) => write!(f, "pointer to {:?}", ptr),
+            Scalar::Ptr(ptr, _range, _width) => write!(f, "pointer to {:?}", ptr),
             Scalar::Int(int) => write!(f, "{:?}", int),
         }
     }
@@ -184,7 +185,11 @@ impl<Tag> Scalar<Tag> {
 
     #[inline(always)]
     pub fn from_pointer(ptr: Pointer<Tag>, cx: &impl HasDataLayout) -> Self {
-        Scalar::Ptr(ptr, u8::try_from(cx.pointer_range().bytes()).unwrap())
+        Scalar::Ptr(
+            ptr,
+            u8::try_from(cx.pointer_range().bytes()).unwrap(),
+            u8::try_from(cx.pointer_width().bytes()).unwrap(),
+        )
     }
 
     /// Create a Scalar from a pointer with an `Option<_>` tag (where `None` represents a plain integer).
@@ -192,14 +197,14 @@ impl<Tag> Scalar<Tag> {
         match ptr.into_parts() {
             (Some(tag), offset) => Scalar::from_pointer(Pointer::new(tag, offset), cx),
             (None, offset) => {
-                Scalar::Int(ScalarInt::try_from_uint(offset.bytes(), cx.pointer_range()).unwrap())
+                Scalar::Int(ScalarInt::try_from_uint(offset.bytes(), cx.pointer_range(), cx.pointer_width()).unwrap())
             }
         }
     }
 
     #[inline]
     pub fn null_ptr(cx: &impl HasDataLayout) -> Self {
-        Scalar::Int(ScalarInt::null(cx.pointer_range()))
+        Scalar::Int(ScalarInt::null(cx.pointer_range(), cx.pointer_width()))
     }
 
     #[inline]
@@ -213,15 +218,16 @@ impl<Tag> Scalar<Tag> {
     }
 
     #[inline]
-    pub fn try_from_uint(i: impl Into<u128>, size: Size) -> Option<Self> {
-        ScalarInt::try_from_uint(i, size).map(Scalar::Int)
+    pub fn try_from_uint(i: impl Into<u128>, range: Size, width: Size) -> Option<Self> {
+        ScalarInt::try_from_uint(i, range, width).map(Scalar::Int)
     }
 
     #[inline]
-    pub fn from_uint(i: impl Into<u128>, size: Size) -> Self {
+    pub fn from_uint(i: impl Into<u128>, range: Size, width: Size) -> Self {
         let i = i.into();
-        Self::try_from_uint(i, size)
-            .unwrap_or_else(|| bug!("Unsigned value {:#x} does not fit in {} bits", i, size.bits()))
+        Self::try_from_uint(i, range, width)
+            .unwrap_or_else(|| bug!("Unsigned value {:#x} does not fit in {}/{} bits",
+                i, range.bits(), width.bits()))
     }
 
     #[inline]
@@ -246,34 +252,41 @@ impl<Tag> Scalar<Tag> {
 
     #[inline]
     pub fn from_machine_usize(i: u64, cx: &impl HasDataLayout) -> Self {
-        Self::from_uint(i, cx.data_layout().pointer_range)
+        let dl = cx.data_layout();
+        Self::from_uint(i, dl.pointer_range, dl.pointer_width)
     }
 
+    // TODO(seharris): it's possible we only need the size of the int here.
     #[inline]
-    pub fn try_from_int(i: impl Into<i128>, size: Size) -> Option<Self> {
-        ScalarInt::try_from_int(i, size).map(Scalar::Int)
+    pub fn try_from_int(i: impl Into<i128>, range: Size, width: Size) -> Option<Self> {
+        ScalarInt::try_from_int(i, range, width).map(Scalar::Int)
     }
 
+    // TODO(seharris): it's possible we only need the size of the int here.
     #[inline]
-    pub fn from_int(i: impl Into<i128>, size: Size) -> Self {
+    pub fn from_int(i: impl Into<i128>, range: Size, width: Size) -> Self {
         let i = i.into();
-        Self::try_from_int(i, size)
-            .unwrap_or_else(|| bug!("Signed value {:#x} does not fit in {} bits", i, size.bits()))
+        Self::try_from_int(i, range, width)
+            .unwrap_or_else(|| bug!("Signed value {:#x} does not fit in {}/{} bits",
+                i, range.bits(), width.bits()))
     }
 
     #[inline]
     pub fn from_i32(i: i32) -> Self {
-        Self::from_int(i, Size::from_bits(32))
+        let size = Size::from_bits(32);
+        Self::from_int(i, size, size)
     }
 
     #[inline]
     pub fn from_i64(i: i64) -> Self {
-        Self::from_int(i, Size::from_bits(64))
+        let size = Size::from_bits(64);
+        Self::from_int(i, size, size)
     }
 
     #[inline]
     pub fn from_machine_isize(i: i64, cx: &impl HasDataLayout) -> Self {
-        Self::from_int(i, cx.data_layout().pointer_range)
+        let dl = cx.data_layout();
+        Self::from_int(i, dl.pointer_range, dl.pointer_width)
     }
 
     #[inline]
@@ -292,22 +305,16 @@ impl<Tag> Scalar<Tag> {
     /// This method only exists for the benefit of low-level operations that truly need to treat the
     /// scalar in whatever form it is.
     #[inline]
-    pub fn to_bits_or_ptr_internal(self, target_size: Size) -> Result<u128, Pointer<Tag>> {
-        assert_ne!(target_size.bytes(), 0, "you should never look at the bits of a ZST");
+    pub fn to_bits_or_ptr_internal(self, target_range: Size, target_width: Size) -> Result<u128, Pointer<Tag>> {
+        assert_ne!(target_width.bytes(), 0, "you should never look at the bits of a ZST");
         match self {
             Scalar::Int(int) => {
-                // This is a hack to allow platforms with 128 bit pointer
-                // representations (like CHERI) to have pointer values stored in
-                // appropriately large storage without blowing up the compiler.
-                assert!(int.size() <= target_size);
-                Ok(int.assert_bits(int.size()))
+                assert!(target_width == int.width());
+                Ok(int.assert_bits(target_range))
             },
-            Scalar::Ptr(ptr, sz) => {
-                // This allows for cases where more space is allocated for the value than required.
-                // This happens on architectures like CHERI where pointers also have metadata.
-                // When interpreting the full width of pointers is allocated, leaving empty space.
-                // TODO(seharris): is the last line true?
-                assert!(target_size.bytes() >= u64::from(sz));
+            Scalar::Ptr(ptr, range, width) => {
+                assert!(target_range.bytes() == range.into());
+                assert!(target_width.bytes() == width.into());
                 Err(ptr)
             }
         }
@@ -325,13 +332,17 @@ impl<'tcx, Tag: Provenance> Scalar<Tag> {
     pub fn try_to_int(self) -> Result<ScalarInt, Scalar<AllocId>> {
         match self {
             Scalar::Int(int) => Ok(int),
-            Scalar::Ptr(ptr, sz) => {
+            Scalar::Ptr(ptr, range, width) => {
                 if Tag::OFFSET_IS_ADDR {
-                    Ok(ScalarInt::try_from_uint(ptr.offset.bytes(), Size::from_bytes(sz)).unwrap())
+                    Ok(ScalarInt::try_from_uint(
+                        ptr.offset.bytes(),
+                        Size::from_bytes(range),
+                        Size::from_bytes(width),
+                    ).unwrap())
                 } else {
                     // We know `offset` is relative, since `OFFSET_IS_ADDR == false`.
                     let (tag, offset) = ptr.into_parts();
-                    Err(Scalar::Ptr(Pointer::new(tag.get_alloc_id(), offset), sz))
+                    Err(Scalar::Ptr(Pointer::new(tag.get_alloc_id(), offset), range, width))
                 }
             }
         }
@@ -600,9 +611,10 @@ impl<'tcx, Tag: Provenance> ScalarMaybeUninit<Tag> {
 pub fn get_slice_bytes<'tcx>(cx: &impl HasDataLayout, val: ConstValue<'tcx>) -> &'tcx [u8] {
     if let ConstValue::Slice { data, start, end } = val {
         let len = end - start;
+        let size = Size::from_bytes(len);
         data.get_bytes(
             cx,
-            AllocRange { start: Size::from_bytes(start), size: Size::from_bytes(len) },
+            AllocRange { start: Size::from_bytes(start), range: size, width: size },
         )
         .unwrap_or_else(|err| bug!("const slice is invalid: {:?}", err))
     } else {

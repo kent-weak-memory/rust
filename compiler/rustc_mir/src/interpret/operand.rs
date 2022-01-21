@@ -104,7 +104,7 @@ impl<Tag: Provenance> std::fmt::Display for ImmTy<'tcx, Tag> {
                 ScalarMaybeUninit::Scalar(Scalar::Int(int)) => {
                     cx.pretty_print_const_scalar_int(int, ty, true)
                 }
-                ScalarMaybeUninit::Scalar(Scalar::Ptr(ptr, _sz)) => {
+                ScalarMaybeUninit::Scalar(Scalar::Ptr(ptr, _range, _width)) => {
                     // Just print the ptr value. `pretty_print_const_scalar_ptr` would also try to
                     // print what is points to, which would fail since it has no access to the local
                     // memory.
@@ -207,21 +207,21 @@ impl<'tcx, Tag: Provenance> ImmTy<'tcx, Tag> {
 
     #[inline]
     pub fn try_from_uint(i: impl Into<u128>, layout: TyAndLayout<'tcx>) -> Option<Self> {
-        Some(Self::from_scalar(Scalar::try_from_uint(i, layout.size)?, layout))
+        Some(Self::from_scalar(Scalar::try_from_uint(i, layout.range.unwrap(), layout.size)?, layout))
     }
     #[inline]
     pub fn from_uint(i: impl Into<u128>, layout: TyAndLayout<'tcx>) -> Self {
-        Self::from_scalar(Scalar::from_uint(i, layout.size), layout)
+        Self::from_scalar(Scalar::from_uint(i, layout.range.unwrap(), layout.size), layout)
     }
 
     #[inline]
     pub fn try_from_int(i: impl Into<i128>, layout: TyAndLayout<'tcx>) -> Option<Self> {
-        Some(Self::from_scalar(Scalar::try_from_int(i, layout.size)?, layout))
+        Some(Self::from_scalar(Scalar::try_from_int(i, layout.range.unwrap(), layout.size)?, layout))
     }
 
     #[inline]
     pub fn from_int(i: impl Into<i128>, layout: TyAndLayout<'tcx>) -> Self {
-        Self::from_scalar(Scalar::from_int(i, layout.size), layout)
+        Self::from_scalar(Scalar::from_int(i, layout.range.unwrap(), layout.size), layout)
     }
 
     #[inline]
@@ -257,7 +257,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         match mplace.layout.abi {
             Abi::Scalar(..) => {
-                let scalar = alloc.read_scalar(alloc_range(Size::ZERO, mplace.layout.size))?;
+                let scalar = alloc.read_scalar(alloc_range(Size::ZERO, mplace.layout.range.unwrap(), mplace.layout.size))?;
                 Ok(Some(ImmTy { imm: scalar.into(), layout: mplace.layout }))
             }
             Abi::ScalarPair(ref a, ref b) => {
@@ -265,11 +265,12 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // We would anyway check against `ptr_align.restrict_for_offset(b_offset)`,
                 // which `ptr.offset(b_offset)` cannot possibly fail to satisfy.
                 let (a, b) = (&a.value, &b.value);
-                let (a_size, b_size) = (a.width(self), b.width(self));
-                let b_offset = a_size.align_to(b.align(self).abi);
+                let (a_range, b_range) = (a.range(self), b.range(self));
+                let (a_width, b_width) = (a.width(self), b.width(self));
+                let b_offset = a_width.align_to(b.align(self).abi);
                 assert!(b_offset.bytes() > 0); // we later use the offset to tell apart the fields
-                let a_val = alloc.read_scalar(alloc_range(Size::ZERO, a_size))?;
-                let b_val = alloc.read_scalar(alloc_range(b_offset, b_size))?;
+                let a_val = alloc.read_scalar(alloc_range(Size::ZERO, a_range, a_width))?;
+                let b_val = alloc.read_scalar(alloc_range(b_offset, b_range, b_width))?;
                 Ok(Some(ImmTy { imm: Immediate::ScalarPair(a_val, b_val), layout: mplace.layout }))
             }
             _ => Ok(None),
@@ -329,8 +330,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
     // Turn the wide MPlace into a string (must already be dereferenced!)
     pub fn read_str(&self, mplace: &MPlaceTy<'tcx, M::PointerTag>) -> InterpResult<'tcx, &str> {
-        let len = mplace.len(self)?;
-        let bytes = self.memory.read_bytes(mplace.ptr, Size::from_bytes(len))?;
+        let len = Size::from_bytes(mplace.len(self)?);
+        let bytes = self.memory.read_bytes(mplace.ptr, len, len)?;
         let str = std::str::from_utf8(bytes).map_err(|err| err_ub!(InvalidStr(err)))?;
         Ok(str)
     }
@@ -572,7 +573,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // Other cases need layout.
         let tag_scalar = |scalar| -> InterpResult<'tcx, _> {
             Ok(match scalar {
-                Scalar::Ptr(ptr, size) => Scalar::Ptr(self.global_base_pointer(ptr)?, size),
+                Scalar::Ptr(ptr, range, width) => Scalar::Ptr(self.global_base_pointer(ptr)?, range, width),
                 Scalar::Int(int) => Scalar::Int(int),
             })
         };
@@ -624,12 +625,12 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     Some(discr) => {
                         // This type actually has discriminants.
                         assert_eq!(discr.ty, discr_layout.ty);
-                        Scalar::from_uint(discr.val, discr_layout.size)
+                        Scalar::from_uint(discr.val, discr_layout.range.unwrap(), discr_layout.size)
                     }
                     None => {
                         // On a type without actual discriminants, variant is 0.
                         assert_eq!(index.as_u32(), 0);
-                        Scalar::from_uint(index.as_u32(), discr_layout.size)
+                        Scalar::from_uint(index.as_u32(), discr_layout.range.unwrap(), discr_layout.size)
                     }
                 };
                 return Ok((discr, index));
@@ -681,7 +682,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     }
                     _ => span_bug!(self.cur_span(), "tagged layout for non-adt non-generator"),
                 }
-                .ok_or_else(|| err_ub!(InvalidTag(Scalar::from_uint(tag_bits, tag_layout.size))))?;
+                .ok_or_else(|| err_ub!(InvalidTag(Scalar::from_uint(tag_bits, tag_layout.range.unwrap(), tag_layout.size))))?;
                 // Return the cast value, and the index.
                 (discr_val, index.0)
             }
@@ -741,7 +742,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // Compute the size of the scalar we need to return.
                 // No need to cast, because the variant index directly serves as discriminant and is
                 // encoded in the tag.
-                (Scalar::from_uint(variant.as_u32(), discr_layout.size), variant)
+                (Scalar::from_uint(variant.as_u32(), discr_layout.range.unwrap(), discr_layout.size), variant)
             }
         })
     }

@@ -57,10 +57,10 @@ impl<'tcx> TyCtxt<'tcx> {
         let align = layout.align.abi.bytes();
 
         let ptr_range = tcx.data_layout.pointer_range;
+        let ptr_width = tcx.data_layout.pointer_width;
         let ptr_align = tcx.data_layout.pointer_align.abi;
 
-        // TODO(seharris): this looks wrong and needs more digging
-        let vtable_size = ptr_range * u64::try_from(vtable_entries.len()).unwrap();
+        let vtable_size = ptr_width * u64::try_from(vtable_entries.len()).unwrap();
         let mut vtable =
             Allocation::uninit(vtable_size, ptr_align, /* panic_on_fail */ true).unwrap();
 
@@ -77,8 +77,8 @@ impl<'tcx> TyCtxt<'tcx> {
                     let fn_ptr = Pointer::from(fn_alloc_id);
                     ScalarMaybeUninit::from_pointer(fn_ptr, &tcx)
                 }
-                VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_range).into(),
-                VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_range).into(),
+                VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_range, ptr_width).into(),
+                VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_range, ptr_width).into(),
                 VtblEntry::Vacant => continue,
                 VtblEntry::Method(def_id, substs) => {
                     // See https://github.com/rust-lang/rust/pull/86475#discussion_r655162674
@@ -95,7 +95,7 @@ impl<'tcx> TyCtxt<'tcx> {
                 }
             };
             vtable
-                .write_scalar(&tcx, alloc_range(ptr_range * idx, ptr_range), scalar)
+                .write_scalar(&tcx, alloc_range(ptr_width * idx, ptr_range, ptr_width), scalar)
                 .expect("failed to build vtable representation");
         }
 

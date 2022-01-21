@@ -192,14 +192,20 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         use rustc_middle::ty::TyKind::*;
         match *cast_ty.kind() {
             Int(_) | Uint(_) | RawPtr(_) => {
-                let size = match *cast_ty.kind() {
+                let width = match *cast_ty.kind() {
                     Int(t) => Integer::from_int_ty(self, t).size(),
                     Uint(t) => Integer::from_uint_ty(self, t).size(),
+                    RawPtr(_) => self.pointer_width(),
+                    _ => bug!(),
+                };
+                let range = match *cast_ty.kind() {
+                    Int(_) => width,
+                    Uint(_) => width,
                     RawPtr(_) => self.pointer_range(),
                     _ => bug!(),
                 };
-                let v = size.truncate(v);
-                Scalar::from_uint(v, size)
+                let v = range.truncate(v);
+                Scalar::from_uint(v, range, width)
             }
 
             Float(FloatTy::F32) if signed => Scalar::from_f32(Single::from_i128(v as i128).value),
@@ -230,7 +236,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // (https://doc.rust-lang.org/nightly/nightly-rustc/rustc_apfloat/trait.Float.html#method.to_i128_r).
                 let v = f.to_u128(size.bits_usize()).value;
                 // This should already fit the bit width
-                Scalar::from_uint(v, size)
+                Scalar::from_uint(v, size, size)
             }
             // float -> int
             Int(t) => {
@@ -238,7 +244,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // `to_i128` is a saturating cast, which is what we need
                 // (https://doc.rust-lang.org/nightly/nightly-rustc/rustc_apfloat/trait.Float.html#method.to_i128_r).
                 let v = f.to_i128(size.bits_usize()).value;
-                Scalar::from_int(v, size)
+                Scalar::from_int(v, size, size)
             }
             // float -> f32
             Float(FloatTy::F32) => Scalar::from_f32(f.convert(&mut false).value),

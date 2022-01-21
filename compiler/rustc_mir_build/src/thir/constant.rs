@@ -19,7 +19,7 @@ crate fn lit_to_const<'tcx>(
         trace!("trunc {} with size {} and shift {}", n, width.bits(), 128 - width.bits());
         let result = width.truncate(n);
         trace!("trunc result: {}", result);
-        Ok(ConstValue::Scalar(Scalar::from_uint(result, width)))
+        Ok(ConstValue::Scalar(Scalar::from_uint(result, width, width)))
     };
 
     let lit = match (lit, &ty.kind()) {
@@ -41,7 +41,7 @@ crate fn lit_to_const<'tcx>(
             ConstValue::Scalar(Scalar::from_pointer(id.into(), &tcx))
         }
         (ast::LitKind::Byte(n), ty::Uint(ty::UintTy::U8)) => {
-            ConstValue::Scalar(Scalar::from_uint(*n, Size::from_bytes(1)))
+            ConstValue::Scalar(Scalar::from_uint(*n, Size::from_bytes(1), Size::from_bytes(1)))
         }
         (ast::LitKind::Int(n, _), ty::Uint(_)) | (ast::LitKind::Int(n, _), ty::Int(_)) => {
             trunc(if neg { (*n as i128).overflowing_neg().0 as u128 } else { *n })?

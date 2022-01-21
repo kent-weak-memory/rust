@@ -388,7 +388,7 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
                 });
 
                 for (value, target) in targets.iter() {
-                    if Scalar::<()>::try_from_uint(value, size).is_none() {
+                    if Scalar::<()>::try_from_uint(value, size, size).is_none() {
                         self.fail(
                             location,
                             format!("the value {:#x} is not a proper {:?}", value, switch_ty),

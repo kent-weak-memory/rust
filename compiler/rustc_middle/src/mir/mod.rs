@@ -2087,7 +2087,7 @@ impl<'tcx> Operand<'tcx> {
                 .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e))
                 .size;
             let scalar_size = match val {
-                Scalar::Int(int) => int.size(),
+                Scalar::Int(int) => int.width(),
                 _ => panic!("Invalid scalar type {:?}", val),
             };
             scalar_size == type_size
@@ -2458,7 +2458,7 @@ pub enum ConstantKind<'tcx> {
 impl Constant<'tcx> {
     pub fn check_static_ptr(&self, tcx: TyCtxt<'_>) -> Option<DefId> {
         match self.literal.const_for_ty()?.val.try_to_scalar() {
-            Some(Scalar::Ptr(ptr, _size)) => match tcx.global_alloc(ptr.provenance) {
+            Some(Scalar::Ptr(ptr, _range, _width)) => match tcx.global_alloc(ptr.provenance) {
                 GlobalAlloc::Static(def_id) => {
                     assert!(!tcx.is_thread_local_static(def_id));
                     Some(def_id)

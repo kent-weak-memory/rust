@@ -38,7 +38,7 @@ fn numeric_intrinsic<Tag>(name: Symbol, bits: u128, kind: Primitive) -> Scalar<T
         sym::bitreverse => (bits << extra).reverse_bits(),
         _ => bug!("not a numeric intrinsic: {}", name),
     };
-    Scalar::from_uint(bits_out, size)
+    Scalar::from_uint(bits_out, size, size)
 }
 
 /// The logic for all nullary intrinsics is implemented here. These intrinsics don't get evaluated
@@ -234,6 +234,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 )?;
                 let val = if overflowed {
                     let num_bits = l.layout.size.bits();
+                    let range = l.layout.range.unwrap();
                     if l.layout.abi.is_signed() {
                         // For signed ints the saturated value depends on the sign of the first
                         // term since the sign of the second term can be inferred from this and
@@ -247,12 +248,13 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                             // or corresponding negated positive term for subtraction
                             Scalar::from_uint(
                                 (1u128 << (num_bits - 1)) - 1, // max positive
+                                range,
                                 Size::from_bits(num_bits),
                             )
                         } else {
                             // Positive overflow not possible for similar reason
                             // max negative
-                            Scalar::from_uint(1u128 << (num_bits - 1), Size::from_bits(num_bits))
+                            Scalar::from_uint(1u128 << (num_bits - 1), range, Size::from_bits(num_bits))
                         }
                     } else {
                         // unsigned
@@ -260,11 +262,12 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                             // max unsigned
                             Scalar::from_uint(
                                 u128::MAX >> (128 - num_bits),
+                                range,
                                 Size::from_bits(num_bits),
                             )
                         } else {
                             // underflow to 0
-                            Scalar::from_uint(0u128, Size::from_bits(num_bits))
+                            Scalar::from_uint(0u128, range, Size::from_bits(num_bits))
                         }
                     }
                 } else {
@@ -325,7 +328,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     (val_bits >> shift_bits) | (val_bits << inv_shift_bits)
                 };
                 let truncated_bits = self.truncate(result_bits, layout);
-                let result = Scalar::from_uint(truncated_bits, layout.size);
+                let result = Scalar::from_uint(truncated_bits, layout.range.unwrap(), layout.size);
                 self.write_scalar(result, dest)?;
             }
             sym::copy => {
@@ -499,7 +502,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         let (res, overflow, _ty) = self.overflowing_binary_op(BinOp::Rem, &a, &b)?;
         if overflow || res.assert_bits(a.layout.size) != 0 {
             // Then, check if `b` is -1, which is the "MIN / -1" case.
-            let minus1 = Scalar::from_int(-1, dest.layout.size);
+            let minus1 = Scalar::from_int(-1, dest.layout.range.unwrap(), dest.layout.size);
             let b_scalar = b.to_scalar().unwrap();
             if b_scalar == minus1 {
                 throw_ub_format!("exact_div: result of dividing MIN by -1 cannot be represented")
@@ -577,8 +580,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         let lhs = self.read_pointer(lhs)?;
         let rhs = self.read_pointer(rhs)?;
-        let lhs_bytes = self.memory.read_bytes(lhs, layout.size)?;
-        let rhs_bytes = self.memory.read_bytes(rhs, layout.size)?;
+        let lhs_bytes = self.memory.read_bytes(lhs, layout.range.unwrap(), layout.size)?;
+        let rhs_bytes = self.memory.read_bytes(rhs, layout.range.unwrap(), layout.size)?;
         Ok(Scalar::from_bool(lhs_bytes == rhs_bytes))
     }
 }

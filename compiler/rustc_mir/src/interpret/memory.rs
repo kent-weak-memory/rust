@@ -338,7 +338,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
             &mut self.extra,
             &mut alloc.extra,
             ptr.provenance,
-            alloc_range(Size::ZERO, size),
+            alloc_range(Size::ZERO, size, size),
         )?;
 
         // Don't forget to remember size and align of this now-dead allocation
@@ -593,13 +593,14 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
     pub fn get<'a>(
         &'a self,
         ptr: Pointer<Option<M::PointerTag>>,
-        size: Size,
+        range: Size,
+        width: Size,
         align: Align,
     ) -> InterpResult<'tcx, Option<AllocRef<'a, 'tcx, M::PointerTag, M::AllocExtra>>> {
         let align = M::enforce_alignment(&self.extra).then_some(align);
         let ptr_and_alloc = self.check_and_deref_ptr(
             ptr,
-            size,
+            width,
             align,
             CheckInAllocMsg::MemoryAccessTest,
             |alloc_id, offset, ptr| {
@@ -608,7 +609,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
             },
         )?;
         if let Some((alloc_id, offset, ptr, alloc)) = ptr_and_alloc {
-            let range = alloc_range(offset, size);
+            let range = alloc_range(offset, range, width);
             M::memory_read(&self.extra, &alloc.extra, ptr.provenance, range)?;
             Ok(Some(AllocRef { alloc, range, tcx: self.tcx, alloc_id }))
         } else {
@@ -661,16 +662,17 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
     pub fn get_mut<'a>(
         &'a mut self,
         ptr: Pointer<Option<M::PointerTag>>,
-        size: Size,
+        range: Size,
+        width: Size,
         align: Align,
     ) -> InterpResult<'tcx, Option<AllocRefMut<'a, 'tcx, M::PointerTag, M::AllocExtra>>> {
-        let parts = self.get_ptr_access(ptr, size, align)?;
+        let parts = self.get_ptr_access(ptr, width, align)?;
         if let Some((alloc_id, offset, ptr)) = parts {
             let tcx = self.tcx;
             // FIXME: can we somehow avoid looking up the allocation twice here?
             // We cannot call `get_raw_mut` inside `check_and_deref_ptr` as that would duplicate `&mut self`.
             let (alloc, extra) = self.get_raw_mut(alloc_id)?;
-            let range = alloc_range(offset, size);
+            let range = alloc_range(offset, range, width);
             M::memory_written(extra, &mut alloc.extra, ptr.provenance, range)?;
             Ok(Some(AllocRefMut { alloc, range, tcx, alloc_id }))
         } else {
@@ -924,7 +926,11 @@ impl<'tcx, 'a, Tag: Copy, Extra> AllocRefMut<'a, 'tcx, Tag, Extra> {
         offset: Size,
         val: ScalarMaybeUninit<Tag>,
     ) -> InterpResult<'tcx> {
-        self.write_scalar(alloc_range(offset, self.tcx.data_layout().pointer_range), val)
+        self.write_scalar(alloc_range(
+            offset,
+            self.tcx.data_layout().pointer_range,
+            self.tcx.data_layout().pointer_width,
+        ), val)
     }
 }
 
@@ -937,7 +943,8 @@ impl<'tcx, 'a, Tag: Copy, Extra> AllocRef<'a, 'tcx, Tag, Extra> {
     }
 
     pub fn read_ptr_sized(&self, offset: Size) -> InterpResult<'tcx, ScalarMaybeUninit<Tag>> {
-        self.read_scalar(alloc_range(offset, self.tcx.data_layout().pointer_range))
+        let dl = self.tcx.data_layout();
+        self.read_scalar(alloc_range(offset, dl.pointer_range, dl.pointer_width))
     }
 
     pub fn check_bytes(&self, range: AllocRange, allow_uninit_and_ptr: bool) -> InterpResult<'tcx> {
@@ -955,9 +962,10 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
     pub fn read_bytes(
         &self,
         ptr: Pointer<Option<M::PointerTag>>,
-        size: Size,
+        range: Size,
+        width: Size,
     ) -> InterpResult<'tcx, &[u8]> {
-        let alloc_ref = match self.get(ptr, size, Align::ONE)? {
+        let alloc_ref = match self.get(ptr, range, width, Align::ONE)? {
             Some(a) => a,
             None => return Ok(&[]), // zero-sized access
         };
@@ -983,7 +991,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
         assert_eq!(lower, len, "can only write iterators with a precise length");
 
         let size = Size::from_bytes(len);
-        let alloc_ref = match self.get_mut(ptr, size, Align::ONE)? {
+        let alloc_ref = match self.get_mut(ptr, size, size, Align::ONE)? {
             Some(alloc_ref) => alloc_ref,
             None => {
                 // zero-sized access
@@ -1044,7 +1052,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
             Some(src_ptr) => src_ptr,
         };
         let src_alloc = self.get_raw(src_alloc_id)?;
-        let src_range = alloc_range(src_offset, size);
+        let src_range = alloc_range(src_offset, size, size);
         M::memory_read(&self.extra, &src_alloc.extra, src.provenance, src_range)?;
         // We need the `dest` ptr for the next operation, so we get it now.
         // We already did the source checks and called the hooks so we are good to return early.
@@ -1070,7 +1078,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
 
         // Destination alloc preparations and access hooks.
         let (dest_alloc, extra) = self.get_raw_mut(dest_alloc_id)?;
-        let dest_range = alloc_range(dest_offset, size * num_copies);
+        let dest_range = alloc_range(dest_offset, size * num_copies, size * num_copies);
         M::memory_written(extra, &mut dest_alloc.extra, dest.provenance, dest_range)?;
         let dest_bytes = dest_alloc.get_bytes_mut_ptr(&tcx, dest_range).as_mut_ptr();
 
@@ -1123,7 +1131,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
         // now fill in all the "init" data
         dest_alloc.mark_compressed_init_range(
             &compressed,
-            alloc_range(dest_offset, size), // just a single copy (i.e., not full `dest_range`)
+            alloc_range(dest_offset, size, size), // just a single copy (i.e., not full `dest_range`)
             num_copies,
         );
         // copy the relocations to the destination
@@ -1138,7 +1146,7 @@ impl<'mir, 'tcx, M: Machine<'mir, 'tcx>> Memory<'mir, 'tcx, M> {
     pub fn scalar_to_ptr(&self, scalar: Scalar<M::PointerTag>) -> Pointer<Option<M::PointerTag>> {
         // We use `to_bits_or_ptr_internal` since we are just implementing the method people need to
         // call to force getting out a pointer.
-        match scalar.to_bits_or_ptr_internal(self.pointer_range()) {
+        match scalar.to_bits_or_ptr_internal(self.pointer_range(), self.pointer_width()) {
             Err(ptr) => ptr.into(),
             Ok(bits) => {
                 let addr = u64::try_from(bits).unwrap();

@@ -579,11 +579,13 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             // We need the type of the LHS. We cannot use `place_layout` as that is the type
             // of the result, which for checked binops is not the same!
             let left_ty = left.ty(&self.local_decls, self.tcx);
-            let left_size = self.ecx.layout_of(left_ty).ok()?.size;
-            let right_size = r.layout.size;
+            let left_layout = self.ecx.layout_of(left_ty).ok()?;
+            let left_range = left_layout.range.unwrap();
+            let left_size = left_layout.size;
+            let right_range = r.layout.range.unwrap();
             let r_bits = r.to_scalar().ok();
-            let r_bits = r_bits.and_then(|r| r.to_bits(right_size).ok());
-            if r_bits.map_or(false, |b| b >= left_size.bits() as u128) {
+            let r_bits = r_bits.and_then(|r| r.to_bits(right_range).ok());
+            if r_bits.map_or(false, |b| b >= left_range.bits() as u128) {
                 debug!("check_binary_op: reporting assert for {:?}", source_info);
                 self.report_assert_as_lint(
                     lint::builtin::ARITHMETIC_OVERFLOW,
@@ -595,7 +597,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                             Some(l) => l.to_const_int(),
                             // Invent a dummy value, the diagnostic ignores it anyway
                             None => ConstInt::new(
-                                ScalarInt::try_from_uint(1_u8, left_size).unwrap(),
+                                ScalarInt::try_from_uint(1_u8, left_range, left_size).unwrap(),
                                 left_ty.is_signed(),
                                 left_ty.is_ptr_sized_integral(),
                             ),

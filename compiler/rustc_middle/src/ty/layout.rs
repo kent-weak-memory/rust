@@ -298,6 +298,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             abi: Abi::ScalarPair(a, b),
             largest_niche,
             align,
+            range: None,
             size,
         }
     }
@@ -491,12 +492,23 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             abi = Abi::Uninhabited;
         }
 
+        // TODO(seharris): this is hacky.
+        let range = if let Abi::Scalar(scalar) = &abi {
+            match scalar.value {
+                Primitive::Pointer => Some(self.data_layout().pointer_range),
+                _ => Some(size),
+            }
+        } else {
+            None
+        };
+
         Ok(Layout {
             variants: Variants::Single { index: VariantIdx::new(0) },
             fields: FieldsShape::Arbitrary { offsets, memory_index },
             abi,
             largest_niche,
             align,
+            range,
             size,
         })
     }
@@ -546,6 +558,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 abi: Abi::Uninhabited,
                 largest_niche: None,
                 align: dl.i8_align,
+                range: Some(Size::ZERO),
                 size: Size::ZERO,
             }),
 
@@ -608,6 +621,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     abi,
                     largest_niche,
                     align: element.align,
+                    range: None,
                     size,
                 })
             }
@@ -619,6 +633,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     abi: Abi::Aggregate { sized: false },
                     largest_niche: None,
                     align: element.align,
+                    range: None,
                     size: Size::ZERO,
                 })
             }
@@ -628,6 +643,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 abi: Abi::Aggregate { sized: false },
                 largest_niche: None,
                 align: dl.i8_align,
+                range: Some(Size::ZERO),
                 size: Size::ZERO,
             }),
 
@@ -788,6 +804,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     fields,
                     abi: Abi::Vector { element: e_abi, count: e_len },
                     largest_niche: e_ly.largest_niche.clone(),
+                    range: None,
                     size,
                     align,
                 })
@@ -863,6 +880,16 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                         align = align.min(AbiAndPrefAlign::new(pack));
                     }
 
+                    // TODO(seharris): this is hacky and duplicated.
+                    let range = if let Abi::Scalar(scalar) = &abi {
+                        match scalar.value {
+                            Primitive::Pointer => Some(dl.pointer_range),
+                            _ => Some(size),
+                        }
+                    } else {
+                        None
+                    };
+
                     return Ok(tcx.intern_layout(Layout {
                         variants: Variants::Single { index },
                         fields: FieldsShape::Union(
@@ -872,6 +899,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                         abi,
                         largest_niche: None,
                         align,
+                        range,
                         size: size.align_to(align.abi),
                     }));
                 }
@@ -1110,6 +1138,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                                 },
                                 abi,
                                 largest_niche,
+                                range: None,
                                 size,
                                 align,
                             });
@@ -1349,6 +1378,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     largest_niche,
                     abi,
                     align,
+                    range: None,
                     size,
                 };
 
@@ -1705,6 +1735,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             fields: outer_fields,
             abi,
             largest_niche: prefix.largest_niche,
+            range: None,
             size,
             align,
         });
@@ -2155,6 +2186,7 @@ where
                     abi: Abi::Uninhabited,
                     largest_niche: None,
                     align: tcx.data_layout.i8_align,
+                    range: Some(Size::ZERO),
                     size: Size::ZERO,
                 })
             }

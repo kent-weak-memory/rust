@@ -1090,12 +1090,15 @@ pub struct Layout {
     pub largest_niche: Option<Niche>,
 
     pub align: AbiAndPrefAlign,
+    // TODO(seharris): rename `size` or replace this hack.
+    pub range: Option<Size>,
     pub size: Size,
 }
 
 impl Layout {
     pub fn scalar<C: HasDataLayout>(cx: &C, scalar: Scalar) -> Self {
         let largest_niche = Niche::from_scalar(cx, Size::ZERO, scalar.clone());
+        let range = Some(scalar.value.range(cx));
         let size = scalar.value.width(cx);
         let align = scalar.value.align(cx);
         Layout {
@@ -1103,6 +1106,7 @@ impl Layout {
             fields: FieldsShape::Primitive,
             abi: Abi::Scalar(scalar),
             largest_niche,
+            range,
             size,
             align,
         }
