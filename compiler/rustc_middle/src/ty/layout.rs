@@ -493,13 +493,11 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         }
 
         // TODO(seharris): this is hacky.
-        let range = if let Abi::Scalar(scalar) = &abi {
-            match scalar.value {
-                Primitive::Pointer => Some(self.data_layout().pointer_range),
-                _ => Some(size),
-            }
-        } else {
-            None
+        let range = match &abi {
+            Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) =>
+                Some(self.data_layout().pointer_range),
+            Abi::Scalar(Scalar {..}) => Some(size),
+            _ => None
         };
 
         Ok(Layout {
