@@ -614,7 +614,7 @@ pub fn get_slice_bytes<'tcx>(cx: &impl HasDataLayout, val: ConstValue<'tcx>) -> 
         let size = Size::from_bytes(len);
         data.get_bytes(
             cx,
-            AllocRange { start: Size::from_bytes(start), range: size, width: size },
+            AllocRange { start: Size::from_bytes(start), range: Some(size), width: size },
         )
         .unwrap_or_else(|err| bug!("const slice is invalid: {:?}", err))
     } else {

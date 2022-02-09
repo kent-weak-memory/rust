@@ -76,21 +76,21 @@ impl AllocError {
 pub struct AllocRange {
     pub start: Size,
     // TODO(seharris): explain
-    pub range: Size,
+    pub range: Option<Size>,
     pub width: Size,
 }
 
 /// Free-standing constructor for less syntactic overhead.
 #[inline(always)]
-pub fn alloc_range(start: Size, range: Size, width: Size) -> AllocRange {
-    assert!(range <= width, "AllocRange valid data must be within overall size of range");
+pub fn alloc_range(start: Size, range: Option<Size>, width: Size) -> AllocRange {
+    assert!(range.is_none() || range.unwrap() <= width, "AllocRange valid data must be within overall size of range");
     AllocRange { start, range, width }
 }
 
 impl AllocRange {
     #[inline(always)]
-    pub fn end_range(self) -> Size {
-        self.start + self.range // This does overflow checking.
+    pub fn end_range_or_width(self) -> Size {
+        self.start+self.range.unwrap_or(self.width) // This does overflow checking.
     }
 
     #[inline(always)]
@@ -250,7 +250,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
             self.check_relocation_edges(cx, range)?;
         }
 
-        Ok(&self.bytes[range.start.bytes_usize()..range.end_range().bytes_usize()])
+        Ok(&self.bytes[range.start.bytes_usize()..range.end_range_or_width().bytes_usize()])
     }
 
     /// Checks that these bytes are initialized and not pointer bytes, and then return them
@@ -287,7 +287,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
         self.mark_init(range, true);
         self.clear_relocations(cx, range);
 
-        &mut self.bytes[range.start.bytes_usize()..range.end_range().bytes_usize()]
+        &mut self.bytes[range.start.bytes_usize()..range.end_range_or_width().bytes_usize()]
     }
 
     /// A raw pointer variant of `get_bytes_mut` that avoids invalidating existing aliases into this memory.
@@ -300,7 +300,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
 
         assert!(range.end_width().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
         let begin_ptr = self.bytes.as_mut_ptr().wrapping_add(range.start.bytes_usize());
-        let len = range.end_range().bytes_usize() - range.start.bytes_usize();
+        let len = range.end_range_or_width().bytes_usize() - range.start.bytes_usize();
         ptr::slice_from_raw_parts_mut(begin_ptr, len)
     }
 }
@@ -354,7 +354,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
         // Now we do the actual reading.
         let bits = read_target_uint(cx.data_layout().endian, bytes).unwrap();
         // See if we got a pointer.
-        if range.range != cx.data_layout().pointer_range || range.width != cx.data_layout().pointer_width {
+        if (range.range.is_some() && range.range.unwrap() != cx.data_layout().pointer_range) || range.width != cx.data_layout().pointer_width {
             // Not a pointer.
             // *Now*, we better make sure that the inside is free of relocations too.
             self.check_relocations(cx, range)?;
@@ -366,7 +366,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
             }
         }
         // We don't. Just return the bits.
-        Ok(ScalarMaybeUninit::Scalar(Scalar::from_uint(bits, range.range, range.width)))
+        Ok(ScalarMaybeUninit::Scalar(Scalar::from_uint(bits, range.range.unwrap(), range.width)))
     }
 
     /// Writes a *non-ZST* scalar.
@@ -394,7 +394,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
 
         // `to_bits_or_ptr_internal` is the right method because we just want to store this data
         // as-is into memory.
-        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.range, range.width) {
+        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.range.unwrap(), range.width) {
             Err(val) => {
                 let (provenance, offset) = val.into_parts();
                 (u128::from(offset.bytes()), Some(provenance))
@@ -487,8 +487,8 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
     // moment.
     #[inline]
     fn check_relocation_edges(&self, cx: &impl HasDataLayout, range: AllocRange) -> AllocResult {
-        self.check_relocations(cx, alloc_range(range.start, Size::ZERO, Size::ZERO))?;
-        self.check_relocations(cx, alloc_range(range.end_width(), Size::ZERO, Size::ZERO))?;
+        self.check_relocations(cx, alloc_range(range.start, None, Size::ZERO))?;
+        self.check_relocations(cx, alloc_range(range.end_width(), None, Size::ZERO))?;
         Ok(())
     }
 }
@@ -500,7 +500,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
     /// Returns `Ok(())` if it's initialized. Otherwise returns the range of byte
     /// indexes of the first contiguous uninitialized access.
     fn is_init(&self, range: AllocRange) -> Result<(), Range<Size>> {
-        self.init_mask.is_range_initialized(range.start, range.end_range()) // `Size` addition
+        self.init_mask.is_range_initialized(range.start, range.end_range_or_width()) // `Size` addition
     }
 
     /// Checks that a range of bytes is initialized. If not, returns the `InvalidUninitBytes`
@@ -509,7 +509,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
         self.is_init(range).or_else(|idx_range| {
             Err(AllocError::InvalidUninitBytes(Some(UninitBytesAccess {
                 access_offset: range.start,
-                access_size: range.range,
+                access_size: range.range.unwrap_or(range.width),
                 uninit_offset: idx_range.start,
                 uninit_size: idx_range.end - idx_range.start, // `Size` subtraction
             })))
@@ -518,11 +518,11 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
 
     // TODO(seharris): should we be marking range or width here?
     pub fn mark_init(&mut self, range: AllocRange, is_init: bool) {
-        if range.range.bytes() == 0 {
+        if range.range.unwrap_or(range.width).bytes() == 0 {
             return;
         }
         assert!(self.mutability == Mutability::Mut);
-        self.init_mask.set_range(range.start, range.end_range(), is_init);
+        self.init_mask.set_range(range.start, range.end_range_or_width(), is_init);
     }
 }
 

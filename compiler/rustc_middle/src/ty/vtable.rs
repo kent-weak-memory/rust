@@ -95,7 +95,7 @@ impl<'tcx> TyCtxt<'tcx> {
                 }
             };
             vtable
-                .write_scalar(&tcx, alloc_range(ptr_width * idx, ptr_range, ptr_width), scalar)
+                .write_scalar(&tcx, alloc_range(ptr_width * idx, Some(ptr_range), ptr_width), scalar)
                 .expect("failed to build vtable representation");
         }
 

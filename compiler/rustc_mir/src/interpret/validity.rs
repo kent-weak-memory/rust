@@ -826,7 +826,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
                 let mplace = op.assert_mem_place(); // strings are never immediate
                 let len = Size::from_bytes(mplace.len(self.ecx)?);
                 try_validation!(
-                    self.ecx.memory.read_bytes(mplace.ptr, len, len),
+                    self.ecx.memory.read_bytes(mplace.ptr, Some(len), len),
                     self.path,
                     err_ub!(InvalidUninitBytes(..)) => { "uninitialized data in `str`" },
                     err_unsup!(ReadPointerAsBytes) => { "a pointer in `str`" },
@@ -862,7 +862,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
                 // to reject those pointers, we just do not have the machinery to
                 // talk about parts of a pointer.
                 // We also accept uninit, for consistency with the slow path.
-                let alloc = match self.ecx.memory.get(mplace.ptr, size, size, mplace.align)? {
+                let alloc = match self.ecx.memory.get(mplace.ptr, Some(size), size, mplace.align)? {
                     Some(a) => a,
                     None => {
                         // Size 0, nothing more to check.
@@ -871,7 +871,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
                 };
 
                 match alloc.check_bytes(
-                    alloc_range(Size::ZERO, size, size),
+                    alloc_range(Size::ZERO, Some(size), size),
                     /*allow_uninit_and_ptr*/ self.ctfe_mode.is_none(),
                 ) {
                     // In the happy case, we needn't check anything else.

@@ -580,8 +580,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         let lhs = self.read_pointer(lhs)?;
         let rhs = self.read_pointer(rhs)?;
-        let lhs_bytes = self.memory.read_bytes(lhs, layout.range.unwrap(), layout.size)?;
-        let rhs_bytes = self.memory.read_bytes(rhs, layout.range.unwrap(), layout.size)?;
+        let lhs_bytes = self.memory.read_bytes(lhs, layout.range, layout.size)?;
+        let rhs_bytes = self.memory.read_bytes(rhs, layout.range, layout.size)?;
         Ok(Scalar::from_bool(lhs_bytes == rhs_bytes))
     }
 }

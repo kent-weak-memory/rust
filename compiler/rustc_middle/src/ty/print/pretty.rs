@@ -1007,7 +1007,7 @@ pub trait PrettyPrinter<'tcx>:
                 Some(GlobalAlloc::Memory(alloc)) => {
                     let len = int.assert_bits(self.tcx().data_layout.pointer_range);
                     let size = Size::from_bytes(len);
-                    let range = AllocRange { start: offset, range: size, width: size };
+                    let range = AllocRange { start: offset, range: Some(size), width: size };
                     if let Ok(byte_str) = alloc.get_bytes(&self.tcx(), range) {
                         p!(pretty_print_byte_str(byte_str))
                     } else {
@@ -1184,7 +1184,7 @@ pub trait PrettyPrinter<'tcx>:
                 let n = n.val.try_to_bits(self.tcx().data_layout.pointer_range).unwrap();
                 // cast is ok because we already checked for pointer size (32 or 64 bit) above
                 let size = Size::from_bytes(n);
-                let range = AllocRange { start: offset, range: size, width: size };
+                let range = AllocRange { start: offset, range: Some(size), width: size };
 
                 let byte_str = alloc.get_bytes(&self.tcx(), range).unwrap();
                 p!("*");

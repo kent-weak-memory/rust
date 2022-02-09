@@ -312,9 +312,7 @@ where
     ) -> InterpResult<'tcx, Option<AllocRef<'_, 'tcx, M::PointerTag, M::AllocExtra>>> {
         assert!(!place.layout.is_unsized());
         assert!(!place.meta.has_meta());
-        let range = place.layout.range.unwrap();
-        let size = place.layout.size;
-        self.memory.get(place.ptr, range, size, place.align)
+        self.memory.get(place.ptr, place.layout.range, place.layout.size, place.align)
     }
 
     #[inline]
@@ -324,9 +322,7 @@ where
     ) -> InterpResult<'tcx, Option<AllocRefMut<'_, 'tcx, M::PointerTag, M::AllocExtra>>> {
         assert!(!place.layout.is_unsized());
         assert!(!place.meta.has_meta());
-        let range = place.layout.range.unwrap();
-        let size = place.layout.size;
-        self.memory.get_mut(place.ptr, range, size, place.align)
+        self.memory.get_mut(place.ptr, place.layout.range, place.layout.size, place.align)
     }
 
     /// Check if this mplace is dereferencable and sufficiently aligned.
@@ -752,7 +748,7 @@ where
                         dest.layout
                     ),
                 }
-                alloc.write_scalar(alloc_range(Size::ZERO, dest.layout.range.unwrap(), dest.layout.size), scalar)
+                alloc.write_scalar(alloc_range(Size::ZERO, Some(dest.layout.range.unwrap()), dest.layout.size), scalar)
             }
             Immediate::ScalarPair(a_val, b_val) => {
                 // We checked `ptr_align` above, so all fields will have the alignment they need.
@@ -774,8 +770,8 @@ where
                 // but that does not work: We could be a newtype around a pair, then the
                 // fields do not match the `ScalarPair` components.
 
-                alloc.write_scalar(alloc_range(Size::ZERO, a_range, a_width), a_val)?;
-                alloc.write_scalar(alloc_range(b_offset, b_range, b_width), b_val)
+                alloc.write_scalar(alloc_range(Size::ZERO, Some(a_range), a_width), a_val)?;
+                alloc.write_scalar(alloc_range(b_offset, Some(b_range), b_width), b_val)
             }
         }
     }

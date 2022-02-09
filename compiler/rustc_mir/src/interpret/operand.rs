@@ -257,7 +257,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         match mplace.layout.abi {
             Abi::Scalar(..) => {
-                let scalar = alloc.read_scalar(alloc_range(Size::ZERO, mplace.layout.range.unwrap(), mplace.layout.size))?;
+                let scalar = alloc.read_scalar(alloc_range(Size::ZERO, Some(mplace.layout.range.unwrap()), mplace.layout.size))?;
                 Ok(Some(ImmTy { imm: scalar.into(), layout: mplace.layout }))
             }
             Abi::ScalarPair(ref a, ref b) => {
@@ -269,8 +269,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let (a_width, b_width) = (a.width(self), b.width(self));
                 let b_offset = a_width.align_to(b.align(self).abi);
                 assert!(b_offset.bytes() > 0); // we later use the offset to tell apart the fields
-                let a_val = alloc.read_scalar(alloc_range(Size::ZERO, a_range, a_width))?;
-                let b_val = alloc.read_scalar(alloc_range(b_offset, b_range, b_width))?;
+                let a_val = alloc.read_scalar(alloc_range(Size::ZERO, Some(a_range), a_width))?;
+                let b_val = alloc.read_scalar(alloc_range(b_offset, Some(b_range), b_width))?;
                 Ok(Some(ImmTy { imm: Immediate::ScalarPair(a_val, b_val), layout: mplace.layout }))
             }
             _ => Ok(None),
@@ -331,7 +331,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     // Turn the wide MPlace into a string (must already be dereferenced!)
     pub fn read_str(&self, mplace: &MPlaceTy<'tcx, M::PointerTag>) -> InterpResult<'tcx, &str> {
         let len = Size::from_bytes(mplace.len(self)?);
-        let bytes = self.memory.read_bytes(mplace.ptr, len, len)?;
+        let bytes = self.memory.read_bytes(mplace.ptr, Some(len), len)?;
         let str = std::str::from_utf8(bytes).map_err(|err| err_ub!(InvalidStr(err)))?;
         Ok(str)
     }
