@@ -321,6 +321,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
         let mut inverse_memory_index: Vec<u32> = (0..fields.len() as u32).collect();
 
+// Reorder field indices by width
         let optimize = !repr.inhibit_struct_field_reordering_opt();
         if optimize {
             let end =
@@ -359,6 +360,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         let mut largest_niche = None;
         let mut largest_niche_available = 0;
 
+// Expand alignment and offset fields to fit prefix in
         if let StructKind::Prefixed(prefix_size, prefix_align) = kind {
             let prefix_align =
                 if let Some(pack) = pack { prefix_align.min(pack) } else { prefix_align };
@@ -366,6 +368,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             offset = prefix_size.align_to(prefix_align);
         }
 
+// Calculate field offsets, expand struct align to fit most demmanding field, find single largest niche...
         for &i in &inverse_memory_index {
             let field = fields[i as usize];
             if !sized {
@@ -383,6 +386,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 sized = false;
             }
 
+// Align field offset and expand struct's alignment to fit field
             // Invariant: offset < dl.obj_size_bound() <= 1<<61
             let field_align = if let Some(pack) = pack {
                 field.align.min(AbiAndPrefAlign::new(pack))
@@ -395,6 +399,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             debug!("univariant offset: {:?} field: {:#?}", offset, field);
             offsets[i as usize] = offset;
 
+// Find one single largest niche among all the fields
             if !repr.hide_niche() {
                 if let Some(mut niche) = field.largest_niche.clone() {
                     let available = niche.available(dl);
@@ -413,6 +418,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             align = align.max(AbiAndPrefAlign::new(repr_align));
         }
 
+// Use offset for next field after end to decide size (excluding any trailing unsized field)
         debug!("univariant min_size: {:?}", offset);
         let min_size = offset;
 
@@ -429,11 +435,13 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         let size = min_size.align_to(align.abi);
         let mut abi = Abi::Aggregate { sized };
 
+// Special case optimisations for simple wrappers and packing pairs of fields into a scalar pair
         // Unpack newtype ABIs and find scalar pairs.
         if sized && size.bytes() > 0 {
             // All other fields must be ZSTs.
             let mut non_zst_fields = fields.iter().enumerate().filter(|&(_, f)| !f.is_zst());
 
+// Single field
             match (non_zst_fields.next(), non_zst_fields.next(), non_zst_fields.next()) {
                 // We have exactly one non-ZST field.
                 (Some((i, field)), None, None) => {
@@ -456,6 +464,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     }
                 }
 
+// Scalar pair
                 // Two non-ZST fields, and they're both scalars.
                 (
                     Some((i, &TyAndLayout { layout: &Layout { abi: Abi::Scalar(ref a), .. }, .. })),
@@ -488,6 +497,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             }
         }
 
+// If any field of an aggregate is uninhabited then the whole thing is
         if sized && fields.iter().any(|f| f.abi.is_uninhabited()) {
             abi = Abi::Uninhabited;
         }
@@ -515,6 +525,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         let tcx = self.tcx;
         let param_env = self.param_env;
         let dl = self.data_layout();
+// Convert primitive value to scalar
+// Should choose correct range for pointers on CHERI
         let scalar_unit = |value: Primitive| {
             let bits = value.range(dl).bits();
             assert!(bits <= 128);
@@ -522,11 +534,13 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         };
         let scalar = |value: Primitive| tcx.intern_layout(Layout::scalar(self, scalar_unit(value)));
 
+// Wraps `univariant_uninterned()`
         let univariant = |fields: &[TyAndLayout<'_>], repr: &ReprOptions, kind| {
             Ok(tcx.intern_layout(self.univariant_uninterned(ty, fields, repr, kind)?))
         };
         debug_assert!(!ty.has_infer_types_or_consts());
 
+// Note that we have access to field information via `ty`
         Ok(match *ty.kind() {
             // Basic scalars.
             ty::Bool => tcx.intern_layout(Layout::scalar(
@@ -569,9 +583,14 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
                 let pointee = tcx.normalize_erasing_regions(param_env, pointee);
                 if pointee.is_sized(tcx.at(DUMMY_SP), param_env) {
+// Basic pointer type
                     return Ok(tcx.intern_layout(Layout::scalar(self, data_ptr)));
                 }
 
+// Specialised pointer
+// - foreign type (uses basic pointer anyway)
+// - slices (adds length)
+// - dyn pointers (adds vtable pointer)
                 let unsized_part = tcx.struct_tail_erasing_lifetimes(pointee, param_env);
                 let metadata = match unsized_part.kind() {
                     ty::Foreign(..) => {
@@ -592,6 +611,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
             // Arrays and slices.
             ty::Array(element, mut count) => {
+// Unclear
                 if count.has_projections() {
                     count = tcx.normalize_erasing_regions(param_env, count);
                     if count.has_projections() {
@@ -623,6 +643,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     size,
                 })
             }
+// Concrete slices are probably a ZST that should only be referenced.
             ty::Slice(element) => {
                 let element = self.layout_of(element)?;
                 tcx.intern_layout(Layout {
@@ -647,6 +668,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
             // Odd unit types.
             ty::FnDef(..) => univariant(&[], &ReprOptions::default(), StructKind::AlwaysSized)?,
+// Both of these seem to be opaque things that should only be referenced.
             ty::Dynamic(..) | ty::Foreign(..) => {
                 let mut unit = self.univariant_uninterned(
                     ty,
@@ -663,6 +685,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
             ty::Generator(def_id, substs, _) => self.generator_layout(ty, def_id, substs)?,
 
+// Compute struct to hold captured values
             ty::Closure(_, ref substs) => {
                 let tys = substs.as_closure().upvar_tys();
                 univariant(
@@ -838,6 +861,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                         align = align.max(AbiAndPrefAlign::new(repr_align));
                     }
 
+// Forward the layout of a single (non-ZST) field, or use aggregate abi and the largest size and alignment
                     let optimize = !def.repr.inhibit_union_abi_opt();
                     let mut size = Size::ZERO;
                     let mut abi = Abi::Aggregate { sized: true };
@@ -921,9 +945,12 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 let present_first = match present_first {
                     Some(present_first) => present_first,
                     // Uninhabited because it has no variants, or only absent ones.
+// Enums with no variants are represented with the never type because they can't be instantiated
                     None if def.is_enum() => return tcx.layout_raw(param_env.and(tcx.types.never)),
                     // If it's a struct, still compute a layout so that we can still compute the
                     // field offsets.
+// How does this even work? Shouldn't this be an out of range index?
+// It appears there must always be some kind of placeholder.
                     None => VariantIdx::new(0),
                 };
 
@@ -937,6 +964,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     // (Typechecking will reject discriminant-sizing attrs.)
 
                     let v = present_first;
+// Enum variants can't be unsized
                     let kind = if def.is_enum() || variants[v].is_empty() {
                         StructKind::AlwaysSized
                     } else {
@@ -956,6 +984,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     let (start, end) = self.tcx.layout_scalar_valid_range(def.did);
                     match st.abi {
                         Abi::Scalar(ref mut scalar) | Abi::ScalarPair(ref mut scalar, _) => {
+// Shrink range of scalar values allowed to match... something?
                             // the asserts ensure that we are not using the
                             // `#[rustc_layout_scalar_valid_range(n)]`
                             // attribute to widen the range of anything as that would probably
@@ -978,6 +1007,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                                 scalar.valid_range = *scalar.valid_range.start()..=end;
                             }
 
+// Add niche created by shrinking range
+// WTF is with this assignment and second if?
                             // Update `largest_niche` if we have introduced a larger niche.
                             let niche = if def.repr.hide_niche() {
                                 None
@@ -1035,6 +1066,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                         }
                         for f in fields {
                             if !f.is_zst() {
+// Find exactly one variant with any non-ZST field
                                 if dataful_variant.is_none() {
                                     dataful_variant = Some(v);
                                     continue 'variants;
@@ -1044,14 +1076,18 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                                 }
                             }
                         }
+// Find range covering all variants containing only fields that are ZSTs? (otherwise inside out range)
+// What the heck is this supposed to do?!
                         niche_variants = *niche_variants.start().min(&v)..=v;
                     }
 
+// Unclear
                     if niche_variants.start() > niche_variants.end() {
                         dataful_variant = None;
                     }
 
                     if let Some(i) = dataful_variant {
+// Find out how many values the discriminant will need to be able to store?
                         let count = (niche_variants.end().as_u32()
                             - niche_variants.start().as_u32()
                             + 1) as u128;
@@ -1064,11 +1100,14 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                             .max_by_key(|(_, niche)| niche.available(dl));
 
                         if let Some((field_index, niche, (niche_start, niche_scalar))) =
+// Add particular required range of niche to information we have already
                             niche_candidate.and_then(|(field_index, niche)| {
                                 Some((field_index, niche, niche.reserve(self, count)?))
                             })
                         {
                             let mut align = dl.aggregate_align;
+// Convert variants to list of struct layouts
+// Also expand alignment to widest variant alignment
                             let st = variants
                                 .iter_enumerated()
                                 .map(|(j, v)| {
@@ -1086,10 +1125,12 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                                 })
                                 .collect::<Result<IndexVec<VariantIdx, _>, _>>()?;
 
+// Get position and abi of niche
                             let offset = st[i].fields.offset(field_index) + niche.offset;
                             let size = st[i].size;
 
                             let abi = if st.iter().all(|v| v.abi.is_uninhabited()) {
+// Enum is uninhabited if all variants are uninhabited thus niche is uninhabited?
                                 Abi::Uninhabited
                             } else {
                                 match st[i].abi {
@@ -1119,6 +1160,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                             let largest_niche =
                                 Niche::from_scalar(dl, offset, niche_scalar.clone());
 
+// Unclear
                             niche_filling_layout = Some(Layout {
                                 variants: Variants::Multiple {
                                     tag: niche_scalar,
@@ -1141,9 +1183,11 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                                 align,
                             });
                         }
+// Fall through if niche optimisation isn't applicable
                     }
                 }
 
+// Get range of discriminants for completely inhabited variants
                 let (mut min, mut max) = (i128::MAX, i128::MIN);
                 let discr_type = def.repr.discr_type();
                 let bits = Integer::from_attr(self, discr_type).size().bits();
@@ -1169,6 +1213,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     max = 0;
                 }
                 assert!(min <= max, "discriminant range is {}...{}", min, max);
+// Choose representation to fit the range
                 let (min_ity, signed) = Integer::repr_discr(tcx, ty, &def.repr, min, max);
 
                 let mut align = dl.aggregate_align;
@@ -1178,6 +1223,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 let mut start_align = Align::from_bytes(256).unwrap();
                 assert_eq!(Integer::for_align(dl, start_align), None);
 
+// Align prefix to widest field
                 // repr(C) on an enum tells us to make a (tag, union) layout,
                 // so we need to grow the prefix alignment to be at least
                 // the alignment of the union. (This value is used both for
@@ -1192,6 +1238,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     }
                 }
 
+// Generate a layout for each variant and find the width alignment and size
                 // Create the set of structs that represent each variant.
                 let mut layout_variants = variants
                     .iter_enumerated()
@@ -1209,6 +1256,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                             st.fields.index_by_increasing_offset().map(|j| field_layouts[j])
                         {
                             if !field.is_zst() || field.align.abi.bytes() != 1 {
+// Unclear, find smallest field alignment over all variants?
                                 start_align = start_align.min(field.align.abi);
                                 break;
                             }
@@ -1219,13 +1267,17 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     })
                     .collect::<Result<IndexVec<VariantIdx, _>, _>>()?;
 
+// Expand size to alignment
                 // Align the maximum variant size to the largest alignment.
                 size = size.align_to(align.abi);
 
+// Check size is sensible
                 if size.bytes() >= dl.obj_size_bound() {
                     return Err(LayoutError::SizeOverflow(ty));
                 }
 
+// Choose representation of discriminant
+// `from_attr()` converts between int type enums (output is just I8, I16, I32, and so on)
                 let typeck_ity = Integer::from_attr(dl, def.repr.discr_type());
                 if typeck_ity < min_ity {
                     // It is a bug if Layout decided on a greater discriminant size than typeck for
@@ -1257,16 +1309,20 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
 
                 // Use the initial field alignment
                 let mut ity = if def.repr.c() || def.repr.int.is_some() {
+// Use pre-chosen discriminant int type for C and explicitly specified enums
                     min_ity
                 } else {
+// Tentatively choose a discriminant that fits an alignment hole?
                     Integer::for_align(dl, start_align).unwrap_or(min_ity)
                 };
 
                 // If the alignment is not larger than the chosen discriminant size,
                 // don't use the alignment as the final size.
                 if ity <= min_ity {
+// Use small discriminant computed from type holes if it's large enough
                     ity = min_ity;
                 } else {
+// Make space for a wider discriminant if required
                     // Patch up the variants' first few fields.
                     let old_ity_size = min_ity.size();
                     let new_ity_size = ity.size();
@@ -1296,9 +1352,12 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 };
                 let mut abi = Abi::Aggregate { sized: true };
                 if tag.value.width(dl) == size {
+// Plain enum
                     abi = Abi::Scalar(tag.clone());
                 } else {
                     // Try to use a ScalarPair for all tagged enums.
+// Check if all enum variants contain only a single integer field of a common type (or only ZST fields)
+// If this holds, store information about the common field in `common_prim`
                     let mut common_prim = None;
                     for (field_layouts, layout_variant) in iter::zip(&variants, &layout_variants) {
                         let offsets = match layout_variant.fields {
@@ -1335,6 +1394,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                             common_prim = Some((prim, offset));
                         }
                     }
+// Represent the whole enum as a scalar pair if possible
                     if let Some((prim, offset)) = common_prim {
                         let pair = self.scalar_pair(tag.clone(), scalar_unit(prim));
                         let pair_offsets = match pair.fields {
@@ -1356,10 +1416,12 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     }
                 }
 
+// Whole type is uninhabited if no variants are inhabited
                 if layout_variants.iter().all(|v| v.abi.is_uninhabited()) {
                     abi = Abi::Uninhabited;
                 }
 
+// Assemble tag and data layout (with possible pair optimisation)
                 let largest_niche = Niche::from_scalar(dl, Size::ZERO, tag.clone());
 
                 let tagged_layout = Layout {
@@ -1380,6 +1442,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     size,
                 };
 
+// Choose between different layout strategies
                 let best_layout = match (tagged_layout, niche_filling_layout) {
                     (tagged_layout, Some(niche_filling_layout)) => {
                         // Pick the smaller layout; otherwise,
