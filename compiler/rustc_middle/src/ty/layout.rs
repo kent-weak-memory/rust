@@ -662,7 +662,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                 abi: Abi::Aggregate { sized: false },
                 largest_niche: None,
                 align: dl.i8_align,
-                range: Some(Size::ZERO),
+                range: None,
                 size: Size::ZERO,
             }),
 
@@ -1160,6 +1160,17 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                             let largest_niche =
                                 Niche::from_scalar(dl, offset, niche_scalar.clone());
 
+                            // TODO(seharris): heard you like duplication?
+                            // TODO(seharris): pointers shouldn't collide with niches because there's no room, but can we enforce that more strongly?
+                            let range = if let Abi::Scalar(scalar) = &abi {
+                                match scalar.value {
+                                    Primitive::Pointer => Some(dl.pointer_range),
+                                    _ => Some(size),
+                                }
+                            } else {
+                                None
+                            };
+
 // Unclear
                             niche_filling_layout = Some(Layout {
                                 variants: Variants::Multiple {
@@ -1178,7 +1189,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                                 },
                                 abi,
                                 largest_niche,
-                                range: None,
+                                range,
                                 size,
                                 align,
                             });
