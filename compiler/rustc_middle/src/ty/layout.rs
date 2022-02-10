@@ -1432,6 +1432,14 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     abi = Abi::Uninhabited;
                 }
 
+                // TODO(seharris): this is hacky.
+                let range = match &abi {
+                    Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) =>
+                        Some(self.data_layout().pointer_range),
+                    Abi::Scalar(Scalar {..}) => Some(size),
+                    _ => None
+                };
+
 // Assemble tag and data layout (with possible pair optimisation)
                 let largest_niche = Niche::from_scalar(dl, Size::ZERO, tag.clone());
 
@@ -1449,7 +1457,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     largest_niche,
                     abi,
                     align,
-                    range: None,
+                    range,
                     size,
                 };
 

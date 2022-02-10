@@ -677,7 +677,7 @@ where
                 Immediate::Scalar(ScalarMaybeUninit::Scalar(Scalar::Int(int))) => {
                     if let Abi::Scalar(abi::Scalar{value: Primitive::Pointer, valid_range: _}) = dest.layout.abi {
                         assert_eq!(int.range(), self.pointer_range(), "Size mismatch when writing bits");
-                        assert_eq!(int.width(), self.pointer_width(), "Size mismatch when writing bits");
+                        assert!(int.width() == self.pointer_range() || int.width() == self.pointer_width(), "Size mismatch when writing bits");
                     } else {
                         assert_eq!(int.range(), dest.layout.range.unwrap(), "Size mismatch when writing bits");
                         assert_eq!(int.width(), dest.layout.size, "Size mismatch when writing bits");

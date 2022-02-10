@@ -309,7 +309,8 @@ impl<Tag> Scalar<Tag> {
         assert_ne!(target_width.bytes(), 0, "you should never look at the bits of a ZST");
         match self {
             Scalar::Int(int) => {
-                assert!(target_width == int.width());
+                assert!(int.range() == target_range);
+                assert!(int.width() == target_range || int.width() == target_width);
                 Ok(int.assert_bits(target_range))
             },
             Scalar::Ptr(ptr, range, width) => {

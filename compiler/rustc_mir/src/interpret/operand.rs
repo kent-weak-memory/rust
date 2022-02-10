@@ -257,7 +257,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         match mplace.layout.abi {
             Abi::Scalar(..) => {
-                let scalar = alloc.read_scalar(alloc_range(Size::ZERO, Some(mplace.layout.range.unwrap()), mplace.layout.size))?;
+                let scalar = alloc.read_scalar(alloc_range(Size::ZERO, mplace.layout.range, mplace.layout.size))?;
                 Ok(Some(ImmTy { imm: scalar.into(), layout: mplace.layout }))
             }
             Abi::ScalarPair(ref a, ref b) => {
@@ -654,7 +654,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         // Read tag and sanity-check `tag_layout`.
         let tag_val = self.read_immediate(&self.operand_field(op, tag_field)?)?;
-        assert_eq!(tag_layout.size, tag_val.layout.size);
+        assert_eq!(tag_layout.range.unwrap(), tag_val.layout.range.unwrap());
+        assert!(tag_layout.size == tag_val.layout.range.unwrap() || tag_layout.size == tag_val.layout.size);
         assert_eq!(tag_layout.abi.is_signed(), tag_val.layout.abi.is_signed());
         let tag_val = tag_val.to_scalar()?;
         trace!("tag value: {:?}", tag_val);
