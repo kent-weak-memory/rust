@@ -679,8 +679,8 @@ where
                         assert_eq!(int.range(), self.pointer_range(), "Size mismatch when writing bits");
                         assert!(int.width() == self.pointer_range() || int.width() == self.pointer_width(), "Size mismatch when writing bits");
                     } else {
-                        assert_eq!(int.range(), dest.layout.range.unwrap(), "Size mismatch when writing bits");
-                        assert_eq!(int.width(), dest.layout.size, "Size mismatch when writing bits");
+                        assert_eq!(dest.layout.range.unwrap(), int.range(), "Size mismatch when writing bits");
+                        assert!(dest.layout.size == int.range() || dest.layout.size == int.width(), "Size mismatch when writing bits");
                     }
                 }
                 Immediate::Scalar(ScalarMaybeUninit::Uninit) => {} // uninit can have any size

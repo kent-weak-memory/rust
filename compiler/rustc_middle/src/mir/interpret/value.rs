@@ -310,7 +310,6 @@ impl<Tag> Scalar<Tag> {
         match self {
             Scalar::Int(int) => {
                 assert!(int.range() == target_range);
-                assert!(int.width() == target_range || int.width() == target_width);
                 Ok(int.assert_bits(target_range))
             },
             Scalar::Ptr(ptr, range, width) => {
