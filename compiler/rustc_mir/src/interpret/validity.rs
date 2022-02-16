@@ -638,7 +638,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
         let (lo, hi) = valid_range.clone().into_inner();
         // Determine the allowed range
         // `max_hi` is as big as the size fits
-        let max_hi = u128::MAX >> (128 - op.layout.size.bits());
+        let max_hi = u128::MAX >> (128 - op.layout.range.unwrap().bits());
         assert!(hi <= max_hi);
         // We could also write `(hi + 1) % (max_hi + 1) == lo` but `max_hi + 1` overflows for `u128`
         if (lo == 0 && hi == max_hi) || (hi + 1 == lo) {
