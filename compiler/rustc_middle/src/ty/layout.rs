@@ -507,6 +507,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) =>
                 Some(self.data_layout().pointer_range),
             Abi::Scalar(Scalar {..}) => Some(size),
+            // Special case for `()`
+            Abi::Aggregate{sized: true} if size.bytes() == 0 => Some(size),
             _ => None
         };
 

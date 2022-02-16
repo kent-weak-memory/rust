@@ -679,7 +679,7 @@ where
                         assert_eq!(int.range(), self.pointer_range(), "Size mismatch when writing bits");
                         assert!(int.width() == self.pointer_range() || int.width() == self.pointer_width(), "Size mismatch when writing bits");
                     } else {
-                        assert_eq!(dest.layout.range.unwrap_or(abi::Size::from_bits(0)), int.range(), "Size mismatch when writing bits");
+                        assert_eq!(dest.layout.range.unwrap(), int.range(), "Size mismatch when writing bits");
                         assert!(dest.layout.size == int.range() || dest.layout.size == int.width(), "Size mismatch when writing bits");
                     }
                 }
