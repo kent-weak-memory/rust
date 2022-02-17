@@ -634,6 +634,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     };
 
                 let largest_niche = if count != 0 { element.largest_niche.clone() } else { None };
+                let range = if size.bits() == 0 { Some(size) } else { None };
 
                 tcx.intern_layout(Layout {
                     variants: Variants::Single { index: VariantIdx::new(0) },
@@ -641,7 +642,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     abi,
                     largest_niche,
                     align: element.align,
-                    range: None,
+                    range,
                     size,
                 })
             }
