@@ -159,6 +159,8 @@ impl Reg {
 }
 
 impl Reg {
+    pub const LARGEST_INT_BITS: u64 = 128;
+
     pub fn align<C: HasDataLayout>(&self, cx: &C) -> Align {
         let dl = cx.data_layout();
         match self.kind {

@@ -3083,7 +3083,7 @@ where
                 let max_by_val_size = Pointer.width(cx) * 2;
                 let size = arg.layout.size;
 
-                if arg.layout.is_unsized() || size > max_by_val_size {
+                if arg.layout.is_unsized() || size > max_by_val_size || size.bits() > Reg::LARGEST_INT_BITS {
                     arg.make_indirect();
                 } else {
                     // We want to pass small aggregates as immediates, but using
