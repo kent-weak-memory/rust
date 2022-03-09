@@ -1,4 +1,4 @@
-use crate::spec::{Target, TargetOptions};
+use crate::spec::{MergeFunctions, Target, TargetOptions};
 
 pub fn target() -> Target {
     Target {
@@ -11,6 +11,8 @@ pub fn target() -> Target {
         	features: "+morello,+c64".to_string(),
         	llvm_abiname: "purecap".to_string(),
         	max_atomic_width: Some(128),
+        	// TODO: figure out why this optimisation causes crashes when building libc.
+        	merge_functions: MergeFunctions::Disabled,
         	..super::freebsd_base::opts()
         },
     }
