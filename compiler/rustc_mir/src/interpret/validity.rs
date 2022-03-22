@@ -681,7 +681,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
                     )
                 }
             }
-            Ok(int) => int.assert_bits(op.layout.size),
+            Ok(int) => int.assert_bits(op.layout.range.unwrap()),
         };
         // Now compare. This is slightly subtle because this is a special "wrap-around" range.
         if wrapping_range_contains(&valid_range, bits) {
