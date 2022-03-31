@@ -10,6 +10,9 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#define _XOPEN_SOURCE 500
+#define __USE_XOPEN_EXTENDED 1
+#include <ftw.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -264,58 +267,21 @@ bool send_output(const int socket, const uint8_t pipe_number, const int pipe) {
 	}
 }
 
-// Recursively delete a directory and all files in it, crash on error.
-string remove_directory_path; // static to allow re-use and not worrying about free()ing
-void _remove_directory(void) {
-	DIR *directory = opendir(string_nulled(&remove_directory_path));
-	if (directory == NULL) {
-		perror("failed to open temporary directory");
-		abort();
-	}
-
-	const size_t path_length = remove_directory_path.length;
-	string_push(&remove_directory_path, '/');
-
-	while (true) {
-		// Get next item to delete and append it to the path.
-		const struct dirent *const entry = readdir(directory);
-		if (entry == NULL) break;
-		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
-		string_append(&remove_directory_path, entry->d_name, strlen(entry->d_name));
-
-		// Recursively delete item, reusing path buffer for recursion.
-printf("HACK _remove_directory() remove %s\n", string_nulled(&remove_directory_path));
-		if (entry->d_type == DT_DIR) {
-printf("HACK _remove_directory() recurse for %s\n", string_nulled(&remove_directory_path));
-			// `entry` becomes invalid after this call due to how `readdir()` allocates it.
-			_remove_directory();
-		} else if (unlink(string_nulled(&remove_directory_path)) != 0) {
-			perror("failed to remove temporary file");
-			abort();
-		}
-
-		// Remove item from path so we can recycle it on future iterations.
-		remove_directory_path.length = path_length+1;
-	}
-
-	// Remove all added suffixes from path so it stays as it was when we were called.
-	remove_directory_path.length = path_length;
-
-	// Close and delete directory.
-	if (closedir(directory) != 0) {
-		perror("failed to close temporary directory");
-		abort();
-	}
-	if (rmdir(string_nulled(&remove_directory_path)) != 0) {
-		perror("failed to delete temporary directory");
-		abort();
-	}
-printf("HACK _remove_directory() removed directory %s\n", string_nulled(&remove_directory_path));
+int rm_file(const char *filename, 
+	const struct stat *statptr,
+	int fileflags,
+	struct FTW *pfwt) {
+		int rc = remove(filename);
+		if (rc)
+			perror(filename);
+		return rc;
 }
-void remove_directory(const char *const path) {
-	string_clear(&remove_directory_path);
-	string_append(&remove_directory_path, path, strlen(path));
-	_remove_directory();
+
+int remove_directory(const char *path) {
+	int rc = nftw(path, rm_file, 5, FTW_DEPTH | FTW_PHYS);
+	if (rc)
+		perror("error removing directory");
+	return rc;
 }
 
 // Receive a test binary and related files, run the test, transmit results, crash on error.
