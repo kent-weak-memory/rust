@@ -14,6 +14,7 @@
 #define __USE_XOPEN_EXTENDED 1
 #include <ftw.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +29,10 @@ const char *const working_directory = "/tmp/work";
 const char *const test_directory = "/tmp/work/test0";
 const char *const temporary_directory = "/tmp/work/tmp";
 
+#define DEFAULT_PORT (12345)
 #define COMMAND_LENGTH 4
+
+int port = DEFAULT_PORT;
 
 // This macro declares a type to hold dynamically sized arrays of things of type ITEM_TYPE.
 // In other words, this macro does templating.
@@ -497,7 +501,7 @@ int start_listening() {
 	memset(&address, 0, sizeof(address));
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = htons(INADDR_ANY);
-	address.sin_port = htons(12345);
+	address.sin_port = htons(port);
 	if (bind(root_socket, (struct sockaddr*)&address, sizeof(address)) != 0) {
 		perror("failed to choose listening port and interface");
 		abort();
@@ -564,9 +568,30 @@ printf("HACK handle() run\n");
 	}
 }
 
+// Remove temporary directories.
+void cleanup(void) {
+	remove_directory(working_directory);
+}
+
+static void q_sigint(int signo) {
+	(void)signo;
+	cleanup();
+	exit(0);
+}
+
 int main(int argc, char *argv[]) {
-	(void)argc;
-	(void)argv;
+	for (int arg = 1; arg < argc; ) {
+		// Specify port
+		if (strcmp(argv[arg], "-p") == 0 && arg + 1 < argc) {
+			port = atoi(argv[arg+1]);
+			arg+=2;
+		}
+	}
+
+	if (signal(SIGINT, q_sigint) == SIG_ERR) {
+		fputs("Could not attach interrupt signal handler.", stderr);
+		abort();
+	}
 
 	if (mkdir(working_directory, 0755) != 0 || mkdir(temporary_directory, 0755) != 0) {
 		perror("failed to create temporary directory");
@@ -583,6 +608,7 @@ printf("HACK main() accepted client\n");
 		handle(&buffer);
 		if (close(socket) != 0) {
 			perror("failed to close socket");
+			cleanup();
 			abort();
 		}
 printf("HACK main() processed request\n");
