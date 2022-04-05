@@ -47,17 +47,19 @@ impl SignalToken {
         wake
     }
 
-    /// Converts to an unsafe usize value. Useful for storing in a pipe's state
+    /// Converts to an unsafe pointer value. Useful for storing in a pipe's state
     /// flag.
+    /// This originally used a usize, but that doesn't work on CHERI.
     #[inline]
-    pub unsafe fn cast_to_usize(self) -> usize {
+    pub unsafe fn cast_to_ptr(self) -> *mut () {
         mem::transmute(self.inner)
     }
 
-    /// Converts from an unsafe usize value. Useful for retrieving a pipe's state
-    /// flag.
+    /// Converts from an unsafe pointer value. Useful for retrieving a pipe's
+    /// state flag.
+    /// This originally used a usize, but that doesn't work on CHERI.
     #[inline]
-    pub unsafe fn cast_from_usize(signal_ptr: usize) -> SignalToken {
+    pub unsafe fn cast_from_ptr(signal_ptr: *mut ()) -> SignalToken {
         SignalToken { inner: mem::transmute(signal_ptr) }
     }
 }
