@@ -8,7 +8,6 @@
 // Everything here is blocking, one client is served at a time.
 // This will degrade performance, but it make this program much easier to implement correctly!
 
-#include <dirent.h>
 #include <fcntl.h>
 #define _XOPEN_SOURCE 500
 #define __USE_XOPEN_EXTENDED 1
@@ -271,14 +270,18 @@ bool send_output(const int socket, const uint8_t pipe_number, const int pipe) {
 	}
 }
 
-int rm_file(const char *filename, 
+int rm_file(
+	const char *filename, 
 	const struct stat *statptr,
 	int fileflags,
-	struct FTW *pfwt) {
-		int rc = remove(filename);
-		if (rc)
-			perror(filename);
-		return rc;
+	struct FTW *pfwt
+) {
+	(void)statptr;
+	(void)fileflags;
+	(void)pfwt;
+	int rc = remove(filename);
+	if (rc) perror(filename);
+	return rc;
 }
 
 int remove_directory(const char *path) {
