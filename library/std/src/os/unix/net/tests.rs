@@ -507,14 +507,25 @@ fn test_send_vectored_fds_unix_stream() {
 
     let mut ancillary_data_vec = Vec::from_iter(ancillary2.messages());
     assert_eq!(ancillary_data_vec.len(), 1);
-    if let AncillaryData::ScmRights(scm_rights) = ancillary_data_vec.pop().unwrap().unwrap() {
-        let fd_vec = Vec::from_iter(scm_rights);
-        assert_eq!(fd_vec.len(), 1);
-        unsafe {
-            libc::close(fd_vec[0]);
-        }
-    } else {
-        unreachable!("must be ScmRights");
+    let value = ancillary_data_vec.pop().unwrap().unwrap();
+    let scm_rights;
+    #[cfg(not(target_os = "freebsd"))]
+    {
+        scm_rights = if let AncillaryData::ScmRights(value) = value {
+            value
+        } else {
+            unreachable!("must be ScmRights")
+        };
+    }
+    #[cfg(target_os = "freebsd")]
+    {
+        let AncillaryData::ScmRights(value) = value;
+        scm_rights = value;
+    }
+    let fd_vec = Vec::from_iter(scm_rights);
+    assert_eq!(fd_vec.len(), 1);
+    unsafe {
+        libc::close(fd_vec[0]);
     }
 }
 
@@ -628,13 +639,24 @@ fn test_send_vectored_with_ancillary_unix_datagram() {
 
     let mut ancillary_data_vec = Vec::from_iter(ancillary2.messages());
     assert_eq!(ancillary_data_vec.len(), 1);
-    if let AncillaryData::ScmRights(scm_rights) = ancillary_data_vec.pop().unwrap().unwrap() {
-        let fd_vec = Vec::from_iter(scm_rights);
-        assert_eq!(fd_vec.len(), 1);
-        unsafe {
-            libc::close(fd_vec[0]);
-        }
-    } else {
-        unreachable!("must be ScmRights");
+    let value = ancillary_data_vec.pop().unwrap().unwrap();
+    let scm_rights;
+    #[cfg(not(target_os = "freebsd"))]
+    {
+        scm_rights = if let AncillaryData::ScmRights(value) = value {
+            value
+        } else {
+            unreachable!("must be ScmRights")
+        };
+    }
+    #[cfg(target_os = "freebsd")]
+    {
+        let AncillaryData::ScmRights(value) = value;
+        scm_rights = value;
+    }
+    let fd_vec = Vec::from_iter(scm_rights);
+    assert_eq!(fd_vec.len(), 1);
+    unsafe {
+        libc::close(fd_vec[0]);
     }
 }
