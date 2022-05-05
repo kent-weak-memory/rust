@@ -224,13 +224,13 @@ printf("HACK upload_file() length=%lu\n", length);
 	const uint8_t *chunk_data = NULL;
 	size_t chunk_length = 0;
 	while (readbuffer_chunks(buffer, &chunk_data, &chunk_length, &length)) {
-printf("HACK upload_file() read input bytes=%lu/%lu\n", chunk_length, length);
+printf("HACK upload_file() read input bytes=%lu/%-20lu\r", chunk_length, length);
 		if (write(file, chunk_data, chunk_length) != (ssize_t)chunk_length) {
 			fprintf(stderr, "failed to write to file\n");
 			abort();
 		}
 	}
-printf("HACK upload_file() end of bytes\n");
+printf("\nHACK upload_file() end of bytes\n");
 
 	// Tidy up.
 	if (close(file) != 0) {
@@ -465,13 +465,13 @@ printf("HACK run_test() child terminated\n");
 			const uint32_t code = WEXITSTATUS(status);
 			const uint8_t packet[5] = {0, code >> 24, code >> 16, code >> 8, code};
 			send_buffer(buffer->socket, &packet[0], sizeof(packet));
-printf("HACK run_test() sent exit code\n");
+printf("HACK run_test() sent exit code %d\n", code);
 		} else if (WIFSIGNALED(status)) {
 			// Child exited after signal.
 			const uint32_t signal = WTERMSIG(status);
 			const uint8_t packet[5] = {1, signal >> 24, signal >> 16, signal >> 8, signal};
 			send_buffer(buffer->socket, &packet[0], sizeof(packet));
-printf("HACK run_test() sent signal\n");
+printf("HACK run_test() sent signal %d\n", signal);
 		} else {
 			fprintf(stderr, "child process stopped unexpectedly\n");
 			abort();
