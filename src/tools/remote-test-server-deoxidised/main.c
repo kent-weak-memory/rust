@@ -29,9 +29,13 @@ const char *const test_directory = "/tmp/work/test0";
 const char *const temporary_directory = "/tmp/work/tmp";
 
 #define DEFAULT_PORT (12345)
+#define DEFAULT_KEEP_TMP_DIR (false)
+#define DEFAULT_QUIET (false)
 #define COMMAND_LENGTH 4
 
 int port = DEFAULT_PORT;
+int keep_tmp_dir = DEFAULT_KEEP_TMP_DIR;
+int quiet = DEFAULT_QUIET;
 
 // This macro declares a type to hold dynamically sized arrays of things of type ITEM_TYPE.
 // In other words, this macro does templating.
@@ -206,11 +210,11 @@ char *upload_file(readbuffer *buffer, const char *const base_path) {
 	readbuffer_read_until(buffer, &upload_file_path, 0);
 	if (upload_file_path.length-base_length-1 > max_length) upload_file_path.length = base_length+1+max_length;
 	char *const file_path = string_nulled(&upload_file_path);
-printf("HACK upload_file() path=%s\n", file_path);
+	if (!quiet) printf("upload_file() path=%s\n", file_path);
 
 	// Read length of file.
 	size_t length = readbuffer_read_u32(buffer);
-printf("HACK upload_file() length=%lu\n", length);
+	if (!quiet) printf("upload_file() length=%lu\n", length);
 
 	// Create file at calculated path.
 	const int file = open(file_path, O_CREAT|O_TRUNC|O_WRONLY, 0755);
@@ -224,20 +228,20 @@ printf("HACK upload_file() length=%lu\n", length);
 	const uint8_t *chunk_data = NULL;
 	size_t chunk_length = 0;
 	while (readbuffer_chunks(buffer, &chunk_data, &chunk_length, &length)) {
-printf("HACK upload_file() read input bytes=%lu/%-20lu\r", chunk_length, length);
+		if (!quiet) printf("upload_file() read input bytes=%lu/%-20lu\r", chunk_length, length);
 		if (write(file, chunk_data, chunk_length) != (ssize_t)chunk_length) {
 			fprintf(stderr, "failed to write to file\n");
 			abort();
 		}
 	}
-printf("\nHACK upload_file() end of bytes\n");
+	if (!quiet) printf("\nupload_file() end of bytes\n");
 
 	// Tidy up.
 	if (close(file) != 0) {
 		perror("failed to close file");
 		abort();
 	}
-printf("HACK upload_file() file uploaded\n");
+	if (!quiet) printf("upload_file() file uploaded\n");
 
 	return file_path;
 }
@@ -304,7 +308,7 @@ void run_test(readbuffer *const buffer) {
 		perror("failed to create test directory");
 		abort();
 	}
-printf("HACK run_test() temporary directory created\n");
+if (!quiet) printf("run_test() temporary directory created\n");
 
 	// Read list of NULL terminated arguments.
 	// We store the argument data into one big long string with a NULL at the end of each argument.
@@ -320,7 +324,7 @@ printf("HACK run_test() temporary directory created\n");
 		string_push(&run_args_strings, 0);
 		string_vector_push(&run_args, &run_args_strings.data[start]);
 	}
-printf("HACK run_test() arguments added\n");
+if (!quiet) printf("run_test() arguments added\n");
 
 	// Do pretty much the same thing for environment variable key-value pairs.
 	// We do some extra processing to format the pairs as needed by `execve()`.
@@ -340,7 +344,7 @@ printf("HACK run_test() arguments added\n");
 		string_push(&run_envs_strings, '\0');
 		string_vector_push(&run_envs, &run_envs_strings.data[start]);
 	}
-printf("HACK run_test() environment variables added\n");
+if (!quiet) printf("run_test() environment variables added\n");
 
 	// Add library paths.
 	{
@@ -370,7 +374,7 @@ printf("HACK run_test() environment variables added\n");
 		string_push(&run_envs_strings, '\0');
 		string_vector_push(&run_envs, &run_envs_strings.data[start]);
 	}
-printf("HACK run_test() extra environment variables inserted\n");
+if (!quiet) printf("run_test() extra environment variables inserted\n");
 
 	// Read list of dynamic libraries.
 	while (readbuffer_peek(buffer) != 0) {
@@ -379,14 +383,14 @@ printf("HACK run_test() extra environment variables inserted\n");
 	uint8_t byte = 0;
 	readbuffer_read(buffer, &byte, 1);
 	if (byte != 0) abort();
-printf("HACK run_test() dynamic libraries copied\n");
+if (!quiet) printf("run_test() dynamic libraries copied\n");
 
 	// Upload binary.
 	char *const binary_path = upload_file(buffer, test_directory);
 
 	// Replace dummy args[0] now we have the path to the binary.
 	run_args.data[0] = binary_path;
-printf("HACK run_test() binary is %s\n", binary_path);
+if (!quiet) printf("run_test() binary is %s\n", binary_path);
 
 	// Run test program.
 	int stdout_pipe[2] = {-1, -1};
@@ -405,8 +409,8 @@ printf("HACK run_test() binary is %s\n", binary_path);
 			perror("failed to close parent end of output pipes");
 			abort();
 		}
-printf("HACK run_test() closed parent end of pipes\n");
-printf("HACK run_test() loading %s\n", binary_path);
+		if (!quiet) printf("run_test() closed parent end of pipes\n");
+		if (!quiet) printf("run_test() loading %s\n", binary_path);
 		if (dup2(stdout_pipe[1], STDOUT_FILENO) != STDOUT_FILENO) {
 			perror("failed to attach stdout");
 			abort();
@@ -424,7 +428,7 @@ printf("HACK run_test() loading %s\n", binary_path);
 			perror("failed to close child end of output pipes");
 			abort();
 		}
-printf("HACK run_test() closed child end of pipes\n");
+		if (!quiet) printf("run_test() closed child end of pipes\n");
 
 		// Transmit output.
 		int end_descriptor = stderr_pipe[0] > stdout_pipe[0] ? stderr_pipe[0] : stdout_pipe[0];
@@ -447,7 +451,7 @@ printf("HACK run_test() closed child end of pipes\n");
 				stderr_open = false;
 			}
 		}
-printf("HACK run_test() end of test\n");
+		if (!quiet) printf("run_test() end of test\n");
 
 		// Transmit result.
 		int status = 0;
@@ -455,7 +459,7 @@ printf("HACK run_test() end of test\n");
 			perror("falied to wait for subprocess to terminate");
 			abort();
 		}
-printf("HACK run_test() child terminated\n");
+		if (!quiet) printf("run_test() child terminated\n");
 		if (close(stdout_pipe[0]) != 0 || close(stderr_pipe[0]) != 0) {
 			perror("failed to close output pipes");
 			abort();
@@ -465,21 +469,23 @@ printf("HACK run_test() child terminated\n");
 			const uint32_t code = WEXITSTATUS(status);
 			const uint8_t packet[5] = {0, code >> 24, code >> 16, code >> 8, code};
 			send_buffer(buffer->socket, &packet[0], sizeof(packet));
-printf("HACK run_test() sent exit code %d\n", code);
+			if (!quiet) printf("run_test() sent exit code %d\n", code);
 		} else if (WIFSIGNALED(status)) {
 			// Child exited after signal.
 			const uint32_t signal = WTERMSIG(status);
 			const uint8_t packet[5] = {1, signal >> 24, signal >> 16, signal >> 8, signal};
 			send_buffer(buffer->socket, &packet[0], sizeof(packet));
-printf("HACK run_test() sent signal %d\n", signal);
+			if (!quiet) printf("run_test() sent signal %d\n", signal);
 		} else {
 			fprintf(stderr, "child process stopped unexpectedly\n");
 			abort();
 		}
 	}
-
-	remove_directory(test_directory);
-printf("HACK run_test() removed temporary directory\n");
+	
+	if(!keep_tmp_dir) {
+		remove_directory(test_directory);
+		if (!quiet) printf("run_test() removed temporary directory\n");
+	}
 }
 
 // Open first socket to listen to new connections.
@@ -556,14 +562,14 @@ void handle(readbuffer *const buffer) {
 	uint8_t command[COMMAND_LENGTH] = {0};
 	readbuffer_read(buffer, &command[0], sizeof(command));
 	if (compare_bytes(command, (const uint8_t*)"ping", COMMAND_LENGTH)) {
-printf("HACK handle() ping\n");
+		if (!quiet) printf("handle() ping\n");
 		send_buffer(buffer->socket, (const uint8_t*)"pong", 4);
 	} else if (compare_bytes(command, (const uint8_t*)"push", COMMAND_LENGTH)) {
-printf("HACK handle() push\n");
+		if (!quiet) printf("handle() push\n");
 		upload_file(buffer, working_directory);
 		send_buffer(buffer->socket, (const uint8_t*)"ack ", 4);
 	} else if (compare_bytes(command, (const uint8_t*)"run ", COMMAND_LENGTH)) {
-printf("HACK handle() run\n");
+		if (!quiet) printf("handle() run\n");
 		run_test(buffer);
 	} else {
 		fprintf(stderr, "invalid command received\n");
@@ -582,13 +588,41 @@ static void q_sigint(int signo) {
 	exit(0);
 }
 
+void print_help(FILE* fd, char *argv[]) {
+	fprintf(fd, "%s [OPTIONS]\n", argv[0]);
+	fprintf(fd, "  -h          Display this menu and exit\n");
+	fprintf(fd, "  -k          Keep temporary directories.\n");
+	fprintf(fd, "  -p <PORT>   Run the test server on a specified port. Default: %d\n", DEFAULT_PORT);
+	fprintf(fd, "  -q          Squelch some prints.\n");
+	exit(0);
+}
+
 int main(int argc, char *argv[]) {
 	for (int arg = 1; arg < argc; ) {
 		// Specify port
 		if (strcmp(argv[arg], "-p") == 0 && arg + 1 < argc) {
 			port = atoi(argv[arg+1]);
 			arg+=2;
+			continue;
 		}
+
+		if (strcmp(argv[arg], "-k") == 0) {
+			keep_tmp_dir = true;
+			arg++;
+			continue;
+		}
+
+		if(strcmp(argv[arg], "-q") == 0) {
+			quiet = true;
+			arg++;
+			continue;
+		}
+
+		if (strcmp(argv[arg], "-h") == 0) {
+			print_help(stdout, argv);
+		}
+
+		print_help(stderr, argv);
 	}
 
 	if (signal(SIGINT, q_sigint) == SIG_ERR) {
@@ -600,13 +634,13 @@ int main(int argc, char *argv[]) {
 		perror("failed to create temporary directory");
 		abort();
 	}
-printf("HACK main() created temporary directories\n");
+	if (!quiet) printf("main() created temporary directories\n");
 
 	const int root_socket = start_listening();
-printf("HACK main() opened port\n");
+	if (!quiet) printf("main() opened port\n");
 	while (true) {
 		const int socket = accept_client(root_socket);
-printf("HACK main() accepted client\n");
+		if (!quiet) printf("main() accepted client\n");
 		readbuffer buffer = readbuffer_new(socket);
 		handle(&buffer);
 		if (close(socket) != 0) {
@@ -614,6 +648,6 @@ printf("HACK main() accepted client\n");
 			cleanup();
 			abort();
 		}
-printf("HACK main() processed request\n");
+		if (!quiet) printf("main() processed request\n");
 	}
 }
