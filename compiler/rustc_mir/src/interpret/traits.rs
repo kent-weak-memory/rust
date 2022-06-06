@@ -52,6 +52,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             .memory
             .get(vtable_slot, Some(ptr_range), ptr_width, self.tcx.data_layout.pointer_align.abi)?
             .expect("cannot be a ZST");
+        // TODO(seharris): maybe change offset to match hardware
         let fn_ptr = self.scalar_to_ptr(vtable_slot.read_ptr_sized(Size::ZERO)?.check_init()?);
         self.memory.get_fn(fn_ptr)
     }
@@ -101,6 +102,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             .memory
             .get(vtable, None, vtable_size, self.tcx.data_layout.pointer_align.abi)?
             .expect("cannot be a ZST");
+        // TODO(seharris): we're wasting some of the allocation here, we could pack these values as `usize`s
         let size = vtable
             .read_ptr_sized(pointer_width * u64::try_from(COMMON_VTABLE_ENTRIES_SIZE).unwrap())?
             .check_init()?;

@@ -23,6 +23,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
     let mut llvals = Vec::with_capacity(alloc.relocations().len() + 1);
     let dl = cx.data_layout();
     let pointer_range = dl.pointer_range.bytes() as usize;
+    let pointer_width = dl.pointer_width.bytes() as usize;
 
     let mut next_offset = 0;
     for &(offset, alloc_id) in alloc.relocations().iter() {
@@ -62,8 +63,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
             &Scalar { value: Primitive::Pointer, valid_range: 0..=!0 },
             cx.type_i8p_ext(address_space),
         ));
-        // TODO(seharris): this doesn't look sensible
-        next_offset = offset + pointer_range;
+        next_offset = offset + pointer_width;
     }
     if alloc.len() >= next_offset {
         let range = next_offset..alloc.len();
