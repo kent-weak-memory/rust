@@ -2,6 +2,7 @@
 # Script to annotate LLVM IR with more readable debugging notes
 
 import re
+from sys import argv
 
 # Reference to a debug entry
 regex_reference = re.compile(b"!dbg !([0-9]+)")
@@ -67,16 +68,25 @@ def find_scope_source(text, uid, uids_seen):
 						name = next_name
 	return (filename, line, name)
 
+# Parse arguments
+if len(argv) < 2 or len(argv) > 3:
+	program = argv[0] if len(argv) > 0 else "program.py"
+	print("Usage: {} input.ll [debug.ll]".format(program))
+	print("Annotate contents of LLVM IR file input.ll with debugging information read from debug.ll")
+	print("If debug.ll is not given then input.ll will be used instead")
+	print("Output will be written to input.ll.out")
+	exit(0)
+input_path = argv[1]
+debug_path = argv[2] if len(argv) == 3 else input_path
+write_path = input_path+".out"
+
 # Load input files.
-input_path = "/tmp/build/args.ll" # file to annotate
-debug_path = "/tmp/build/std.ll" # file containing debug entries
 with open(input_path, "rb") as file:
 	input_bytes = file.read()
 with open(debug_path, "rb") as file:
 	debug_bytes = file.read()
 
 # Write new file with annotations.
-write_path = "/tmp/build/args.ll.out"
 with open(write_path, "wb") as file:
 	# Find all !dbg references and annotate their lines
 	last_end = 0
