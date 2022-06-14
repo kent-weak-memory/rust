@@ -8,12 +8,15 @@ pub fn target() -> Target {
         data_layout: "e-m:e-pf200:128:128:128:64-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128-A200-P200-G200".to_string(),
         arch: "aarch64".to_string(),
         options: TargetOptions {
-        	features: "+morello,+c64".to_string(),
-        	llvm_abiname: "purecap".to_string(),
-        	max_atomic_width: Some(128),
-        	// TODO: figure out why this optimisation causes crashes when building libc.
-        	merge_functions: MergeFunctions::Disabled,
-        	..super::freebsd_base::opts()
+            features: "+morello,+c64".to_string(),
+            llvm_abiname: "purecap".to_string(),
+            max_atomic_width: Some(128),
+            // Atomic pointers are supported and converting to integers
+            // invalidates capabilities so we *must* use atomic pointers.
+            atomic_pointers_via_integers: false,
+            // TODO: figure out why this optimisation causes crashes when building libc.
+            merge_functions: MergeFunctions::Disabled,
+            ..super::freebsd_base::opts()
         },
     }
 }

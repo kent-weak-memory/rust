@@ -1228,6 +1228,12 @@ pub struct TargetOptions {
 
     /// Whether the target supports atomic CAS operations natively
     pub atomic_cas: bool,
+    /// Whether to use atomic integers to implement atomic pointers.
+    /// Defaults to true.
+    /// This is, so far, only relevant to CHERI where atomic pointers *are*
+    /// supported, and converting a pointer to an integer and back has side
+    /// effects that make the pointer unusable.
+    pub atomic_pointers_via_integers: bool,
 
     /// Panic strategy: "unwind" or "abort"
     pub panic_strategy: PanicStrategy,
@@ -1413,6 +1419,7 @@ impl Default for TargetOptions {
             min_atomic_width: None,
             max_atomic_width: None,
             atomic_cas: true,
+            atomic_pointers_via_integers: true,
             panic_strategy: PanicStrategy::Unwind,
             crt_static_allows_dylibs: false,
             crt_static_default: false,
