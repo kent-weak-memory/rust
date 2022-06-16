@@ -513,15 +513,15 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                         if int_type_width_signed(ty, bx.tcx()).is_some()
                             || (ty.is_unsafe_ptr() && op == "xchg")
                         {
-                            let ptr = args[0].immediate();
-                            let val = args[1].immediate();
-                            // if ty.is_unsafe_ptr() && bx.target_spec().atomic_pointers_via_integers {
-                            //     // Some platforms do not support atomic operations on pointers,
-                            //     // so we cast to integer first.
-                            //     let ptr_llty = bx.type_ptr_to(bx.type_isize());
-                            //     ptr = bx.pointercast(ptr, ptr_llty);
-                            //     val = bx.ptrtoint(val, bx.type_isize());
-                            // }
+                            let mut ptr = args[0].immediate();
+                            let mut val = args[1].immediate();
+                            if ty.is_unsafe_ptr() && bx.target_spec().atomic_pointers_via_integers {
+                                // Some platforms do not support atomic operations on pointers,
+                                // so we cast to integer first.
+                                let ptr_llty = bx.type_ptr_to(bx.type_isize());
+                                ptr = bx.pointercast(ptr, ptr_llty);
+                                val = bx.ptrtoint(val, bx.type_isize());
+                            }
                             bx.atomic_rmw(atom_op, ptr, val, order)
                         } else {
                             return invalid_monomorphization(ty);
