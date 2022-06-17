@@ -744,10 +744,21 @@ extern "C" {
         link_name = "readdir$INODE64"
     )]
     #[cfg_attr(target_os = "netbsd", link_name = "__readdir30")]
-    #[cfg_attr(
-        all(target_os = "freebsd", any(freebsd11, freebsd10)),
-        link_name = "readdir@FBSD_1.0"
-    )]
+    // It looks like this symbol isn't available in later versions of FreeBSD,
+    // but unfortunately libc's build.rs defaults to version 11 if it's running
+    // anywhere other than BSD (maybe it assumes wrongly that this is a safe
+    // default?)
+    // Forcing it to build for version 12 or 13 (I think we're using a
+    // development version derived from 13) causes issues with `std`.
+    // `std` requires an environment variable to be set (manually?) to build
+    // for version 12 and possibly 13.
+    // This is a nuisance, and this whole thing feels hacky and probably
+    // broken, so here's more hack just to make it do what we need.
+    // TODO(seharris): possibly report this as a bug
+    // #[cfg_attr(
+    //     all(target_os = "freebsd", any(freebsd11, freebsd10)),
+    //     link_name = "readdir@FBSD_1.0"
+    // )]
     pub fn readdir(dirp: *mut ::DIR) -> *mut ::dirent;
     #[cfg_attr(
         all(target_os = "macos", target_arch = "x86"),
