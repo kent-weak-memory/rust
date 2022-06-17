@@ -32,7 +32,15 @@ fn main() {
         Some(11) if libc_ci => println!("cargo:rustc-cfg=freebsd11"),
         Some(12) if libc_ci => println!("cargo:rustc-cfg=freebsd12"),
         Some(13) if libc_ci => println!("cargo:rustc-cfg=freebsd13"),
-        Some(_) | None => println!("cargo:rustc-cfg=freebsd11"),
+        // Some(_) | None => println!("cargo:rustc-cfg=freebsd11"),
+        // TODO(seharris): probably report this as a bug
+        // Without this hack libc tries to link `readdir_r@FBSD_1.0` which is
+        // unavailable on CHERI BSD (which appears to be trunk, so somewhere
+        // ahead of 13).
+        // This is presumably either broken for cross compiling, or it's meant
+        // to fall back to a safe and maximally-compatible default version that
+        // actually isn't.
+        Some(_) | None => println!("cargo:rustc-cfg=freebsd12"),
     }
 
     // On CI: deny all warnings

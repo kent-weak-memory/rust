@@ -1403,7 +1403,7 @@ cfg_if! {
             #[cfg_attr(target_os = "netbsd", link_name = "__readdir_r30")]
             #[cfg_attr(
                 all(target_os = "freebsd", any(freebsd11, freebsd10)),
-                link_name = "readdir_r"
+                link_name = "readdir_r@FBSD_1.0"
             )]
             #[allow(non_autolinks)] // FIXME: `<>` breaks line length limit.
             /// The 64-bit libc on Solaris and illumos only has readdir_r. If a

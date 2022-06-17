@@ -62,6 +62,7 @@ impl<T> Queue<T> {
     /// one consumer.
     pub fn new() -> Queue<T> {
         let stub = unsafe { Node::new(None) };
+// TODO(seharris) investigate why this breaks
 // HACK(scooksey) the original code here seemed to create a bad pointer. I don't think I understand why.
         let r = Queue { head: AtomicPtr::new(ptr::null_mut()), tail: UnsafeCell::new(stub) };
         r.head.store(stub, Ordering::Relaxed);
