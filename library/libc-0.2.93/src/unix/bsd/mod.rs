@@ -3,9 +3,12 @@ pub type useconds_t = u32;
 pub type blkcnt_t = i64;
 pub type socklen_t = u32;
 pub type sa_family_t = u8;
-pub type pthread_t = *mut ::c_void;
+pub type pthread_t = *mut PThread;
 pub type nfds_t = ::c_uint;
 pub type regoff_t = off_t;
+
+#[allow(missing_copy_implementations)]
+pub struct PThread { _opaque: [u8; 0] }
 
 s! {
     pub struct sockaddr {
