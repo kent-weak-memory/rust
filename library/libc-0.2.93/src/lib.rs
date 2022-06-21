@@ -30,6 +30,8 @@
 )]
 #![cfg_attr(libc_const_extern_fn, feature(const_extern_fn))]
 #![feature(rustc_private)]
+#![feature(native_link_modifiers)]
+#![feature(native_link_modifiers_bundle)]
 
 #[macro_use]
 mod macros;
