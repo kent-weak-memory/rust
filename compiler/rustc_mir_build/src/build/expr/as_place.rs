@@ -670,6 +670,11 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         expr_span: Span,
         source_info: SourceInfo,
     ) -> BasicBlock {
+        // TOOD(simonc) hook in compiler flag for this
+        let gcx = *self.tcx;
+        if gcx.sess.opts.cg.drop_bounds_checks {
+            return block
+        }
         let usize_ty = self.tcx.types.usize;
         let bool_ty = self.tcx.types.bool;
         // bounds check:

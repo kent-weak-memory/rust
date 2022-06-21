@@ -890,6 +890,10 @@ options! {
     // If you add a new option, please update:
     // - compiler/rustc_interface/src/tests.rs
     // - src/doc/rustc/src/codegen-options/index.md
+    
+    // XXX(simonc): EXPERIEMTAL drop compiler emitted bounds checks
+    drop_bounds_checks: bool = (false, parse_bool, [TRACKED], 
+        "EXPERIEMTAL drop compiler emitted bounds checks (default: no)"),
 
     ar: String = (String::new(), parse_string, [UNTRACKED],
         "this option is deprecated and does nothing"),
