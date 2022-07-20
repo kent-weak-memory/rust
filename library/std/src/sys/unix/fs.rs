@@ -242,6 +242,10 @@ pub struct OpenOptions {
     // system-specific
     custom_flags: i32,
     mode: mode_t,
+    // TODO(seharris): figure out why this is broken.
+    // This extra padding stops this struct being returned as an i96 and
+    // causing a SIGPROT during its initialisation.
+    padding: [u8; 4],
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -681,6 +685,7 @@ impl OpenOptions {
             // system-specific
             custom_flags: 0,
             mode: 0o666,
+            padding: [0; 4],
         }
     }
 
