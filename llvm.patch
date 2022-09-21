@@ -1,40 +1,62 @@
+diff --git a/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp b/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp
+index f1e2b0e3236f..fb06033d379a 100644
+--- a/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp
++++ b/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp
+@@ -591,6 +591,8 @@ static unsigned getEntrySizeForKind(SectionKind Kind) {
+ /// Return the section prefix name used by options FunctionsSections and
+ /// DataSections.
+ static StringRef getSectionPrefixForGlobal(SectionKind Kind) {
++  if (Kind.isMetadata())
++    return ".rmeta";
+   if (Kind.isText())
+     return ".text";
+   if (Kind.isReadOnly())
 diff --git a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-index d73d42c52..06e8b5706 100644
+index aa916345954d..7d479bb37648 100644
 --- a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
 +++ b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-@@ -299,7 +299,7 @@ void PassManagerBuilder::populateFunctionPassManager(
-   addInitialAliasAnalysisPasses(FPM);
- 
+@@ -332,7 +332,7 @@ void PassManagerBuilder::populateFunctionPassManager(
+   // Compare/branch metadata may alter the behavior of passes like SimplifyCFG.
+   FPM.add(createLowerExpectIntrinsicPass());
    FPM.add(createCFGSimplificationPass());
 -  FPM.add(createSROAPass());
-+  // HACK FPM.add(createSROAPass());
++  //  FPM.add(createSROAPass());
    FPM.add(createEarlyCSEPass());
-   FPM.add(createLowerExpectIntrinsicPass());
  }
-@@ -329,7 +329,7 @@ void PassManagerBuilder::addPGOInstrPasses(legacy::PassManagerBase &MPM,
-     IP.HintThreshold = 325;
+ 
+@@ -363,7 +363,7 @@ void PassManagerBuilder::addPGOInstrPasses(legacy::PassManagerBase &MPM,
+     IP.HintThreshold = SizeLevel > 0 ? PreInlineThreshold : 325;
  
      MPM.add(createFunctionInliningPass(IP));
 -    MPM.add(createSROAPass());
-+    // HACK MPM.add(createSROAPass());
++    //    MPM.add(createSROAPass());
      MPM.add(createEarlyCSEPass());             // Catch trivial redundancies
      MPM.add(createCFGSimplificationPass());    // Merge & remove BBs
      MPM.add(createInstructionCombiningPass()); // Combine silly seq's
-@@ -360,7 +360,7 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
+@@ -394,7 +394,7 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
    // Start of function pass.
    // Break up aggregate allocas, using SSAUpdater.
    assert(OptLevel >= 1 && "Calling function optimizer with no optimization level!");
 -  MPM.add(createSROAPass());
-+  // HACK MPM.add(createSROAPass());
++  //  MPM.add(createSROAPass());
    MPM.add(createEarlyCSEPass(true /* Enable mem-ssa. */)); // Catch trivial redundancies
    if (EnableKnowledgeRetention)
      MPM.add(createAssumeSimplifyPass());
-@@ -987,7 +987,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
-   PM.add(createJumpThreadingPass());
+@@ -482,7 +482,7 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
+   // This ends the loop pass pipelines.
+ 
+   // Break up allocas that may now be splittable after loop unrolling.
+-  MPM.add(createSROAPass());
++  //  MPM.add(createSROAPass());
+ 
+   if (OptLevel > 1) {
+     MPM.add(createMergedLoadStoreMotionPass()); // Merge ld/st in diamonds
+@@ -1103,7 +1103,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
+   PM.add(createJumpThreadingPass(/*FreezeSelectCond*/ true));
  
    // Break up allocas
 -  PM.add(createSROAPass());
-+  // HACK PM.add(createSROAPass());
++  //  PM.add(createSROAPass());
  
    // LTO provides additional opportunities for tailcall elimination due to
    // link-time inlining, and visibility of nocapture attribute.
