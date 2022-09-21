@@ -421,6 +421,14 @@ fn link_rlib<'a, B: ArchiveBuilder<'a>>(
             let mut file = Object::new(BinaryFormat::Elf, architecture, endianness);
 
             match &sess.target.arch[..] {
+                // copied from the ARM ARM supplement for Morello.
+                // TODO: the magic number should be copied to elf.rs.
+                "aarch64" if sess.target.options.features.contains("+morello") => {
+                    const EF_AARCH64_CHERI_PURECAP : u32 = 0x00010000;
+                    let e_flags = EF_AARCH64_CHERI_PURECAP;
+                    file.flags = FileFlags::Elf { e_flags };
+                }
+
                 // copied from `mipsel-linux-gnu-gcc foo.c -c` and
                 // inspecting the resulting `e_flags` field.
                 "mips" => {
