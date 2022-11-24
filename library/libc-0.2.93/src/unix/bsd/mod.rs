@@ -3,6 +3,8 @@ pub type useconds_t = u32;
 pub type blkcnt_t = i64;
 pub type socklen_t = u32;
 pub type sa_family_t = u8;
+// TODO(seharris): investigate what this should be
+//                 (it was initially using uintptr_t, which wasn't defined properly for CHERI)
 pub type pthread_t = *mut PThread;
 pub type nfds_t = ::c_uint;
 pub type regoff_t = off_t;

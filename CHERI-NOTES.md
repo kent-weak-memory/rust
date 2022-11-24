@@ -37,6 +37,10 @@ linker = "/path/to/rust/clang-morello.sh"
 runner = ["/path/to/rust/test-runner-morello.sh"]
 ```
 
+cargo config can also often be passed on the command line:
+
+`cargo --config 'build.rustc="/path/to/rust/build/x86_64-unknown-linux-gnu/stage1/bin/rustc"'`
+
 testing compiler components on CHERI remote host:
 
 `TEST_DEVICE_ADDR="localhost:1234" ./x.py test --target aarch64-unknown-freebsd-purecap library/core`
