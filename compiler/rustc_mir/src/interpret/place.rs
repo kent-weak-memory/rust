@@ -10,8 +10,8 @@ use rustc_macros::HashStable;
 use rustc_middle::mir;
 use rustc_middle::ty::layout::{PrimitiveExt, TyAndLayout};
 use rustc_middle::ty::{self, Ty};
-use rustc_target::abi::{Abi, Align, FieldsShape, TagEncoding};
-use rustc_target::abi::{HasDataLayout, LayoutOf, Size, VariantIdx, Variants};
+use rustc_target::abi::{self, Abi, Align, FieldsShape, TagEncoding};
+use rustc_target::abi::{HasDataLayout, LayoutOf, Primitive, Size, VariantIdx, Variants};
 
 use super::{
     alloc_range, mir_assign_valid_types, AllocId, AllocRef, AllocRefMut, CheckInAllocMsg,
@@ -312,8 +312,7 @@ where
     ) -> InterpResult<'tcx, Option<AllocRef<'_, 'tcx, M::PointerTag, M::AllocExtra>>> {
         assert!(!place.layout.is_unsized());
         assert!(!place.meta.has_meta());
-        let size = place.layout.size;
-        self.memory.get(place.ptr, size, place.align)
+        self.memory.get(place.ptr, place.layout.range, place.layout.size, place.align)
     }
 
     #[inline]
@@ -323,8 +322,7 @@ where
     ) -> InterpResult<'tcx, Option<AllocRefMut<'_, 'tcx, M::PointerTag, M::AllocExtra>>> {
         assert!(!place.layout.is_unsized());
         assert!(!place.meta.has_meta());
-        let size = place.layout.size;
-        self.memory.get_mut(place.ptr, size, place.align)
+        self.memory.get_mut(place.ptr, place.layout.range, place.layout.size, place.align)
     }
 
     /// Check if this mplace is dereferencable and sufficiently aligned.
@@ -672,13 +670,18 @@ where
             // This is a very common path, avoid some checks in release mode
             assert!(!dest.layout.is_unsized(), "Cannot write unsized data");
             match src {
-                Immediate::Scalar(ScalarMaybeUninit::Scalar(Scalar::Ptr(..))) => assert_eq!(
-                    self.pointer_size(),
-                    dest.layout.size,
-                    "Size mismatch when writing pointer"
-                ),
+                Immediate::Scalar(ScalarMaybeUninit::Scalar(Scalar::Ptr(..))) => {
+                    assert_eq!(self.pointer_width(), dest.layout.size, "Size mismatch when writing pointer");
+                    assert_eq!(self.pointer_range(), dest.layout.range.unwrap(), "Size mismatch when writing pointer");
+                },
                 Immediate::Scalar(ScalarMaybeUninit::Scalar(Scalar::Int(int))) => {
-                    assert_eq!(int.size(), dest.layout.size, "Size mismatch when writing bits")
+                    if let Abi::Scalar(abi::Scalar{value: Primitive::Pointer, valid_range: _}) = dest.layout.abi {
+                        assert_eq!(int.range(), self.pointer_range(), "Size mismatch when writing bits");
+                        assert!(int.width() == self.pointer_range() || int.width() == self.pointer_width(), "Size mismatch when writing bits");
+                    } else {
+                        assert_eq!(dest.layout.range.unwrap(), int.range(), "Size mismatch when writing bits");
+                        assert!(dest.layout.size == int.range() || dest.layout.size == int.width(), "Size mismatch when writing bits");
+                    }
                 }
                 Immediate::Scalar(ScalarMaybeUninit::Uninit) => {} // uninit can have any size
                 Immediate::ScalarPair(_, _) => {
@@ -745,7 +748,7 @@ where
                         dest.layout
                     ),
                 }
-                alloc.write_scalar(alloc_range(Size::ZERO, dest.layout.size), scalar)
+                alloc.write_scalar(alloc_range(Size::ZERO, Some(dest.layout.range.unwrap()), dest.layout.size), scalar)
             }
             Immediate::ScalarPair(a_val, b_val) => {
                 // We checked `ptr_align` above, so all fields will have the alignment they need.
@@ -759,15 +762,16 @@ where
                         dest.layout
                     ),
                 };
-                let (a_size, b_size) = (a.size(&tcx), b.size(&tcx));
-                let b_offset = a_size.align_to(b.align(&tcx).abi);
+                let (a_range, b_range) = (a.range(&tcx), b.range(&tcx));
+                let (a_width, b_width) = (a.width(&tcx), b.width(&tcx));
+                let b_offset = a_width.align_to(b.align(&tcx).abi);
 
                 // It is tempting to verify `b_offset` against `layout.fields.offset(1)`,
                 // but that does not work: We could be a newtype around a pair, then the
                 // fields do not match the `ScalarPair` components.
 
-                alloc.write_scalar(alloc_range(Size::ZERO, a_size), a_val)?;
-                alloc.write_scalar(alloc_range(b_offset, b_size), b_val)
+                alloc.write_scalar(alloc_range(Size::ZERO, Some(a_range), a_width), a_val)?;
+                alloc.write_scalar(alloc_range(b_offset, Some(b_range), b_width), b_val)
             }
         }
     }
@@ -1013,11 +1017,12 @@ where
                 // raw discriminants for enums are isize or bigger during
                 // their computation, but the in-memory tag is the smallest possible
                 // representation
-                let size = tag_layout.value.size(self);
-                let tag_val = size.truncate(discr_val);
+                let range = tag_layout.value.range(self);
+                let width = tag_layout.value.width(self);
+                let tag_val = range.truncate(discr_val);
 
                 let tag_dest = self.place_field(dest, tag_field)?;
-                self.write_scalar(Scalar::from_uint(tag_val, size), &tag_dest)?;
+                self.write_scalar(Scalar::from_uint(tag_val, range, width), &tag_dest)?;
             }
             Variants::Multiple {
                 tag_encoding:

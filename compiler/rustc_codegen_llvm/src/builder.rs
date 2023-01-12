@@ -317,8 +317,8 @@ impl BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
         use rustc_middle::ty::{IntTy::*, UintTy::*};
 
         let new_kind = match ty.kind() {
-            Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_width)),
-            Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_width)),
+            Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_range)),
+            Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_range)),
             t @ (Uint(_) | Int(_)) => t.clone(),
             _ => panic!("tried to get overflow intrinsic for op applied to non-int type"),
         };
@@ -496,7 +496,7 @@ impl BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
             });
             OperandValue::Immediate(self.to_immediate(llval, place.layout))
         } else if let abi::Abi::ScalarPair(ref a, ref b) = place.layout.abi {
-            let b_offset = a.value.size(self).align_to(b.value.align(self).abi);
+            let b_offset = a.value.width(self).align_to(b.value.align(self).abi);
             let pair_ty = place.layout.llvm_type(self);
 
             let mut load = |i, scalar: &abi::Scalar, align| {

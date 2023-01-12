@@ -7,9 +7,9 @@ use rustc_middle::bug;
 use rustc_middle::ty::layout::{FnAbiExt, TyAndLayout};
 use rustc_middle::ty::print::with_no_trimmed_paths;
 use rustc_middle::ty::{self, Ty, TypeFoldable};
-use rustc_target::abi::{Abi, AddressSpace, Align, FieldsShape};
+use rustc_target::abi::{Abi, Align, FieldsShape};
 use rustc_target::abi::{Int, Pointer, F32, F64};
-use rustc_target::abi::{LayoutOf, PointeeInfo, Scalar, Size, TyAbiInterface, Variants};
+use rustc_target::abi::{HasDataLayout, LayoutOf, PointeeInfo, Scalar, Size, TyAbiInterface, Variants};
 use smallvec::{smallvec, SmallVec};
 use tracing::debug;
 
@@ -310,7 +310,7 @@ impl<'tcx> LayoutLlvmExt<'tcx> for TyAndLayout<'tcx> {
                     if let Some(pointee) = self.pointee_info_at(cx, offset) {
                         (cx.type_pointee_for_align(pointee.align), pointee.address_space)
                     } else {
-                        (cx.type_i8(), AddressSpace::DATA)
+                        (cx.type_i8(), cx.data_layout().data_address_space)
                     };
                 cx.type_ptr_to_ext(pointee, address_space)
             }
@@ -353,7 +353,7 @@ impl<'tcx> LayoutLlvmExt<'tcx> for TyAndLayout<'tcx> {
         }
 
         let offset =
-            if index == 0 { Size::ZERO } else { a.value.size(cx).align_to(b.value.align(cx).abi) };
+            if index == 0 { Size::ZERO } else { a.value.width(cx).align_to(b.value.align(cx).abi) };
         self.scalar_llvm_type_at(cx, scalar, offset)
     }
 

@@ -26,6 +26,7 @@ use rustc_session::config::{self, Lto, OutputType, Passes, SwitchWithOptPath};
 use rustc_session::Session;
 use rustc_span::symbol::sym;
 use rustc_span::InnerSpan;
+use rustc_target::abi::AddressSpace;
 use rustc_target::spec::{CodeModel, RelocModel, SanitizerSet, SplitDebuginfo};
 use tracing::debug;
 
@@ -1069,7 +1070,10 @@ fn create_msvc_imps(
     let prefix = if cgcx.target_arch == "x86" { "\x01__imp__" } else { "\x01__imp_" };
 
     unsafe {
-        let i8p_ty = Type::i8p_llcx(llcx);
+        // TODO(seharris): Ideally, this should use address space information from data layout.
+        //                 Unfortunately, data layout info isn't easily accessible here.
+        //                 Figure out a better solution than just assuming the default value.
+        let i8p_ty = Type::i8p_llcx(llcx, AddressSpace::DATA);
         let globals = base::iter_globals(llmod)
             .filter(|&val| {
                 llvm::LLVMRustGetLinkage(val) == llvm::Linkage::ExternalLinkage

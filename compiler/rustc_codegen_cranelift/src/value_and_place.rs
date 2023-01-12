@@ -54,7 +54,7 @@ fn scalar_pair_calculate_b_offset(
     a_scalar: &Scalar,
     b_scalar: &Scalar,
 ) -> Offset32 {
-    let b_offset = a_scalar.value.size(&tcx).align_to(b_scalar.value.align(&tcx).abi);
+    let b_offset = a_scalar.value.width(&tcx).align_to(b_scalar.value.align(&tcx).abi);
     Offset32::new(b_offset.bytes().try_into().unwrap())
 }
 

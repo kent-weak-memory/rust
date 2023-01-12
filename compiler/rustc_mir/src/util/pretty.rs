@@ -669,7 +669,7 @@ pub fn write_allocations<'tcx>(
     }
     fn alloc_ids_from_const(val: ConstValue<'_>) -> impl Iterator<Item = AllocId> + '_ {
         match val {
-            ConstValue::Scalar(interpret::Scalar::Ptr(ptr, _size)) => {
+            ConstValue::Scalar(interpret::Scalar::Ptr(ptr, _range, _width)) => {
                 Either::Left(Either::Left(std::iter::once(ptr.provenance)))
             }
             ConstValue::Scalar(interpret::Scalar::Int { .. }) => {
@@ -836,7 +836,7 @@ fn write_allocation_bytes<Tag: Provenance, Extra>(
     let mut i = Size::ZERO;
     let mut line_start = Size::ZERO;
 
-    let ptr_size = tcx.data_layout.pointer_size;
+    let ptr_size = tcx.data_layout.pointer_range;
 
     let mut ascii = String::new();
 

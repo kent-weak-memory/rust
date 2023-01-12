@@ -148,7 +148,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 }
             };
             let truncated = self.truncate(result, left_layout);
-            return Ok((Scalar::from_uint(truncated, left_layout.size), overflow, left_layout.ty));
+            return Ok((Scalar::from_uint(truncated, left_layout.range.unwrap(), left_layout.size), overflow, left_layout.ty));
         }
 
         // For the remaining ops, the types must be the same on both sides
@@ -164,6 +164,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             )
         }
 
+        let range = left_layout.range.unwrap();
         let size = left_layout.size;
 
         // Operations that need special treatment for signed integers
@@ -196,8 +197,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // "int_min % -1" overflows and returns 0, but after casting things to a larger int
                 // type it does *not* overflow nor give an unrepresentable result!
                 if bin_op == Rem {
-                    if r == -1 && l == (1 << (size.bits() - 1)) {
-                        return Ok((Scalar::from_int(0, size), true, left_layout.ty));
+                    if r == -1 && l == (1 << (range.bits() - 1)) {
+                        return Ok((Scalar::from_int(0, range, size), true, left_layout.ty));
                     }
                 }
                 let l = self.sign_extend(l, left_layout) as i128;
@@ -208,7 +209,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let result = result as u128;
                 let truncated = self.truncate(result, left_layout);
                 return Ok((
-                    Scalar::from_uint(truncated, size),
+                    Scalar::from_uint(truncated, range, size),
                     oflo || self.sign_extend(truncated, left_layout) != result,
                     left_layout.ty,
                 ));
@@ -224,9 +225,9 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             Gt => (Scalar::from_bool(l > r), self.tcx.types.bool),
             Ge => (Scalar::from_bool(l >= r), self.tcx.types.bool),
 
-            BitOr => (Scalar::from_uint(l | r, size), left_layout.ty),
-            BitAnd => (Scalar::from_uint(l & r, size), left_layout.ty),
-            BitXor => (Scalar::from_uint(l ^ r, size), left_layout.ty),
+            BitOr => (Scalar::from_uint(l | r, range, size), left_layout.ty),
+            BitAnd => (Scalar::from_uint(l & r, range, size), left_layout.ty),
+            BitXor => (Scalar::from_uint(l ^ r, range, size), left_layout.ty),
 
             Add | Sub | Mul | Rem | Div => {
                 assert!(!left_layout.abi.is_signed());
@@ -245,7 +246,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // If that truncation loses any information, we have an overflow.
                 let truncated = self.truncate(result, left_layout);
                 return Ok((
-                    Scalar::from_uint(truncated, size),
+                    Scalar::from_uint(truncated, range, size),
                     oflo || truncated != result,
                     left_layout.ty,
                 ));
@@ -318,8 +319,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     right.layout.ty
                 );
 
-                let l = left.to_scalar()?.to_bits(left.layout.size)?;
-                let r = right.to_scalar()?.to_bits(right.layout.size)?;
+                let l = left.to_scalar()?.to_bits(left.layout.range.unwrap())?;
+                let r = right.to_scalar()?.to_bits(right.layout.range.unwrap())?;
                 self.binary_int_op(bin_op, l, left.layout, r, right.layout)
             }
             _ if left.layout.ty.is_any_ptr() => {
@@ -401,7 +402,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                         (truncated, overflow || self.sign_extend(truncated, layout) != res)
                     }
                 };
-                Ok((Scalar::from_uint(res, layout.size), overflow, layout.ty))
+                Ok((Scalar::from_uint(res, layout.range.unwrap(), layout.size), overflow, layout.ty))
             }
         }
     }

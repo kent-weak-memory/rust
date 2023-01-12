@@ -67,10 +67,11 @@ pub(super) fn vtable_allocation_provider<'tcx>(
     let size = layout.size.bytes();
     let align = layout.align.abi.bytes();
 
-    let ptr_size = tcx.data_layout.pointer_size;
+    let ptr_range = tcx.data_layout.pointer_range;
+    let ptr_width = tcx.data_layout.pointer_width;
     let ptr_align = tcx.data_layout.pointer_align.abi;
 
-    let vtable_size = ptr_size * u64::try_from(vtable_entries.len()).unwrap();
+    let vtable_size = ptr_width * u64::try_from(vtable_entries.len()).unwrap();
     let mut vtable = Allocation::uninit(vtable_size, ptr_align, /* panic_on_fail */ true).unwrap();
 
     // No need to do any alignment checks on the memory accesses below, because we know the
@@ -86,8 +87,8 @@ pub(super) fn vtable_allocation_provider<'tcx>(
                 let fn_ptr = Pointer::from(fn_alloc_id);
                 ScalarMaybeUninit::from_pointer(fn_ptr, &tcx)
             }
-            VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_size).into(),
-            VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_size).into(),
+            VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_range, ptr_width).into(),
+            VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_range, ptr_width).into(),
             VtblEntry::Vacant => continue,
             VtblEntry::Method(instance) => {
                 // Prepare the fn ptr we write into the vtable.
@@ -105,7 +106,7 @@ pub(super) fn vtable_allocation_provider<'tcx>(
             }
         };
         vtable
-            .write_scalar(&tcx, alloc_range(ptr_size * idx, ptr_size), scalar)
+            .write_scalar(&tcx, alloc_range(ptr_width * idx, Some(ptr_range), ptr_width), scalar)
             .expect("failed to build vtable representation");
     }
 

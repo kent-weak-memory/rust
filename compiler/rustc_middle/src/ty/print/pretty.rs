@@ -743,7 +743,7 @@ pub trait PrettyPrinter<'tcx>:
                     // array length anon const, rustc will (with debug assertions) print the
                     // constant's path. Which will end up here again.
                     p!("_");
-                } else if let Some(n) = sz.val.try_to_bits(self.tcx().data_layout.pointer_size) {
+                } else if let Some(n) = sz.val.try_to_bits(self.tcx().data_layout.pointer_range) {
                     p!(write("{}", n));
                 } else if let ty::ConstKind::Param(param) = sz.val {
                     p!(write("{}", param));
@@ -975,7 +975,7 @@ pub trait PrettyPrinter<'tcx>:
         print_ty: bool,
     ) -> Result<Self::Const, Self::Error> {
         match scalar {
-            Scalar::Ptr(ptr, _size) => self.pretty_print_const_scalar_ptr(ptr, ty, print_ty),
+            Scalar::Ptr(ptr, _range, _width) => self.pretty_print_const_scalar_ptr(ptr, ty, print_ty),
             Scalar::Int(int) => self.pretty_print_const_scalar_int(int, ty, print_ty),
         }
     }
@@ -1006,8 +1006,9 @@ pub trait PrettyPrinter<'tcx>:
                 _,
             ) => match self.tcx().get_global_alloc(alloc_id) {
                 Some(GlobalAlloc::Memory(alloc)) => {
-                    let len = int.assert_bits(self.tcx().data_layout.pointer_size);
-                    let range = AllocRange { start: offset, size: Size::from_bytes(len) };
+                    let len = int.assert_bits(self.tcx().data_layout.pointer_range);
+                    let size = Size::from_bytes(len);
+                    let range = AllocRange { start: offset, range: Some(size), width: size };
                     if let Ok(byte_str) = alloc.get_bytes(&self.tcx(), range) {
                         p!(pretty_print_byte_str(byte_str))
                     } else {
@@ -1072,7 +1073,7 @@ pub trait PrettyPrinter<'tcx>:
             }
             // Pointer types
             ty::Ref(..) | ty::RawPtr(_) | ty::FnPtr(_) => {
-                let data = int.assert_bits(self.tcx().data_layout.pointer_size);
+                let data = int.assert_bits(self.tcx().data_layout.pointer_range);
                 self = self.typed_value(
                     |mut this| {
                         write!(this, "0x{:x}", data)?;
@@ -1089,7 +1090,7 @@ pub trait PrettyPrinter<'tcx>:
             // Nontrivial types with scalar bit representation
             _ => {
                 let print = |mut this: Self| {
-                    if int.size() == Size::ZERO {
+                    if int.range() == Size::ZERO {
                         write!(this, "transmute(())")?;
                     } else {
                         write!(this, "transmute(0x{:x})", int)?;
@@ -1181,9 +1182,10 @@ pub trait PrettyPrinter<'tcx>:
                 Ok(self)
             }
             (ConstValue::ByRef { alloc, offset }, ty::Array(t, n)) if *t == u8_type => {
-                let n = n.val.try_to_bits(self.tcx().data_layout.pointer_size).unwrap();
+                let n = n.val.try_to_bits(self.tcx().data_layout.pointer_range).unwrap();
                 // cast is ok because we already checked for pointer size (32 or 64 bit) above
-                let range = AllocRange { start: offset, size: Size::from_bytes(n) };
+                let size = Size::from_bytes(n);
+                let range = AllocRange { start: offset, range: Some(size), width: size };
 
                 let byte_str = alloc.get_bytes(&self.tcx(), range).unwrap();
                 p!("*");

@@ -1,0 +1,66 @@
+diff --git a/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp b/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp
+index 2cb280cea487..08983f3f4eba 100644
+--- a/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp
++++ b/llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp
+@@ -578,6 +578,8 @@ static unsigned getEntrySizeForKind(SectionKind Kind) {
+ /// Return the section prefix name used by options FunctionsSections and
+ /// DataSections.
+ static StringRef getSectionPrefixForGlobal(SectionKind Kind) {
++  if (Kind.isMetadata())
++    return ".rmeta";
+   if (Kind.isText())
+     return ".text";
+   if (Kind.isReadOnly())
+diff --git a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
+index d73d42c52074..6d2a4c1e2237 100644
+--- a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
++++ b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
+@@ -299,7 +299,7 @@ void PassManagerBuilder::populateFunctionPassManager(
+   addInitialAliasAnalysisPasses(FPM);
+ 
+   FPM.add(createCFGSimplificationPass());
+-  FPM.add(createSROAPass());
++  // FPM.add(createSROAPass());
+   FPM.add(createEarlyCSEPass());
+   FPM.add(createLowerExpectIntrinsicPass());
+ }
+@@ -329,7 +329,7 @@ void PassManagerBuilder::addPGOInstrPasses(legacy::PassManagerBase &MPM,
+     IP.HintThreshold = 325;
+ 
+     MPM.add(createFunctionInliningPass(IP));
+-    MPM.add(createSROAPass());
++    // MPM.add(createSROAPass());
+     MPM.add(createEarlyCSEPass());             // Catch trivial redundancies
+     MPM.add(createCFGSimplificationPass());    // Merge & remove BBs
+     MPM.add(createInstructionCombiningPass()); // Combine silly seq's
+@@ -360,7 +360,7 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
+   // Start of function pass.
+   // Break up aggregate allocas, using SSAUpdater.
+   assert(OptLevel >= 1 && "Calling function optimizer with no optimization level!");
+-  MPM.add(createSROAPass());
++  // MPM.add(createSROAPass());
+   MPM.add(createEarlyCSEPass(true /* Enable mem-ssa. */)); // Catch trivial redundancies
+   if (EnableKnowledgeRetention)
+     MPM.add(createAssumeSimplifyPass());
+@@ -987,7 +987,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
+   PM.add(createJumpThreadingPass());
+ 
+   // Break up allocas
+-  PM.add(createSROAPass());
++  // PM.add(createSROAPass());
+ 
+   // LTO provides additional opportunities for tailcall elimination due to
+   // link-time inlining, and visibility of nocapture attribute.
+diff --git a/llvm/lib/Transforms/InstCombine/InstCombineCalls.cpp b/llvm/lib/Transforms/InstCombine/InstCombineCalls.cpp
+index 11274262459c..13932c44d27f 100644
+--- a/llvm/lib/Transforms/InstCombine/InstCombineCalls.cpp
++++ b/llvm/lib/Transforms/InstCombine/InstCombineCalls.cpp
+@@ -164,7 +164,7 @@ Instruction *InstCombiner::SimplifyAnyMemTransfer(AnyMemTransferInst *MI) {
+       return nullptr;  // If not 1/2/4/8 bytes, exit.
+     uint64_t PtrCpySize = DL.getPointerSize(200);
+     Align PtrCpyAlign = DL.getPointerPrefAlignment(200);
+-    if ((Size > PtrCpySize) ||
++    if ((Size != PtrCpySize) ||
+         (CopyDstAlign.hasValue() && *CopyDstAlign < PtrCpyAlign) ||
+         (CopySrcAlign.hasValue() && *CopySrcAlign < PtrCpyAlign))
+       return nullptr;

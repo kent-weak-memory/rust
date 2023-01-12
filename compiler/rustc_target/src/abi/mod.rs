@@ -29,7 +29,15 @@ pub struct TargetDataLayout {
     pub i128_align: AbiAndPrefAlign,
     pub f32_align: AbiAndPrefAlign,
     pub f64_align: AbiAndPrefAlign,
-    pub pointer_size: Size,
+    /// Size of pointer as stored in memory.
+    /// This is distinct from `pointer_range` because systems like CHERI add metadata to pointers.
+    // TODO(seharris): should this stay "size" for consistency, or "width" to highlight change?
+    pub pointer_width: Size,
+    /// Size of the part of pointers that actually contains an address.
+    /// This defines the addressable range, but not the space needed in memory layout.
+    pub pointer_range: Size,
+    /// Pointer alignment used for memory layout.
+    /// The size of the address information within the pointer may be unrelated (see above).
     pub pointer_align: AbiAndPrefAlign,
     pub aggregate_align: AbiAndPrefAlign,
 
@@ -37,6 +45,7 @@ pub struct TargetDataLayout {
     pub vector_align: Vec<(Size, AbiAndPrefAlign)>,
 
     pub instruction_address_space: AddressSpace,
+    pub data_address_space: AddressSpace,
 
     /// Minimum size of #[repr(C)] enums (default I32 bits)
     pub c_enum_min_size: Integer,
@@ -56,7 +65,8 @@ impl Default for TargetDataLayout {
             i128_align: AbiAndPrefAlign { abi: align(32), pref: align(64) },
             f32_align: AbiAndPrefAlign::new(align(32)),
             f64_align: AbiAndPrefAlign::new(align(64)),
-            pointer_size: Size::from_bits(64),
+            pointer_width: Size::from_bits(64),
+            pointer_range: Size::from_bits(64),
             pointer_align: AbiAndPrefAlign::new(align(64)),
             aggregate_align: AbiAndPrefAlign { abi: align(0), pref: align(64) },
             vector_align: vec![
@@ -64,6 +74,7 @@ impl Default for TargetDataLayout {
                 (Size::from_bits(128), AbiAndPrefAlign::new(align(128))),
             ],
             instruction_address_space: AddressSpace::DATA,
+            data_address_space: AddressSpace::DATA,
             c_enum_min_size: Integer::I32,
         }
     }
@@ -104,6 +115,15 @@ impl TargetDataLayout {
         };
 
         let mut dl = TargetDataLayout::default();
+        // Layout for pointers can be specified for different address spaces.
+        // I'm (seharris) not aware of any defined order in the data layout string.
+        // As a result, we may not know the data adress space until after the pointer info.
+        // To get round this, `pointer_info` is used to keep all of the info we see.
+        // Once we're done parsing we can then find the relevant entry.
+        // Using a vector implies some O(n) searching, but data layouts are typically short.
+        // (n should be small enough it doesn't matter, and this is nice and simple)
+        // Contained data: (pointer addres space, width, range, alignment)
+        let mut pointer_info = Vec::new();
         let mut i128_align_src = 64;
         for spec in target.data_layout.split('-') {
             let spec_parts = spec.split(':').collect::<Vec<_>>();
@@ -114,12 +134,27 @@ impl TargetDataLayout {
                 [p] if p.starts_with('P') => {
                     dl.instruction_address_space = parse_address_space(&p[1..], "P")?
                 }
+                [p] if p.starts_with('A') => {
+                    dl.data_address_space = parse_address_space(&p[1..], "A")?
+                }
                 ["a", ref a @ ..] => dl.aggregate_align = align(a, "a")?,
                 ["f32", ref a @ ..] => dl.f32_align = align(a, "f32")?,
                 ["f64", ref a @ ..] => dl.f64_align = align(a, "f64")?,
-                [p @ "p", s, ref a @ ..] | [p @ "p0", s, ref a @ ..] => {
-                    dl.pointer_size = size(s, p)?;
-                    dl.pointer_align = align(a, p)?;
+                [p, s, ref a @ ..] if p.starts_with('p') => {
+                    // The extra f appears to be an extension added in CHERI LLVM.
+                    // I (seharris) don't currently know what it means, so we just ignore it.
+                    let prefix_len = if p.starts_with("pf") { 2 } else { 1 };
+                    let address_space = if p.len() > prefix_len {
+                        parse_address_space(&p[prefix_len..], "p")?
+                    } else {
+                        AddressSpace::DATA
+                    };
+                    let width = size(s, p)?;
+                    let align = align(a, p)?;
+                    let range = a.get(2).copied().map_or(Ok(width), |bits| {
+                        parse_bits(bits, "range", p).map(Size::from_bits)
+                    })?;
+                    pointer_info.push((address_space, width, range, align));
                 }
                 [s, ref a @ ..] if s.starts_with('i') => {
                     let bits = match s[1..].parse::<u64>() {
@@ -159,6 +194,15 @@ impl TargetDataLayout {
             }
         }
 
+        // Look for pointer layout information to match data address space.
+        for (address_space, width, range, align) in pointer_info {
+            if address_space == dl.data_address_space {
+                dl.pointer_width = width;
+                dl.pointer_range = range;
+                dl.pointer_align = align;
+            }
+        }
+
         // Perform consistency checks against the Target information.
         if dl.endian != target.endian {
             return Err(format!(
@@ -169,12 +213,21 @@ impl TargetDataLayout {
             ));
         }
 
-        if dl.pointer_size.bits() != target.pointer_width.into() {
+        if dl.pointer_width.bits() != target.pointer_width.into() {
             return Err(format!(
                 "inconsistent target specification: \"data-layout\" claims \
-                 pointers are {}-bit, while \"target-pointer-width\" is `{}`",
-                dl.pointer_size.bits(),
+                 pointer width is {}-bit, while \"target-pointer-width\" is `{}`",
+                dl.pointer_width.bits(),
                 target.pointer_width
+            ));
+        }
+
+        if dl.pointer_range.bits() != target.pointer_range.into() {
+            return Err(format!(
+                "inconsistent target specification: \"data-layout\" claims \
+                 pointer range is {}-bit, while \"target-pointer-range\" is `{}`",
+                dl.pointer_range.bits(),
+                target.pointer_range
             ));
         }
 
@@ -196,7 +249,7 @@ impl TargetDataLayout {
     /// address space on 64-bit ARMv8 and x86_64.
     #[inline]
     pub fn obj_size_bound(&self) -> u64 {
-        match self.pointer_size.bits() {
+        match self.pointer_range.bits() {
             16 => 1 << 15,
             32 => 1 << 31,
             64 => 1 << 47,
@@ -204,13 +257,16 @@ impl TargetDataLayout {
         }
     }
 
+    /// Returns an integer wide enough to hold the address component of a pointer.
+    /// On architectures like x86 this means the same size as a pointer.
+    /// On architectures like CHERI this means smaller, because metadata is excluded.
     #[inline]
-    pub fn ptr_sized_integer(&self) -> Integer {
-        match self.pointer_size.bits() {
+    pub fn ptr_ranged_integer(&self) -> Integer {
+        match self.pointer_range.bits() {
             16 => I16,
             32 => I32,
             64 => I64,
-            bits => panic!("ptr_sized_integer: unknown pointer bit size {}", bits),
+            bits => panic!("ptr_ranged_integer: unknown pointer range bit size {}", bits),
         }
     }
 
@@ -696,14 +752,28 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub fn size<C: HasDataLayout>(self, cx: &C) -> Size {
+    /// Size of the type as represented in memory during program execution.
+    pub fn width<C: HasDataLayout>(self, cx: &C) -> Size {
         let dl = cx.data_layout();
 
         match self {
             Int(i, _) => i.size(),
             F32 => Size::from_bits(32),
             F64 => Size::from_bits(64),
-            Pointer => dl.pointer_size,
+            Pointer => dl.pointer_width,
+        }
+    }
+
+    /// Size of the data-carrying part of the type.
+    /// This is currently only relevant to pointers on CHERI architectures.
+    pub fn range<C: HasDataLayout>(self, cx: &C) -> Size {
+        let dl = cx.data_layout();
+
+        match self {
+            Int(i, _) => i.size(),
+            F32 => Size::from_bits(32),
+            F64 => Size::from_bits(64),
+            Pointer => dl.pointer_range,
         }
     }
 
@@ -815,7 +885,7 @@ impl Scalar {
         // For a (max) value of -1, max will be `-1 as usize`, which overflows.
         // However, that is fine here (it would still represent the full range),
         // i.e., if the range is everything.
-        let bits = self.value.size(cx).bits();
+        let bits = self.value.range(cx).bits();
         assert!(bits <= 128);
         let mask = !0u128 >> (128 - bits);
         let start = self.valid_range.start;
@@ -1073,7 +1143,7 @@ impl Niche {
 
     pub fn available<C: HasDataLayout>(&self, cx: &C) -> u128 {
         let Scalar { value, valid_range: ref v } = self.scalar;
-        let bits = value.size(cx).bits();
+        let bits = value.range(cx).bits();
         assert!(bits <= 128);
         let max_value = !0u128 >> (128 - bits);
 
@@ -1086,7 +1156,7 @@ impl Niche {
         assert!(count > 0);
 
         let Scalar { value, valid_range: v } = self.scalar.clone();
-        let bits = value.size(cx).bits();
+        let bits = value.range(cx).bits();
         assert!(bits <= 128);
         let max_value = !0u128 >> (128 - bits);
 
@@ -1134,19 +1204,23 @@ pub struct Layout {
     pub largest_niche: Option<Niche>,
 
     pub align: AbiAndPrefAlign,
+    // TODO(seharris): rename `size` or replace this hack.
+    pub range: Option<Size>,
     pub size: Size,
 }
 
 impl Layout {
     pub fn scalar<C: HasDataLayout>(cx: &C, scalar: Scalar) -> Self {
         let largest_niche = Niche::from_scalar(cx, Size::ZERO, scalar.clone());
-        let size = scalar.value.size(cx);
+        let range = Some(scalar.value.range(cx));
+        let size = scalar.value.width(cx);
         let align = scalar.value.align(cx);
         Layout {
             variants: Variants::Single { index: VariantIdx::new(0) },
             fields: FieldsShape::Primitive,
             abi: Abi::Scalar(scalar),
             largest_niche,
+            range,
             size,
             align,
         }

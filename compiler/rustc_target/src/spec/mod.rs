@@ -29,10 +29,11 @@
 //! this module defines the format the JSON file should take, though each
 //! underscore in the field names should be replaced with a hyphen (`-`) in the
 //! JSON file. Some fields are required in every target specification, such as
-//! `llvm-target`, `target-endian`, `target-pointer-width`, `data-layout`,
-//! `arch`, and `os`. In general, options passed to rustc with `-C` override
-//! the target's settings, though `target-feature` and `link-args` will *add*
-//! to the list specified by the target, rather than replace.
+//! `llvm-target`, `target-endian`, `target-pointer-range`,
+//! `target-pointer-width`, `data-layout`, `arch`, and `os`. In general, options
+//! passed to rustc with `-C` override the target's settings, though
+//! `target-feature` and `link-args` will *add* to the list specified by the
+//! target, rather than replace.
 
 use crate::abi::Endian;
 use crate::spec::abi::{lookup as lookup_abi, Abi};
@@ -799,6 +800,7 @@ supported_targets! {
     ("x86_64-unknown-none-linuxkernel", x86_64_unknown_none_linuxkernel),
 
     ("aarch64-unknown-freebsd", aarch64_unknown_freebsd),
+    ("aarch64-unknown-freebsd-purecap", aarch64_unknown_freebsd_purecap),
     ("armv6-unknown-freebsd", armv6_unknown_freebsd),
     ("armv7-unknown-freebsd", armv7_unknown_freebsd),
     ("i686-unknown-freebsd", i686_unknown_freebsd),
@@ -982,7 +984,10 @@ impl TargetWarnings {
 pub struct Target {
     /// Target triple to pass to LLVM.
     pub llvm_target: String,
-    /// Number of bits in a pointer. Influences the `target_pointer_width` `cfg` variable.
+    /// Number of bits in a pointer that are used for addressing.
+    pub pointer_range: u32,
+    /// Number of bits used to represent a pointer in the target's memory.
+    /// This may be more than `pointer_range` on targets like CHERI that store extra metadata.
     pub pointer_width: u32,
     /// Architecture to use for ABI considerations. Valid options include: "x86",
     /// "x86_64", "arm", "aarch64", "mips", "powerpc", "powerpc64", and others.
@@ -1226,6 +1231,12 @@ pub struct TargetOptions {
 
     /// Whether the target supports atomic CAS operations natively
     pub atomic_cas: bool,
+    /// Whether to use atomic integers to implement atomic pointers.
+    /// Defaults to true.
+    /// This is, so far, only relevant to CHERI where atomic pointers *are*
+    /// supported, and converting a pointer to an integer and back has side
+    /// effects that make the pointer unusable.
+    pub atomic_pointers_via_integers: bool,
 
     /// Panic strategy: "unwind" or "abort"
     pub panic_strategy: PanicStrategy,
@@ -1414,6 +1425,7 @@ impl Default for TargetOptions {
             min_atomic_width: None,
             max_atomic_width: None,
             atomic_cas: true,
+            atomic_pointers_via_integers: true,
             panic_strategy: PanicStrategy::Unwind,
             crt_static_allows_dylibs: false,
             crt_static_default: false,
@@ -1580,6 +1592,9 @@ impl Target {
 
         let mut base = Target {
             llvm_target: get_req_field("llvm-target")?,
+            pointer_range: get_req_field("target-pointer-range")?
+                .parse::<u32>()
+                .map_err(|_| "target-pointer-range must be an integer".to_string())?,
             pointer_width: get_req_field("target-pointer-width")?
                 .parse::<u32>()
                 .map_err(|_| "target-pointer-width must be an integer".to_string())?,
@@ -2167,6 +2182,7 @@ impl ToJson for Target {
         }
 
         target_val!(llvm_target);
+        d.insert("target-pointer-range".to_string(), self.pointer_range.to_string().to_json());
         d.insert("target-pointer-width".to_string(), self.pointer_width.to_string().to_json());
         target_val!(arch);
         target_val!(data_layout);

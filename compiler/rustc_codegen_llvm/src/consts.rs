@@ -18,7 +18,7 @@ use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::ty::{self, Instance, Ty};
 use rustc_middle::{bug, span_bug};
 use rustc_target::abi::{
-    AddressSpace, Align, HasDataLayout, LayoutOf, Primitive, Scalar, Size, WrappingRange,
+    Align, HasDataLayout, LayoutOf, Primitive, Scalar, Size, WrappingRange,
 };
 use std::ops::Range;
 use tracing::debug;
@@ -26,7 +26,8 @@ use tracing::debug;
 pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll Value {
     let mut llvals = Vec::with_capacity(alloc.relocations().len() + 1);
     let dl = cx.data_layout();
-    let pointer_size = dl.pointer_size.bytes() as usize;
+    let pointer_range = dl.pointer_range.bytes() as usize;
+    let pointer_width = dl.pointer_width.bytes() as usize;
 
     // Note: this function may call `inspect_with_uninit_and_ptr_outside_interpreter`,
     // so `range` must be within the bounds of `alloc` and not contain or overlap a relocation.
@@ -95,14 +96,14 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
             // This `inspect` is okay since it is within the bounds of the allocation, it doesn't
             // affect interpreter execution (we inspect the result after interpreter execution),
             // and we properly interpret the relocation as a relocation pointer offset.
-            alloc.inspect_with_uninit_and_ptr_outside_interpreter(offset..(offset + pointer_size)),
+            alloc.inspect_with_uninit_and_ptr_outside_interpreter(offset..(offset + pointer_range)),
         )
         .expect("const_alloc_to_llvm: could not read relocation pointer")
             as u64;
 
         let address_space = match cx.tcx.global_alloc(alloc_id) {
             GlobalAlloc::Function(..) => cx.data_layout().instruction_address_space,
-            GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) => AddressSpace::DATA,
+            GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) => dl.data_address_space,
         };
 
         llvals.push(cx.scalar_to_backend(
@@ -113,7 +114,7 @@ pub fn const_alloc_to_llvm(cx: &CodegenCx<'ll, '_>, alloc: &Allocation) -> &'ll 
             &Scalar { value: Primitive::Pointer, valid_range: WrappingRange { start: 0, end: !0 } },
             cx.type_i8p_ext(address_space),
         ));
-        next_offset = offset + pointer_size;
+        next_offset = offset + pointer_width;
     }
     if alloc.len() >= next_offset {
         let range = next_offset..alloc.len();

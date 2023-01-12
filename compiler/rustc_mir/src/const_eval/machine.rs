@@ -200,7 +200,7 @@ impl<'mir, 'tcx: 'mir> CompileTimeEvalContext<'mir, 'tcx> {
             // Comparisons of abstract pointers with null pointers are known if the pointer
             // is in bounds, because if they are in bounds, the pointer can't be null.
             // Inequality with integers other than null can never be known for sure.
-            (Scalar::Int(int), Scalar::Ptr(ptr, _)) | (Scalar::Ptr(ptr, _), Scalar::Int(int)) => {
+            (Scalar::Int(int), Scalar::Ptr(ptr, _, _)) | (Scalar::Ptr(ptr, _, _), Scalar::Int(int)) => {
                 int.is_null() && !self.memory.ptr_may_be_null(ptr.into())
             }
             // FIXME: return `true` for at least some comparisons where we can reliably

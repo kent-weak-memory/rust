@@ -8,11 +8,11 @@ use crate::constant::ConstantCx;
 use crate::prelude::*;
 
 pub(crate) fn pointer_ty(tcx: TyCtxt<'_>) -> types::Type {
-    match tcx.data_layout.pointer_size.bits() {
+    match tcx.data_layout.pointer_range.bits() {
         16 => types::I16,
         32 => types::I32,
         64 => types::I64,
-        bits => bug!("ptr_sized_integer: unknown pointer bit size {}", bits),
+        bits => bug!("ptr_ranged_integer: unknown pointer range bit size {}", bits),
     }
 }
 

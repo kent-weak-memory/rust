@@ -663,7 +663,7 @@ fn codegen_stmt<'tcx>(
                         .monomorphize(times)
                         .eval(fx.tcx, ParamEnv::reveal_all())
                         .val
-                        .try_to_bits(fx.tcx.data_layout.pointer_size)
+                        .try_to_bits(fx.tcx.data_layout.pointer_range)
                         .unwrap();
                     if operand.layout().size.bytes() == 0 {
                         // Do nothing for ZST's

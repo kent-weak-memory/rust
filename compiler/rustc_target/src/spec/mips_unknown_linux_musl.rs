@@ -9,6 +9,7 @@ pub fn target() -> Target {
     base.crt_static_default = false;
     Target {
         llvm_target: "mips-unknown-linux-musl".to_string(),
+        pointer_range: 32,
         pointer_width: 32,
         data_layout: "E-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64".to_string(),
         arch: "mips".to_string(),

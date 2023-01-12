@@ -563,7 +563,11 @@ pub mod guard {
             let mut guardsize = 0;
             assert_eq!(libc::pthread_attr_getguardsize(&attr, &mut guardsize), 0);
             if guardsize == 0 {
-                if cfg!(all(target_os = "linux", target_env = "musl")) {
+// TODO(seharris): allow zero guard page for CHERI?
+// TODO(seharris): replace conditional with one that detects capability feature
+//                 see: https://doc.rust-lang.org/reference/conditional-compilation.html#target_feature
+// HACK this works around a CHERI bsd thing...
+                if cfg!(all(target_os = "linux", target_env = "musl")) || cfg!(all(target_os = "freebsd", target_arch="aarch64")) {
                     // musl versions before 1.1.19 always reported guard
                     // size obtained from pthread_attr_get_np as zero.
                     // Use page size as a fallback.

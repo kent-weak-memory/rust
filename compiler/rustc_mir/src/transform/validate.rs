@@ -377,7 +377,7 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
                     );
                 }
 
-                let target_width = self.tcx.sess.target.pointer_width;
+                let target_width = self.tcx.sess.target.pointer_range;
 
                 let size = Size::from_bits(match switch_ty.kind() {
                     ty::Uint(uint) => uint.normalize(target_width).bit_width().unwrap(),
@@ -388,7 +388,7 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
                 });
 
                 for (value, target) in targets.iter() {
-                    if Scalar::<()>::try_from_uint(value, size).is_none() {
+                    if Scalar::<()>::try_from_uint(value, size, size).is_none() {
                         self.fail(
                             location,
                             format!("the value {:#x} is not a proper {:?}", value, switch_ty),

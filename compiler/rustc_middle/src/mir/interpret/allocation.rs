@@ -31,8 +31,8 @@ pub struct Allocation<Tag = AllocId, Extra = ()> {
     bytes: Box<[u8]>,
     /// Maps from byte addresses to extra data for each pointer.
     /// Only the first byte of a pointer is inserted into the map; i.e.,
-    /// every entry in this map applies to `pointer_size` consecutive bytes starting
-    /// at the given offset.
+    /// every entry in this map applies to `pointer_range` consecutive bytes
+    /// starting at the given offset.
     relocations: Relocations<Tag>,
     /// Denotes which part of this allocation is initialized.
     init_mask: InitMask,
@@ -79,27 +79,35 @@ impl AllocError {
 #[derive(Copy, Clone, Debug)]
 pub struct AllocRange {
     pub start: Size,
-    pub size: Size,
+    // TODO(seharris): explain
+    pub range: Option<Size>,
+    pub width: Size,
 }
 
-/// Free-starting constructor for less syntactic overhead.
+/// Free-standing constructor for less syntactic overhead.
 #[inline(always)]
-pub fn alloc_range(start: Size, size: Size) -> AllocRange {
-    AllocRange { start, size }
+pub fn alloc_range(start: Size, range: Option<Size>, width: Size) -> AllocRange {
+    assert!(range.is_none() || range.unwrap() <= width, "AllocRange valid data must be within overall size of range");
+    AllocRange { start, range, width }
 }
 
 impl AllocRange {
     #[inline(always)]
-    pub fn end(self) -> Size {
-        self.start + self.size // This does overflow checking.
+    pub fn end_range_or_width(self) -> Size {
+        self.start+self.range.unwrap_or(self.width) // This does overflow checking.
+    }
+
+    #[inline(always)]
+    pub fn end_width(self) -> Size {
+        self.start + self.width // This does overflow checking.
     }
 
     /// Returns the `subrange` within this range; panics if it is not a subrange.
     #[inline]
     pub fn subrange(self, subrange: AllocRange) -> AllocRange {
         let sub_start = self.start + subrange.start;
-        let range = alloc_range(sub_start, subrange.size);
-        assert!(range.end() <= self.end(), "access outside the bounds for given AllocRange");
+        let range = alloc_range(sub_start, subrange.range, subrange.width);
+        assert!(range.end_width() <= self.end_width(), "access outside the bounds for given AllocRange");
         range
     }
 }
@@ -169,7 +177,7 @@ impl Allocation {
         // Compute new pointer tags, which also adjusts the bytes.
         let mut bytes = self.bytes;
         let mut new_relocations = Vec::with_capacity(self.relocations.0.len());
-        let ptr_size = cx.data_layout().pointer_size.bytes_usize();
+        let ptr_size = cx.data_layout().pointer_range.bytes_usize();
         let endian = cx.data_layout().endian;
         for &(offset, alloc_id) in self.relocations.iter() {
             let idx = offset.bytes_usize();
@@ -246,7 +254,7 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
             self.check_relocation_edges(cx, range)?;
         }
 
-        Ok(&self.bytes[range.start.bytes_usize()..range.end().bytes_usize()])
+        Ok(&self.bytes[range.start.bytes_usize()..range.end_range_or_width().bytes_usize()])
     }
 
     /// Checks that these bytes are initialized and not pointer bytes, and then return them
@@ -287,7 +295,7 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
         self.mark_init(range, true);
         self.clear_relocations(cx, range)?;
 
-        Ok(&mut self.bytes[range.start.bytes_usize()..range.end().bytes_usize()])
+        Ok(&mut self.bytes[range.start.bytes_usize()..range.end_range_or_width().bytes_usize()])
     }
 
     /// A raw pointer variant of `get_bytes_mut` that avoids invalidating existing aliases into this memory.
@@ -299,9 +307,9 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
         self.mark_init(range, true);
         self.clear_relocations(cx, range)?;
 
-        assert!(range.end().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
+        assert!(range.end_width().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
         let begin_ptr = self.bytes.as_mut_ptr().wrapping_add(range.start.bytes_usize());
-        let len = range.end().bytes_usize() - range.start.bytes_usize();
+        let len = range.end_range_or_width().bytes_usize() - range.start.bytes_usize();
         Ok(ptr::slice_from_raw_parts_mut(begin_ptr, len))
     }
 }
@@ -355,7 +363,7 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
         // Now we do the actual reading.
         let bits = read_target_uint(cx.data_layout().endian, bytes).unwrap();
         // See if we got a pointer.
-        if range.size != cx.data_layout().pointer_size {
+        if (range.range.is_some() && range.range.unwrap() != cx.data_layout().pointer_range) || range.width != cx.data_layout().pointer_width {
             // Not a pointer.
             // *Now*, we better make sure that the inside is free of relocations too.
             self.check_relocations(cx, range)?;
@@ -367,7 +375,7 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
             }
         }
         // We don't. Just return the bits.
-        Ok(ScalarMaybeUninit::Scalar(Scalar::from_uint(bits, range.size)))
+        Ok(ScalarMaybeUninit::Scalar(Scalar::from_uint(bits, range.range.unwrap(), range.width)))
     }
 
     /// Writes a *non-ZST* scalar.
@@ -395,7 +403,7 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
 
         // `to_bits_or_ptr_internal` is the right method because we just want to store this data
         // as-is into memory.
-        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.size) {
+        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.range.unwrap(), range.width) {
             Err(val) => {
                 let (provenance, offset) = val.into_parts();
                 (u128::from(offset.bytes()), Some(provenance))
@@ -419,11 +427,15 @@ impl<Tag: Provenance, Extra> Allocation<Tag, Extra> {
 /// Relocations.
 impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
     /// Returns all relocations overlapping with the given pointer-offset pair.
+    // TODO(seharris): I'm not entirely sure whether this should clear
+    // relocations only within pointer *range* or the entire pointer *width*.
+    // I've chosen the more conservative of the two, pointer width, for the
+    // moment.
     pub fn get_relocations(&self, cx: &impl HasDataLayout, range: AllocRange) -> &[(Size, Tag)] {
-        // We have to go back `pointer_size - 1` bytes, as that one would still overlap with
+        // We have to go back `pointer_width - 1` bytes, as that one would still overlap with
         // the beginning of this range.
-        let start = range.start.bytes().saturating_sub(cx.data_layout().pointer_size.bytes() - 1);
-        self.relocations.range(Size::from_bytes(start)..range.end())
+        let start = range.start.bytes().saturating_sub(cx.data_layout().pointer_width.bytes() - 1);
+        self.relocations.range(Size::from_bytes(start)..range.end_width())
     }
 
     /// Checks that there are no relocations overlapping with the given range.
@@ -442,6 +454,10 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
     /// uninitialized. This is a somewhat odd "spooky action at a distance",
     /// but it allows strictly more code to run than if we would just error
     /// immediately in that case.
+    // TODO(seharris): I'm not entirely sure whether this should clear
+    // relocations only within pointer *range* or the entire pointer *width*.
+    // I've chosen the more conservative of the two, pointer width, for the
+    // moment.
     fn clear_relocations(&mut self, cx: &impl HasDataLayout, range: AllocRange) -> AllocResult
     where
         Tag: Provenance,
@@ -456,11 +472,11 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
 
             (
                 relocations.first().unwrap().0,
-                relocations.last().unwrap().0 + cx.data_layout().pointer_size,
+                relocations.last().unwrap().0 + cx.data_layout().pointer_width,
             )
         };
         let start = range.start;
-        let end = range.end();
+        let end = range.end_width();
 
         // We need to handle clearing the relocations from parts of a pointer. See
         // <https://github.com/rust-lang/rust/issues/87184> for details.
@@ -473,7 +489,8 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
         if last > end {
             if Tag::ERR_ON_PARTIAL_PTR_OVERWRITE {
                 return Err(AllocError::PartialPointerOverwrite(
-                    last - cx.data_layout().pointer_size,
+                    // TODO(seharris): this is a guess.
+                    last - cx.data_layout().pointer_width,
                 ));
             }
             self.init_mask.set_range(end, last, false);
@@ -487,10 +504,14 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
 
     /// Errors if there are relocations overlapping with the edges of the
     /// given memory range.
+    // TODO(seharris): I'm not entirely sure whether this should clear
+    // relocations only within pointer *range* or the entire pointer *width*.
+    // I've chosen the more conservative of the two, pointer width, for the
+    // moment.
     #[inline]
     fn check_relocation_edges(&self, cx: &impl HasDataLayout, range: AllocRange) -> AllocResult {
-        self.check_relocations(cx, alloc_range(range.start, Size::ZERO))?;
-        self.check_relocations(cx, alloc_range(range.end(), Size::ZERO))?;
+        self.check_relocations(cx, alloc_range(range.start, None, Size::ZERO))?;
+        self.check_relocations(cx, alloc_range(range.end_width(), None, Size::ZERO))?;
         Ok(())
     }
 }
@@ -537,13 +558,13 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
             return AllocationRelocations { relative_relocations: Vec::new() };
         }
 
-        let size = src.size;
+        let width = src.width; // TODO(seharris): not sure about this.
         let mut new_relocations = Vec::with_capacity(relocations.len() * (count as usize));
 
         for i in 0..count {
             new_relocations.extend(relocations.iter().map(|&(offset, reloc)| {
                 // compute offset for current repetition
-                let dest_offset = dest + size * i; // `Size` operations
+                let dest_offset = dest + width * i; // `Size` operations
                 (
                     // shift offsets from source allocation to destination allocation
                     (offset + dest_offset) - src.start, // `Size` operations
@@ -998,7 +1019,7 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
     /// Returns `Ok(())` if it's initialized. Otherwise returns the range of byte
     /// indexes of the first contiguous uninitialized access.
     fn is_init(&self, range: AllocRange) -> Result<(), Range<Size>> {
-        self.init_mask.is_range_initialized(range.start, range.end()) // `Size` addition
+        self.init_mask.is_range_initialized(range.start, range.end_range_or_width()) // `Size` addition
     }
 
     /// Checks that a range of bytes is initialized. If not, returns the `InvalidUninitBytes`
@@ -1007,19 +1028,20 @@ impl<Tag: Copy, Extra> Allocation<Tag, Extra> {
         self.is_init(range).or_else(|idx_range| {
             Err(AllocError::InvalidUninitBytes(Some(UninitBytesAccess {
                 access_offset: range.start,
-                access_size: range.size,
+                access_size: range.range.unwrap_or(range.width),
                 uninit_offset: idx_range.start,
                 uninit_size: idx_range.end - idx_range.start, // `Size` subtraction
             })))
         })
     }
 
+    // TODO(seharris): should we be marking range or width here?
     pub fn mark_init(&mut self, range: AllocRange, is_init: bool) {
-        if range.size.bytes() == 0 {
+        if range.range.unwrap_or(range.width).bytes() == 0 {
             return;
         }
         assert!(self.mutability == Mutability::Mut);
-        self.init_mask.set_range(range.start, range.end(), is_init);
+        self.init_mask.set_range(range.start, range.end_range_or_width(), is_init);
     }
 }
 
@@ -1062,7 +1084,7 @@ impl<Tag, Extra> Allocation<Tag, Extra> {
 
         let mut ranges = smallvec::SmallVec::<[u64; 1]>::new();
 
-        let mut chunks = self.init_mask.range_as_init_chunks(range.start, range.end()).peekable();
+        let mut chunks = self.init_mask.range_as_init_chunks(range.start, range.end_width()).peekable();
 
         let initial = chunks.peek().expect("range should be nonempty").is_init();
 
@@ -1087,14 +1109,14 @@ impl<Tag, Extra> Allocation<Tag, Extra> {
         if defined.ranges.len() <= 1 {
             self.init_mask.set_range_inbounds(
                 range.start,
-                range.start + range.size * repeat, // `Size` operations
+                range.start + range.width * repeat, // `Size` operations
                 defined.initial,
             );
             return;
         }
 
         for mut j in 0..repeat {
-            j *= range.size.bytes();
+            j *= range.width.bytes();
             j += range.start.bytes();
             let mut cur = defined.initial;
             for range in &defined.ranges {

@@ -411,9 +411,9 @@ fn define_all_allocs(tcx: TyCtxt<'_>, module: &mut dyn Module, cx: &mut Constant
             let addend = {
                 let endianness = tcx.data_layout.endian;
                 let offset = offset.bytes() as usize;
-                let ptr_size = tcx.data_layout.pointer_size;
+                let ptr_range = tcx.data_layout.pointer_range;
                 let bytes = &alloc.inspect_with_uninit_and_ptr_outside_interpreter(
-                    offset..offset + ptr_size.bytes() as usize,
+                    offset..offset + range.bytes() as usize,
                 );
                 read_target_uint(endianness, bytes).unwrap()
             };

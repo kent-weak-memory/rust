@@ -122,11 +122,11 @@ impl<'tcx> Const<'tcx> {
     #[inline]
     /// Creates a constant with the given integer value and interns it.
     pub fn from_bits(tcx: TyCtxt<'tcx>, bits: u128, ty: ParamEnvAnd<'tcx, Ty<'tcx>>) -> &'tcx Self {
-        let size = tcx
+        let layout = tcx
             .layout_of(ty)
-            .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e))
-            .size;
-        Self::from_scalar(tcx, Scalar::from_uint(bits, size), ty.value)
+            .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e));
+        // TODO(seharris): this will likely crash many many times.
+        Self::from_scalar(tcx, Scalar::from_uint(bits, layout.range.unwrap(), layout.size), ty.value)
     }
 
     #[inline]

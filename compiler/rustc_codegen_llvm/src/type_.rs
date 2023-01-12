@@ -14,7 +14,7 @@ use rustc_middle::bug;
 use rustc_middle::ty::layout::TyAndLayout;
 use rustc_middle::ty::{self, Ty};
 use rustc_target::abi::call::{CastTarget, FnAbi, Reg};
-use rustc_target::abi::{AddressSpace, Align, Integer, Size};
+use rustc_target::abi::{AddressSpace, Align, Integer, HasDataLayout, Size};
 
 use std::fmt;
 use std::ptr;
@@ -195,7 +195,7 @@ impl BaseTypeMethods<'tcx> for CodegenCx<'ll, 'tcx> {
             TypeKind::Function,
             "don't call ptr_to on function types, use ptr_to_llvm_type on FnAbi instead or explicitly specify an address space if it makes sense"
         );
-        ty.ptr_to(AddressSpace::DATA)
+        ty.ptr_to(self.data_layout().data_address_space)
     }
 
     fn type_ptr_to_ext(&self, ty: &'ll Type, address_space: AddressSpace) -> &'ll Type {
@@ -243,8 +243,8 @@ impl Type {
         unsafe { llvm::LLVMIntTypeInContext(llcx, num_bits as c_uint) }
     }
 
-    pub fn i8p_llcx(llcx: &llvm::Context) -> &Type {
-        Type::i8_llcx(llcx).ptr_to(AddressSpace::DATA)
+    pub fn i8p_llcx(llcx: &llvm::Context, address_space: AddressSpace) -> &Type {
+        Type::i8_llcx(llcx).ptr_to(address_space)
     }
 
     fn ptr_to(&self, address_space: AddressSpace) -> &Type {

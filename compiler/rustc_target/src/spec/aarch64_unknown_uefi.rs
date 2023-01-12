@@ -20,6 +20,7 @@ pub fn target() -> Target {
     Target {
         llvm_target: "aarch64-unknown-windows".to_string(),
         pointer_width: 64,
+        pointer_range: 64,
         data_layout: "e-m:w-p:64:64-i32:32-i64:64-i128:128-n32:64-S128".to_string(),
         arch: "aarch64".to_string(),
         options: base,

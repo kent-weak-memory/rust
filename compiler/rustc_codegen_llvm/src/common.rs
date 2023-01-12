@@ -14,7 +14,7 @@ use rustc_middle::bug;
 use rustc_middle::mir::interpret::{Allocation, GlobalAlloc, Scalar};
 use rustc_middle::ty::{layout::TyAndLayout, ScalarInt};
 use rustc_span::symbol::Symbol;
-use rustc_target::abi::{self, AddressSpace, HasDataLayout, LayoutOf, Pointer, Size};
+use rustc_target::abi::{self, HasDataLayout, LayoutOf, Pointer, Size};
 
 use libc::{c_char, c_uint};
 use tracing::debug;
@@ -185,7 +185,7 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
     }
 
     fn const_usize(&self, i: u64) -> &'ll Value {
-        let bit_size = self.data_layout().pointer_size.bits();
+        let bit_size = self.data_layout().pointer_range.bits();
         if bit_size < 64 {
             // make sure it doesn't overflow
             assert!(i < (1 << bit_size));
@@ -228,14 +228,14 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
     }
 
     fn scalar_to_backend(&self, cv: Scalar, layout: &abi::Scalar, llty: &'ll Type) -> &'ll Value {
-        let bitsize = if layout.is_bool() { 1 } else { layout.value.size(self).bits() };
+        let bitsize = if layout.is_bool() { 1 } else { layout.value.range(self).bits() };
         match cv {
             Scalar::Int(ScalarInt::ZST) => {
-                assert_eq!(0, layout.value.size(self).bytes());
+                assert_eq!(0, layout.value.width(self).bytes());
                 self.const_undef(self.type_ix(0))
             }
             Scalar::Int(int) => {
-                let data = int.assert_bits(layout.value.size(self));
+                let data = int.assert_bits(layout.value.range(self));
                 let llval = self.const_uint_big(self.type_ix(bitsize), data);
                 if layout.value == Pointer {
                     unsafe { llvm::LLVMConstIntToPtr(llval, llty) }
@@ -243,7 +243,7 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                     self.const_bitcast(llval, llty)
                 }
             }
-            Scalar::Ptr(ptr, _size) => {
+            Scalar::Ptr(ptr, _range, _width) => {
                 let (alloc_id, offset) = ptr.into_parts();
                 let (base_addr, base_addr_space) = match self.tcx.global_alloc(alloc_id) {
                     GlobalAlloc::Memory(alloc) => {
@@ -255,7 +255,7 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                         if !self.sess().fewer_names() {
                             llvm::set_value_name(value, format!("{:?}", alloc_id).as_bytes());
                         }
-                        (value, AddressSpace::DATA)
+                        (value, self.data_layout().data_address_space)
                     }
                     GlobalAlloc::Function(fn_instance) => (
                         self.get_fn_addr(fn_instance.polymorphize(self.tcx)),
@@ -264,7 +264,7 @@ impl ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                     GlobalAlloc::Static(def_id) => {
                         assert!(self.tcx.is_static(def_id));
                         assert!(!self.tcx.is_thread_local_static(def_id));
-                        (self.get_static(def_id), AddressSpace::DATA)
+                        (self.get_static(def_id), self.data_layout().data_address_space)
                     }
                 };
                 let llval = unsafe {

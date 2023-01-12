@@ -318,7 +318,8 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
                 try_validation!(
                     self.ecx.memory.check_ptr_access_align(
                         vtable,
-                        3 * self.ecx.tcx.data_layout.pointer_size, // drop, size, align
+                        // TODO(seharris): this looks dodgy, should probably be `pointer_width`.
+                        3 * self.ecx.tcx.data_layout.pointer_range, // drop, size, align
                         self.ecx.tcx.data_layout.pointer_align.abi,
                         CheckInAllocMsg::InboundsTest, // will anyway be replaced by validity message
                     ),
@@ -627,7 +628,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
         let WrappingRange { start: lo, end: hi } = valid_range;
         // Determine the allowed range
         // `max_hi` is as big as the size fits
-        let max_hi = u128::MAX >> (128 - op.layout.size.bits());
+        let max_hi = u128::MAX >> (128 - op.layout.range.unwrap().bits());
         assert!(hi <= max_hi);
         // We could also write `(hi + 1) % (max_hi + 1) == lo` but `max_hi + 1` overflows for `u128`
         if (lo == 0 && hi == max_hi) || (hi + 1 == lo) {
@@ -670,7 +671,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
                     )
                 }
             }
-            Ok(int) => int.assert_bits(op.layout.size),
+            Ok(int) => int.assert_bits(op.layout.range.unwrap()),
         };
         // Now compare. This is slightly subtle because this is a special "wrap-around" range.
         if valid_range.contains(bits) {
@@ -813,9 +814,9 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
         match op.layout.ty.kind() {
             ty::Str => {
                 let mplace = op.assert_mem_place(); // strings are never immediate
-                let len = mplace.len(self.ecx)?;
+                let len = Size::from_bytes(mplace.len(self.ecx)?);
                 try_validation!(
-                    self.ecx.memory.read_bytes(mplace.ptr, Size::from_bytes(len)),
+                    self.ecx.memory.read_bytes(mplace.ptr, Some(len), len),
                     self.path,
                     err_ub!(InvalidUninitBytes(..)) => { "uninitialized data in `str`" },
                     err_unsup!(ReadPointerAsBytes) => { "a pointer in `str`" },
@@ -851,7 +852,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
                 // to reject those pointers, we just do not have the machinery to
                 // talk about parts of a pointer.
                 // We also accept uninit, for consistency with the slow path.
-                let alloc = match self.ecx.memory.get(mplace.ptr, size, mplace.align)? {
+                let alloc = match self.ecx.memory.get(mplace.ptr, Some(size), size, mplace.align)? {
                     Some(a) => a,
                     None => {
                         // Size 0, nothing more to check.
@@ -860,7 +861,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
                 };
 
                 match alloc.check_bytes(
-                    alloc_range(Size::ZERO, size),
+                    alloc_range(Size::ZERO, Some(size), size),
                     /*allow_uninit_and_ptr*/ self.ctfe_mode.is_none(),
                 ) {
                     // In the happy case, we needn't check anything else.
