@@ -37,7 +37,7 @@ use rustc_session::config::{self, DebugInfo};
 use rustc_span::symbol::{Interner, Symbol};
 use rustc_span::FileNameDisplayPreference;
 use rustc_span::{self, SourceFile, SourceFileHash, Span};
-use rustc_target::abi::{Abi, Align, HasDataLayout, Integer, LayoutOf, TagEncoding};
+use rustc_target::abi::{Abi, Align, AddressSpace, HasDataLayout, Integer, LayoutOf, TagEncoding};
 use rustc_target::abi::{Int, Pointer, F32, F64};
 use rustc_target::abi::{Primitive, Size, VariantIdx, Variants};
 use tracing::debug;
@@ -83,6 +83,11 @@ const DW_ATE_signed: c_uint = 0x05;
 const DW_ATE_unsigned: c_uint = 0x07;
 #[allow(non_upper_case_globals)]
 const DW_ATE_unsigned_char: c_uint = 0x08;
+
+#[allow(non_upper_case_globals)]
+const DW_ADDR_none: c_uint = 0x0;
+#[allow(non_upper_case_globals)]
+const DW_ADDR_capability: c_uint = 0x1;
 
 pub const UNKNOWN_LINE_NUMBER: c_uint = 0;
 pub const UNKNOWN_COLUMN_NUMBER: c_uint = 0;
@@ -953,13 +958,19 @@ fn pointer_type_metadata(
 ) -> &'ll DIType {
     let (pointer_size, pointer_align) = cx.size_and_align_of(pointer_type);
     let name = compute_debuginfo_type_name(cx.tcx, pointer_type, false);
+    // TODO(simonc): There is probably a better way to detect if we're on Morello
+    let dwarf_ptr_address_space = 
+        match cx.tcx.data_layout.data_address_space {
+            AddressSpace(200) => DW_ADDR_capability,
+            _ => DW_ADDR_none
+        };
     unsafe {
         llvm::LLVMRustDIBuilderCreatePointerType(
             DIB(cx),
             pointee_type_metadata,
             pointer_size.bits(),
             pointer_align.bits() as u32,
-            0, // Ignore DWARF address space.
+            dwarf_ptr_address_space,
             name.as_ptr().cast(),
             name.len(),
         )
