@@ -10,6 +10,7 @@ pub fn target() -> Target {
         options: TargetOptions {
             features: "+morello,+c64".to_string(),
             llvm_abiname: "purecap".to_string(),
+            abi: "purecap".to_string(), // just for identification via `#[cfg(target_abi=...)]` attributes
             max_atomic_width: Some(128),
             // Atomic pointers are supported and converting to integers
             // invalidates capabilities so we *must* use atomic pointers.
