@@ -14,6 +14,8 @@
 #![no_std]
 #![unstable(feature = "panic_unwind", issue = "32837")]
 #![doc(issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/")]
+#![feature(asm)]
+#![feature(cfg_target_abi)]
 #![feature(core_intrinsics)]
 #![feature(lang_items)]
 #![feature(nll)]

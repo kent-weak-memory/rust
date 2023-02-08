@@ -40,8 +40,12 @@ use alloc::boxed::Box;
 use core::any::Any;
 
 use crate::dwarf::eh::{self, EHAction, EHContext};
-use libc::{c_int, uintptr_t};
+use libc::{c_int, c_void};
 use unwind as uw;
+
+// TODO(seharris): fix libc definition and replace this hack with normal import.
+#[allow(non_camel_case_types)]
+type uintptr_t = *const c_void;
 
 #[repr(C)]
 struct Exception {
@@ -54,7 +58,7 @@ pub unsafe fn panic(data: Box<dyn Any + Send>) -> u32 {
         _uwe: uw::_Unwind_Exception {
             exception_class: rust_exception_class(),
             exception_cleanup,
-            private: [0; uw::unwinder_private_data_size],
+            private: [0 as *const c_void; uw::unwinder_private_data_size],
         },
         cause: data,
     });
@@ -250,7 +254,13 @@ cfg_if::cfg_if! {
                     EHAction::Catch(lpad) => {
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.0,
                             exception_object as uintptr_t);
-                        uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, 0);
+                        uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, 0 as *const c_void);
+                        if cfg!(target_abi = "purecap") {
+                            // TODO(seharris): this code doesn't seem to execute in `catch_unwind()` crashes, but making this code exit in different ways causes the crash to change between "failed to initiate panic, error 5" and "bus error".
+                            let is_valid: u64;
+                            asm!("gctag {0}, {1}", out(reg) is_valid, in(reg) lpad);
+                            assert!(is_valid == 1);
+                        }
                         uw::_Unwind_SetIP(context, lpad);
                         uw::_URC_INSTALL_CONTEXT
                     }
@@ -299,14 +309,14 @@ cfg_if::cfg_if! {
 unsafe fn find_eh_action(context: *mut uw::_Unwind_Context) -> Result<EHAction, ()> {
     let lsda = uw::_Unwind_GetLanguageSpecificData(context) as *const u8;
     let mut ip_before_instr: c_int = 0;
-    let ip = uw::_Unwind_GetIPInfo(context, &mut ip_before_instr);
+    let ip = uw::_Unwind_GetIPInfo(context, &mut ip_before_instr) as usize;
     let eh_context = EHContext {
         // The return address points 1 byte past the call instruction,
         // which could be in the next IP range in LSDA range table.
         ip: if ip_before_instr != 0 { ip } else { ip - 1 },
-        func_start: uw::_Unwind_GetRegionStart(context),
-        get_text_start: &|| uw::_Unwind_GetTextRelBase(context),
-        get_data_start: &|| uw::_Unwind_GetDataRelBase(context),
+        func_start: uw::_Unwind_GetRegionStart(context) as usize,
+        get_text_start: &|| uw::_Unwind_GetTextRelBase(context) as usize,
+        get_data_start: &|| uw::_Unwind_GetDataRelBase(context) as usize,
     };
     eh::find_eh_action(lsda, &eh_context)
 }

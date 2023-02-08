@@ -1,6 +1,6 @@
 #![allow(nonstandard_style)]
 
-use libc::{c_int, c_void, uintptr_t};
+use libc::{c_int, c_void};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -19,8 +19,9 @@ pub enum _Unwind_Reason_Code {
 pub use _Unwind_Reason_Code::*;
 
 pub type _Unwind_Exception_Class = u64;
-pub type _Unwind_Word = uintptr_t;
-pub type _Unwind_Ptr = uintptr_t;
+// TODO(seharris): fix libc definition and replace this hack with normal import.
+pub type _Unwind_Word = *const c_void;
+pub type _Unwind_Ptr = *const c_void;
 pub type _Unwind_Trace_Fn =
     extern "C" fn(ctx: *mut _Unwind_Context, arg: *mut c_void) -> _Unwind_Reason_Code;
 

@@ -12,6 +12,7 @@
 #![allow(unused)]
 
 use crate::dwarf::DwarfReader;
+use core::ffi::c_void;
 use core::mem;
 
 pub const DW_EH_PE_omit: u8 = 0xFF;
@@ -44,8 +45,9 @@ pub struct EHContext<'a> {
 
 pub enum EHAction {
     None,
-    Cleanup(usize),
-    Catch(usize),
+    // TODO(seharris): is this really the right way to handle this?
+    Cleanup(*const c_void),
+    Catch(*const c_void),
     Terminate,
 }
 
@@ -126,6 +128,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
 }
 
 fn interpret_cs_action(cs_action: u64, lpad: usize) -> EHAction {
+    let lpad = int_to_program_pointer(lpad);
     if cs_action == 0 {
         // If cs_action is 0 then this is a cleanup (Drop::drop). We run these
         // for both Rust panics and foreign exceptions.
@@ -134,6 +137,33 @@ fn interpret_cs_action(cs_action: u64, lpad: usize) -> EHAction {
         // Stop unwinding Rust panics at catch_unwind.
         EHAction::Catch(lpad)
     }
+}
+
+// Rederive a capability using the program counter.
+// This is required on CHERI if we want to be able to dereference landing pads.
+// We generally *do* want to dereference landing pads because we want to be
+// able to execute from them.
+// Failing to do this will cause an error about an invalid capability from
+// somewhere in libunwind.
+//
+// Note that this only works for pointers into loaded machine code, i.e. the
+// actual program instructions.
+#[cfg(target_abi = "purecap")]
+fn int_to_program_pointer(pointer: usize) -> *const c_void {
+    // TODO(seharris): Clang provides intrinsicts for doing this which appear to
+    //                 come from LLVM, so we should probably find a way to add
+    //                 those to Rust instead of using inline assembly.
+    // TODO(seharris): don't forget to remove the `#![feature(asm)]` annotation
+    //                 from the root of this crate.
+    let capability: *const c_void;
+    unsafe {
+        asm!("cvtpz {0}, {1}", out(reg) capability, in(reg) pointer);
+    }
+    capability
+}
+#[cfg(not(target_abi = "purecap"))]
+fn int_to_program_pointer(pointer: usize) -> *const c_void {
+    pointer as *const c_void
 }
 
 #[inline]
