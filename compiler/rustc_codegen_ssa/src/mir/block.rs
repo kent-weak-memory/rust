@@ -393,6 +393,14 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
             return;
         }
 
+        // Following Zhang et. al, ASE 2022:
+        let gcx = bx.tcx();
+        if gcx.sess.opts.cg.drop_bounds_checks {
+            // Modify to disable the run-time checks
+            helper.funclet_br(self, &mut bx, target);
+            return;
+        }
+
         // Pass the condition through llvm.expect for branch hinting.
         let cond = bx.expect(cond, expected);
 
