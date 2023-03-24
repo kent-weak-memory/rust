@@ -12,6 +12,7 @@ Follow their setup instructions for your platform.
 # Build CHERIBSD
 
 You will need to build CHERIBSD for Purecap Morello, and FreeBSD for Aarch64.
+TODO: building Freebsd may not actually be needed, we should update this when we're a bit more certain that building Aarch64 binaries against CheriBSD is appropriate.
 
 ```
 ./cheribuild.py -d cheribsd-purecap-morello
