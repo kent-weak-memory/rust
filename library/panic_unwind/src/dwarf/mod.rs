@@ -35,6 +35,18 @@ impl DwarfReader {
         result
     }
 
+    // Similar to `read()`, but aligns the address upward before reading
+    // instead of allowing unaligned values.
+    pub unsafe fn read_aligned<T: Copy>(&mut self, alignment: usize) -> T {
+        let offset = self.ptr as usize%alignment;
+        if offset != 0 {
+            self.ptr = self.ptr.add(alignment-offset);
+        }
+        let result = *(self.ptr as *const T);
+        self.ptr = self.ptr.add(mem::size_of::<T>());
+        result
+    }
+
     // ULEB128 and SLEB128 encodings are defined in Section 7.6 - "Variable
     // Length Data".
     pub unsafe fn read_uleb128(&mut self) -> u64 {

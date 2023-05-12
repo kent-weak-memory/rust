@@ -84,7 +84,33 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
         while reader.ptr < action_table {
             let cs_start = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
             let cs_len = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
-            let cs_lpad = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
+            let mut cs_lpad = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
+            // Set when landing pad is encoded as a pointer instead of an
+            // offset from `lpad_base`.
+            let mut sealed_lpad = false;
+
+            // Handle special encoding of landing pads on Morello.
+            // Landing pads are encoded as straight pointer values, either
+            // among the LSDA data, or at a given offset.
+            //
+            // Based on changes in
+            // `morello-llvm-project/libcxxabi/src/cxa_personality.cpp`
+            // from Morello LLVM release 1.5 (2022-10-5).
+            #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+            {
+                let pointer_align = 16;
+                if cs_lpad == 0xc {
+                    cs_lpad = reader.read_aligned::<*const c_void>(pointer_align) as usize;
+                    sealed_lpad = true;
+                } else if cs_lpad == 0xd {
+                    let address = reader.read::<u64>();
+                    cs_lpad = *(reader.ptr.add(address as usize) as *const *const c_void) as usize;
+                    sealed_lpad = true;
+                } else if cs_lpad != 0 {
+                    // Invalid encoding.
+                    return Err(());
+                }
+            }
             let cs_action = reader.read_uleb128();
             // Callsite table is sorted by cs_start, so if we've passed the ip, we
             // may stop searching.
@@ -95,7 +121,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
                 if cs_lpad == 0 {
                     return Ok(EHAction::None);
                 } else {
-                    let lpad = lpad_base + cs_lpad;
+                    let lpad = if sealed_lpad { cs_lpad } else { lpad_base + cs_lpad };
                     return Ok(interpret_cs_action(cs_action, lpad));
                 }
             }
@@ -150,13 +176,32 @@ fn interpret_cs_action(cs_action: u64, lpad: usize) -> EHAction {
 // actual program instructions.
 #[cfg(target_abi = "purecap")]
 fn int_to_program_pointer(pointer: usize) -> *const c_void {
-    // TODO(seharris): Clang provides intrinsicts for doing this which appear to
-    //                 come from LLVM, so we should probably find a way to add
-    //                 those to Rust instead of using inline assembly.
+    // TODO(seharris): there are intrinsics that can do this, albeit slightly less cleanly, so we should possibly use them instead of assembly.
     // TODO(seharris): don't forget to remove the `#![feature(asm)]` annotation
     //                 from the root of this crate.
+    // TODO(seharris): it would be cleaner to have a shared implementation of
+    //                 these intrinsics in a library, perhaps adds them to core
+    //                 or something.
+    // I think the intrinsics we need are:
+    // - __builtin_cheri_address_set
+    // - __builtin_cheri_program_counter_get
+    // The extern for one is below, but I couldn't find the other.
+    // pub fn new_cap_with_provenance<T>(cap: *const T, addr: ???) -> *const T {
+    //     extern {
+    //         #[link_name = "llvm.cheri.cap.address.set.i64"]
+    //         fn __builtin_cheri_address_set(cap: ???, addr: ???) -> ???;
+    //     }
+    //     return unsafe { __builtin_cheri_address_set(cap as ???, addr) as *const T };
+    // }
+
     let capability: *const c_void;
     unsafe {
+        // "Convert pointer to capability offset from PCC, with null capability
+        // from zero semantics".
+        //
+        // We assume that the current program counter has access to the whole
+        // executable, and create a new capability with the target address we
+        // want, and provenance and bounds from the program counter.
         asm!("cvtpz {0}, {1}", out(reg) capability, in(reg) pointer);
     }
     capability

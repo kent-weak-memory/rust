@@ -255,8 +255,9 @@ cfg_if::cfg_if! {
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.0,
                             exception_object as uintptr_t);
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, 0 as *const c_void);
-                        if cfg!(target_abi = "purecap") {
-                            // TODO(seharris): this code doesn't seem to execute in `catch_unwind()` crashes, but making this code exit in different ways causes the crash to change between "failed to initiate panic, error 5" and "bus error".
+                        // TODO(seharris) check this code executes, consider removing it.
+                        #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+                        {
                             let is_valid: u64;
                             asm!("gctag {0}, {1}", out(reg) is_valid, in(reg) lpad);
                             assert!(is_valid == 1);
@@ -309,7 +310,17 @@ cfg_if::cfg_if! {
 unsafe fn find_eh_action(context: *mut uw::_Unwind_Context) -> Result<EHAction, ()> {
     let lsda = uw::_Unwind_GetLanguageSpecificData(context) as *const u8;
     let mut ip_before_instr: c_int = 0;
-    let ip = uw::_Unwind_GetIPInfo(context, &mut ip_before_instr) as usize;
+    let mut ip = uw::_Unwind_GetIPInfo(context, &mut ip_before_instr) as usize;
+    // Handle special case for Morello.
+    // LSB is used to indicate capability mode, and isn't part of the
+    // actual instruction location.
+    //
+    // Based on changes in
+    // `morello-llvm-project/libcxxabi/src/cxa_personality.cpp`
+    // from Morello LLVM release 1.5 (2022-10-5).
+    if cfg!(all(target_arch = "aarch64", target_abi = "purecap")) && ip&1 != 0 {
+        ip = ip-1;
+    }
     let eh_context = EHContext {
         // The return address points 1 byte past the call instruction,
         // which could be in the next IP range in LSDA range table.
