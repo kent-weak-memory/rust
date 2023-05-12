@@ -88,3 +88,6 @@ strange runtime errors, especially SIGBUS, C programs using `printf("%d\n", <val
 fix: make sure you are compiling with an LLVM version with an ABI that matches your build of CHERI BSD.
 These sorts of problems seem to indicate ABI mismatch, and the ABI has changed a few times as noted by: https://github.com/CTSRD-CHERI/cheribsd/blob/main/CHERI-UPDATING.md
 It might be desirable to use the same version of LLVM to build both programs and the OS to avoid this kind of weirdness.
+
+rustc fails to build with `Relocations in generic ELF (EM: 183)`, `error adding symbols: file in wrong format`, `collect2: error: ld returned 1 exit status` building for purecap
+fix: make sure the Morello sysroot and linker are being used, this usually means using the arguments `--target aarch64-unknown-freebsd-purecap -C linker=<rust-repository>/clang-morello.sh`
