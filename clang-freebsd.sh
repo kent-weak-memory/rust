@@ -4,4 +4,4 @@
 # See config.toml.sarah for more information.
 source $(dirname "$0")/cheri-config.sh
 
-$CHERI_HOME/output/morello-sdk/bin/clang --sysroot $CHERI_HOME/output/freebsd-aarch64/ -target aarch64-unknown-freebsd "$@"
+$CHERI_HOME/output/morello-sdk/bin/clang --sysroot $CHERI_HOME/output/rootfs-morello-purecap/ -target aarch64-unknown-freebsd "$@"
