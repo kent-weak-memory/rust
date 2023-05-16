@@ -256,6 +256,7 @@ cfg_if::cfg_if! {
                             exception_object as uintptr_t);
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, 0 as *const c_void);
                         // TODO(seharris) check this code executes, consider removing it.
+                        // TODO(seharris) don't forget to remove `#[feature(asm)]` from lib.rs if removing this code.
                         #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
                         {
                             let is_valid: u64;

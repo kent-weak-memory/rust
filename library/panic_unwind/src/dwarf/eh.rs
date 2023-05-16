@@ -171,52 +171,6 @@ fn interpret_cs_action(cs_action: u64, lpad: *const c_void) -> EHAction {
     }
 }
 
-// Rederive a capability using the program counter.
-// This is required on CHERI if we want to be able to dereference landing pads.
-// We generally *do* want to dereference landing pads because we want to be
-// able to execute from them.
-// Failing to do this will cause an error about an invalid capability from
-// somewhere in libunwind.
-//
-// Note that this only works for pointers into loaded machine code, i.e. the
-// actual program instructions.
-#[cfg(target_abi = "purecap")]
-fn int_to_program_pointer(pointer: usize) -> *const c_void {
-    // TODO(seharris): there are intrinsics that can do this, albeit slightly less cleanly, so we should possibly use them instead of assembly.
-    // TODO(seharris): don't forget to remove the `#![feature(asm)]` annotation
-    //                 from the root of this crate.
-    // TODO(seharris): it would be cleaner to have a shared implementation of
-    //                 these intrinsics in a library, perhaps adds them to core
-    //                 or something.
-    // I think the intrinsics we need are:
-    // - __builtin_cheri_address_set
-    // - __builtin_cheri_program_counter_get
-    // The extern for one is below, but I couldn't find the other.
-    // pub fn new_cap_with_provenance<T>(cap: *const T, addr: ???) -> *const T {
-    //     extern {
-    //         #[link_name = "llvm.cheri.cap.address.set.i64"]
-    //         fn __builtin_cheri_address_set(cap: ???, addr: ???) -> ???;
-    //     }
-    //     return unsafe { __builtin_cheri_address_set(cap as ???, addr) as *const T };
-    // }
-
-    let capability: *const c_void;
-    unsafe {
-        // "Convert pointer to capability offset from PCC, with null capability
-        // from zero semantics".
-        //
-        // We assume that the current program counter has access to the whole
-        // executable, and create a new capability with the target address we
-        // want, and provenance and bounds from the program counter.
-        asm!("cvtpz {0}, {1}", out(reg) capability, in(reg) pointer);
-    }
-    capability
-}
-#[cfg(not(target_abi = "purecap"))]
-fn int_to_program_pointer(pointer: usize) -> *const c_void {
-    pointer as *const c_void
-}
-
 #[inline]
 fn round_up(unrounded: usize, align: usize) -> Result<usize, ()> {
     if align.is_power_of_two() { Ok((unrounded + align - 1) & !(align - 1)) } else { Err(()) }
