@@ -29,7 +29,12 @@ fn size_of_32() {
 #[cfg(target_pointer_width = "64")]
 fn size_of_64() {
     assert_eq!(size_of::<usize>(), 8);
-    assert_eq!(size_of::<*const usize>(), 8);
+    if cfg!(all(target_arch = "aarch64", target_abi = "purecap")) {
+        // `target_pointer_width` actually refers to pointer range on Morello.
+        assert_eq!(size_of::<*const usize>(), 16);
+    } else {
+        assert_eq!(size_of::<*const usize>(), 8);
+    }
 }
 
 #[test]
@@ -65,7 +70,12 @@ fn align_of_32() {
 #[cfg(target_pointer_width = "64")]
 fn align_of_64() {
     assert_eq!(align_of::<usize>(), 8);
-    assert_eq!(align_of::<*const usize>(), 8);
+    if cfg!(all(target_arch = "aarch64", target_abi = "purecap")) {
+        // `target_pointer_width` actually refers to pointer range on Morello.
+        assert_eq!(align_of::<*const usize>(), 16);
+    } else {
+        assert_eq!(align_of::<*const usize>(), 8);
+    }
 }
 
 #[test]

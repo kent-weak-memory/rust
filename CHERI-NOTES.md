@@ -63,6 +63,16 @@ readelf -h | grep Flags
 ```
 if flags include 0x10000 ELF is for purecap, otherwise plain aarch64
 
+only build part of a program when compiling for Morello in purecap mode:
+```
+#![feature(cfg_target_abi)]
+
+#[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+{
+	// Morello specific code.
+}
+```
+
 # problems:
 cargo complains "can't find crate for `core`" when building for CHERI
 fix: `./x.py build library/core`
