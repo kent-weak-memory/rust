@@ -186,21 +186,22 @@ pub struct DynMetadata<Dyn: ?Sized> {
 #[repr(C)]
 struct VTable {
     drop_in_place: fn(*mut ()),
-    size_of: usize,
-    align_of: usize,
+    // TODO(seharris): I'd rather make the vtable encoding differentiate between pointer and usize entries than leave these weird gaps.
+    size_of: *const (),
+    align_of: *const (),
 }
 
 impl<Dyn: ?Sized> DynMetadata<Dyn> {
     /// Returns the size of the type associated with this vtable.
     #[inline]
     pub fn size_of(self) -> usize {
-        self.vtable_ptr.size_of
+        self.vtable_ptr.size_of as usize
     }
 
     /// Returns the alignment of the type associated with this vtable.
     #[inline]
     pub fn align_of(self) -> usize {
-        self.vtable_ptr.align_of
+        self.vtable_ptr.align_of as usize
     }
 
     /// Returns the size and alignment together as a `Layout`
