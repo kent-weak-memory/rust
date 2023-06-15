@@ -39,14 +39,23 @@ impl<'a, 'tcx> VirtualIndex {
         // Load the data pointer from the object.
         debug!("get_int({:?}, {:?})", llvtable, self);
 
-        let llty = bx.type_isize();
-        let llvtable = bx.pointercast(llvtable, bx.type_ptr_to(llty));
-        let usize_align = bx.tcx().data_layout.pointer_align.abi;
-        let gep = bx.inbounds_gep(llty, llvtable, &[bx.const_usize(self.0)]);
-        let ptr = bx.load(llty, gep, usize_align);
+        // Cast vtable to array of pointers so indexing matches the rest of the
+        // compiler.
+        let slot_type = bx.type_i8p();
+        let llvtable = bx.pointercast(llvtable, bx.type_ptr_to(slot_type));
+
+        // Index into array to get requested slot.
+        let gep = bx.inbounds_gep(slot_type, llvtable, &[bx.const_usize(self.0)]);
+
+        // Cast slot pointer to usize.
+        let value_type = bx.type_isize();
+        let value_ptr = bx.pointercast(gep, bx.type_ptr_to(value_type));
+        let usize_align = bx.tcx().data_layout.ptr_ranged_integer().align(bx).abi;
+        let value = bx.load(value_type, value_ptr, usize_align);
+
         // Vtable loads are invariant.
-        bx.set_invariant_load(ptr);
-        ptr
+        bx.set_invariant_load(value);
+        value
     }
 }
 
