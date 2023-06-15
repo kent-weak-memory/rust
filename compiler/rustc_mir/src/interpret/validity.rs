@@ -318,8 +318,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValidityVisitor<'rt, 'mir, '
                 try_validation!(
                     self.ecx.memory.check_ptr_access_align(
                         vtable,
-                        // TODO(seharris): this looks dodgy, should probably be `pointer_width`.
-                        3 * self.ecx.tcx.data_layout.pointer_range, // drop, size, align
+                        3 * self.ecx.tcx.data_layout.pointer_width, // drop, size, align
                         self.ecx.tcx.data_layout.pointer_align.abi,
                         CheckInAllocMsg::InboundsTest, // will anyway be replaced by validity message
                     ),
