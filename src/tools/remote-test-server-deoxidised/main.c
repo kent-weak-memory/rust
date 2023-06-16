@@ -312,23 +312,35 @@ if (!quiet) printf("run_test() temporary directory created\n");
 
 	// Read list of NULL terminated arguments.
 	// We store the argument data into one big long string with a NULL at the end of each argument.
-	// We store pointers to the argument data into a list to pass to `execve()`.
-	// The first entry is a special case, a dummy which will later be replaced by the path to the program.
-	string_vector_clear(&run_args);
-	string_vector_push(&run_args, NULL);
 	string_clear(&run_args_strings);
 	while (true) {
 		const size_t start = run_args_strings.length;
-		readbuffer_read_until(buffer, &run_args_strings, 0);
+		readbuffer_read_until(buffer, &run_args_strings, '\0');
 		if (run_args_strings.length == start) break; // empty argument marks end of list
-		string_push(&run_args_strings, 0);
-		string_vector_push(&run_args, &run_args_strings.data[start]);
+		string_push(&run_args_strings, '\0');
+	}
+	// Find the start of each argument and add it to a list of arguments.
+	// This will be passed to `execve()`.
+	// The first entry is a special case: we store a dummy and later replace it with the path to the program.
+	// Note that once we have pointers into the big string, the big string must not be resized!
+	// Any action that can call `realloc()` risks breaking the list of pointers.
+	string_vector_clear(&run_args);
+	string_vector_push(&run_args, NULL);
+	size_t index;
+	for (index = 0; index < run_args_strings.length; index ++) {
+		if (index == 0 || run_args_strings.data[index-1] == '\0') {
+			if (run_args_strings.data[index] == '\0') {
+				fprintf(stderr, "zero length argument\n");
+				abort();
+			}
+			string_vector_push(&run_args, &run_args_strings.data[index]);
+		}
 	}
 if (!quiet) printf("run_test() arguments added\n");
 
-	// Do pretty much the same thing for environment variable key-value pairs.
-	// We do some extra processing to format the pairs as needed by `execve()`.
-	string_vector_clear(&run_envs);
+	// Similar to arguments, receive a list of NULL terminated environment variables.
+	// Unlike the arguments earlier, variables are sent as pairs of name and value.
+	// These need to be formatted in the style `execve()` wants: `variable=value`.
 	string_clear(&run_envs_strings);
 	while (true) {
 		const size_t start = run_envs_strings.length;
@@ -342,13 +354,11 @@ if (!quiet) printf("run_test() arguments added\n");
 		string_push(&run_envs_strings, '=');
 		readbuffer_read_until(buffer, &run_envs_strings, 0);
 		string_push(&run_envs_strings, '\0');
-		string_vector_push(&run_envs, &run_envs_strings.data[start]);
 	}
 if (!quiet) printf("run_test() environment variables added\n");
 
 	// Add library paths.
 	{
-		const size_t start = run_envs_strings.length;
 		const char *const library_path_env = "LD_LIBRARY_PATH";
 		string_append(&run_envs_strings, library_path_env, strlen(library_path_env));
 		string_push(&run_envs_strings, '=');
@@ -361,20 +371,31 @@ if (!quiet) printf("run_test() environment variables added\n");
 			string_append(&run_envs_strings, os_paths, strlen(os_paths));
 		}
 		string_push(&run_envs_strings, '\0');
-		string_vector_push(&run_envs, &run_envs_strings.data[start]);
 	}
 
 	// Add temporary directory.
 	{
-		const size_t start = run_envs_strings.length;
 		const char *const temporary_directory_env = "RUST_TEST_TMPDIR";
 		string_append(&run_envs_strings, temporary_directory_env, strlen(temporary_directory_env));
 		string_push(&run_envs_strings, '=');
 		string_append(&run_envs_strings, temporary_directory, strlen(temporary_directory));
 		string_push(&run_envs_strings, '\0');
-		string_vector_push(&run_envs, &run_envs_strings.data[start]);
 	}
 if (!quiet) printf("run_test() extra environment variables inserted\n");
+
+	// Finalise list of environment variables by building a list of pointers to them.
+	// This works the same way as the arguments did.
+	// That inculdes the limitations about not calling `realloc()`.
+	string_vector_clear(&run_envs);
+	for (index = 0; index < run_envs_strings.length; index ++) {
+		if (index == 0 || run_envs_strings.data[index-1] == '\0') {
+			if (run_envs_strings.data[index] == '\0') {
+				fprintf(stderr, "zero length environment variable assignment\n");
+				abort();
+			}
+			string_vector_push(&run_envs, &run_envs_strings.data[index]);
+		}
+	}
 
 	// Read list of dynamic libraries.
 	while (readbuffer_peek(buffer) != 0) {
