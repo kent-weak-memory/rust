@@ -6,7 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 use crate::error::ERRNO_NOT_POSITIVE;
-use crate::util::LazyUsize;
+use crate::util::LazyPointer;
 use crate::Error;
 use core::num::NonZeroU32;
 use core::ptr::NonNull;
@@ -76,7 +76,7 @@ pub fn sys_fill_exact(
 // weak! macro in libstd.
 pub struct Weak {
     name: &'static str,
-    addr: LazyUsize,
+    addr: LazyPointer<libc::c_void>,
 }
 
 impl Weak {
@@ -85,16 +85,16 @@ impl Weak {
     pub const unsafe fn new(name: &'static str) -> Self {
         Self {
             name,
-            addr: LazyUsize::new(),
+            addr: LazyPointer::new(),
         }
     }
 
     // Return a function pointer if present at runtime. Otherwise, return null.
     pub fn ptr(&self) -> Option<NonNull<libc::c_void>> {
         let addr = self.addr.unsync_init(|| unsafe {
-            libc::dlsym(libc::RTLD_DEFAULT, self.name.as_ptr() as *const _) as usize
+            libc::dlsym(libc::RTLD_DEFAULT, self.name.as_ptr() as *const _)
         });
-        NonNull::new(addr as *mut _)
+        NonNull::new(addr)
     }
 }
 

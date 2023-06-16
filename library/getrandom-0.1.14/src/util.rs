@@ -6,9 +6,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+use core::sync::atomic::{AtomicPtr, Ordering::Relaxed};
 
-// This structure represents a lazily initialized static usize value. Useful
+// This structure represents a lazily initialized static pointer value. Useful
 // when it is preferable to just rerun initialization instead of locking.
 // Both unsync_init and sync_init will invoke an init() function until it
 // succeeds, then return the cached value for future calls.
@@ -18,35 +18,50 @@ use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 //
 // Users should only depend on the _value_ returned by init() functions.
 // Specifically, for the following init() function:
-//      fn init() -> usize {
+//      fn init() -> *const () {
 //          a();
 //          let v = b();
 //          c();
 //          v
 //      }
 // the effects of c() or writes to shared memory will not necessarily be
-// observed and additional synchronization methods with be needed.
-pub struct LazyUsize(AtomicUsize);
+// observed and additional synchronization methods will be needed.
+pub struct LazyPointer<T>(AtomicPtr<T>);
 
-impl LazyUsize {
+impl<T> LazyPointer<T> {
     pub const fn new() -> Self {
-        Self(AtomicUsize::new(Self::UNINIT))
+        Self(AtomicPtr::new(Self::UNINIT))
     }
 
-    // The initialization is not completed.
-    pub const UNINIT: usize = usize::max_value();
+    // Value used when initialization is not complete.
+    pub const UNINIT: *mut T = LazyUsize::UNINIT as *mut T;
 
     // Runs the init() function at least once, returning the value of some run
     // of init(). Multiple callers can run their init() functions in parallel.
     // init() should always return the same value, if it succeeds.
-    pub fn unsync_init(&self, init: impl FnOnce() -> usize) -> usize {
+    pub fn unsync_init(&self, init: impl FnOnce() -> *mut T) -> *mut T {
         // Relaxed ordering is fine, as we only have a single atomic variable.
-        let mut val = self.0.load(Relaxed);
-        if val == Self::UNINIT {
-            val = init();
-            self.0.store(val, Relaxed);
+        let mut value = self.0.load(Relaxed);
+        if value == Self::UNINIT {
+            value = init();
+            self.0.store(value, Relaxed);
         }
-        val
+        value
+    }
+}
+
+// Identical to LazyPointer except with usize instead of *mut T.
+pub struct LazyUsize(LazyPointer<()>);
+
+impl LazyUsize {
+    pub const UNINIT: usize = usize::MAX;
+
+    pub const fn new() -> Self {
+        Self(LazyPointer::new())
+    }
+
+    pub fn unsync_init(&self, init: impl FnOnce() -> usize) -> usize {
+        self.0.unsync_init(|| init() as *mut ()) as usize
     }
 }
 
