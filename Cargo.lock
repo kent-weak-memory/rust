@@ -1385,8 +1385,6 @@ dependencies = [
 [[package]]
 name = "getrandom"
 version = "0.1.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7abc8dd8451921606d809ba32e95b6111925cd2906060d2dcc29c070220503eb"
 dependencies = [
  "cfg-if 0.1.10",
  "libc 0.2.99 (registry+https://github.com/rust-lang/crates.io-index)",
