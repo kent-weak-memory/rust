@@ -3640,7 +3640,6 @@ dependencies = [
  "rustc_span",
  "rustc_target",
  "smallvec",
- "snap",
  "tracing",
 ]
 
@@ -3666,6 +3665,7 @@ dependencies = [
  "rustc_incremental",
  "rustc_index",
  "rustc_macros",
+ "rustc_metadata",
  "rustc_middle",
  "rustc_serialize",
  "rustc_session",
@@ -3673,6 +3673,7 @@ dependencies = [
  "rustc_symbol_mangling",
  "rustc_target",
  "smallvec",
+ "snap",
  "tempfile",
  "tracing",
 ]
