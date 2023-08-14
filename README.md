@@ -34,10 +34,10 @@ Building libraries and programs requires a build of CHERI BSD to compile against
 Use Cheribuild to clone and build it:
 ```
 cd /path/to/cheribuild
-./cheribuild.py -d cheribsd-purecap-morello
+./cheribuild.py -d cheribsd-morello-purecap
 ```
 
-This will also build Morello LLVM as a dependency of `cheribsd-purecap-morello`
+This will also build Morello LLVM as a dependency of `cheribsd-morello-purecap`
 
 ### Patch and Rebuild Morello LLVM
 
