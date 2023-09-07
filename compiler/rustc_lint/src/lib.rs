@@ -46,6 +46,7 @@ extern crate rustc_session;
 
 mod array_into_iter;
 pub mod builtin;
+mod cheri;
 mod context;
 mod early;
 mod internal;
@@ -77,6 +78,7 @@ use rustc_span::Span;
 
 use array_into_iter::ArrayIntoIter;
 use builtin::*;
+use cheri::*;
 use internal::*;
 use methods::*;
 use non_ascii_idents::*;
@@ -171,6 +173,7 @@ macro_rules! late_lint_passes {
                 NoopMethodCall: NoopMethodCall,
                 InvalidAtomicOrdering: InvalidAtomicOrdering,
                 NamedAsmLabels: NamedAsmLabels,
+                UsizeAsPointer: UsizeAsPointer,
             ]
         );
     };
@@ -314,6 +317,11 @@ fn register_builtins(store: &mut LintStore, no_interleave_lints: bool) {
                                        // FIXME macro crates are not up for this yet, too much
                                        // breakage is seen if we try to encourage this lint.
                                        // MACRO_USE_EXTERN_CRATE
+    );
+
+    add_lint_group!(
+        "cheri",
+        USIZE_AS_POINTER
     );
 
     // Register renamed and removed lints.
