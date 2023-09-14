@@ -1425,6 +1425,10 @@ macro_rules! fnptr_impls_safety_abi {
 
         #[stable(feature = "fnptr_impls", since = "1.4.0")]
         impl<Ret, $($Arg),*> fmt::Pointer for $FnTy {
+            // This is ok because the pointer created from this round-trip is
+            // passed to code that will only ever print its address.
+            // The invalid pointer is safe because it won't be dereferenced.
+            #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 // HACK: The intermediate cast as usize is required for AVR
                 // so that the address space of the source function pointer
@@ -1437,6 +1441,10 @@ macro_rules! fnptr_impls_safety_abi {
 
         #[stable(feature = "fnptr_impls", since = "1.4.0")]
         impl<Ret, $($Arg),*> fmt::Debug for $FnTy {
+            // This is ok because the pointer created from this round-trip is
+            // passed to code that will only ever print its address.
+            // The invalid pointer is safe because it won't be dereferenced.
+            #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 // HACK: The intermediate cast as usize is required for AVR
                 // so that the address space of the source function pointer

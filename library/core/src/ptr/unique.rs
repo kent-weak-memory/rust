@@ -68,6 +68,7 @@ impl<T: Sized> Unique<T> {
     /// a `T`, which means this must not be used as a "not yet initialized"
     /// sentinel value. Types that lazily allocate must track initialization by
     /// some other means.
+    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
     #[inline]
     pub const fn dangling() -> Self {
         // SAFETY: mem::align_of() returns a valid, non-null pointer. The

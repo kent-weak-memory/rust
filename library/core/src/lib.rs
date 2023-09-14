@@ -71,6 +71,10 @@
 #![allow(explicit_outlives_requirements)]
 #![cfg_attr(bootstrap, allow(incomplete_features))] // if_let_guard
 //
+// Cheri:
+#![feature(cfg_target_abi)]
+#![cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), warn(usize_as_pointer))]
+//
 // Library features for const fns:
 #![feature(const_align_of_val)]
 #![feature(const_alloc_layout)]

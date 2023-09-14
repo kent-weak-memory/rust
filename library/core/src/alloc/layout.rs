@@ -181,6 +181,7 @@ impl Layout {
     /// which means this must not be used as a "not yet initialized"
     /// sentinel value. Types that lazily allocate must track initialization by
     /// some other means.
+    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
     #[unstable(feature = "alloc_layout_extra", issue = "55724")]
     #[rustc_const_unstable(feature = "alloc_layout_extra", issue = "55724")]
     #[inline]

@@ -89,9 +89,12 @@ mod tests;
 
 use crate::cell::Cell;
 use crate::fmt;
-use crate::marker;
-use crate::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use crate::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use crate::thread::{self, Thread};
+
+/// Used to indicate pointers that are both a pointer to a value *and* include
+/// state in their least significant bits.
+type Masked = ();
 
 /// A synchronization primitive which can be used to run a one-time global
 /// initialization. Useful for one-time initialization for FFI or related
@@ -110,10 +113,8 @@ use crate::thread::{self, Thread};
 /// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct Once {
-    // `state_and_queue` is actually a pointer to a `Waiter` with extra state
-    // bits, so we add the `PhantomData` appropriately.
-    state_and_queue: AtomicUsize,
-    _marker: marker::PhantomData<*const Waiter>,
+    // `state_and_queue` is a pointer to a `Waiter` with extra state bits.
+    state_and_queue: AtomicPtr<Masked>,
 }
 
 // The `PhantomData` of a raw pointer removes these two auto traits, but we
@@ -129,7 +130,7 @@ unsafe impl Send for Once {}
 #[derive(Debug)]
 pub struct OnceState {
     poisoned: bool,
-    set_state_on_drop_to: Cell<usize>,
+    set_state_on_drop_to: Cell<*mut Masked>,
 }
 
 /// Initialization value for static [`Once`] values.
@@ -177,17 +178,18 @@ struct Waiter {
 // Every node is a struct on the stack of a waiting thread.
 // Will wake up the waiters when it gets dropped, i.e. also on panic.
 struct WaiterQueue<'a> {
-    state_and_queue: &'a AtomicUsize,
-    set_state_on_drop_to: usize,
+    state_and_queue: &'a AtomicPtr<Masked>,
+    set_state_on_drop_to: *mut Masked,
 }
 
 impl Once {
     /// Creates a new `Once` value.
     #[inline]
+    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
     #[stable(feature = "once_new", since = "1.2.0")]
     #[rustc_const_stable(feature = "const_once_new", since = "1.32.0")]
     pub const fn new() -> Once {
-        Once { state_and_queue: AtomicUsize::new(INCOMPLETE), _marker: marker::PhantomData }
+        Once { state_and_queue: AtomicPtr::new(INCOMPLETE as *mut Masked) }
     }
 
     /// Performs an initialization routine once and only once. The given closure
@@ -367,7 +369,7 @@ impl Once {
         // operations visible to us, and, this being a fast path, weaker
         // ordering helps with performance. This `Acquire` synchronizes with
         // `Release` operations on the slow path.
-        self.state_and_queue.load(Ordering::Acquire) == COMPLETE
+        self.state_and_queue.load(Ordering::Acquire) as usize == COMPLETE
     }
 
     // This is a non-generic function to reduce the monomorphization cost of
@@ -385,7 +387,7 @@ impl Once {
     fn call_inner(&self, ignore_poisoning: bool, init: &mut dyn FnMut(&OnceState)) {
         let mut state_and_queue = self.state_and_queue.load(Ordering::Acquire);
         loop {
-            match state_and_queue {
+            match state_and_queue as usize {
                 COMPLETE => break,
                 POISONED if !ignore_poisoning => {
                     // Panic to propagate the poison.
@@ -393,9 +395,10 @@ impl Once {
                 }
                 POISONED | INCOMPLETE => {
                     // Try to register this thread as the one RUNNING.
+                    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
                     let exchange_result = self.state_and_queue.compare_exchange(
                         state_and_queue,
-                        RUNNING,
+                        RUNNING as *mut Masked,
                         Ordering::Acquire,
                         Ordering::Acquire,
                     );
@@ -405,15 +408,17 @@ impl Once {
                     }
                     // `waiter_queue` will manage other waiting threads, and
                     // wake them up on drop.
+                    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
                     let mut waiter_queue = WaiterQueue {
                         state_and_queue: &self.state_and_queue,
-                        set_state_on_drop_to: POISONED,
+                        set_state_on_drop_to: POISONED as *mut Masked,
                     };
                     // Run the initialization function, letting it know if we're
                     // poisoned or not.
+                    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
                     let init_state = OnceState {
-                        poisoned: state_and_queue == POISONED,
-                        set_state_on_drop_to: Cell::new(COMPLETE),
+                        poisoned: state_and_queue as usize == POISONED,
+                        set_state_on_drop_to: Cell::new(COMPLETE as *mut Masked),
                     };
                     init(&init_state);
                     waiter_queue.set_state_on_drop_to = init_state.set_state_on_drop_to.get();
@@ -422,7 +427,7 @@ impl Once {
                 _ => {
                     // All other values must be RUNNING with possibly a
                     // pointer to the waiter queue in the more significant bits.
-                    assert!(state_and_queue & STATE_MASK == RUNNING);
+                    assert!(state_and_queue as usize & STATE_MASK == RUNNING);
                     wait(&self.state_and_queue, state_and_queue);
                     state_and_queue = self.state_and_queue.load(Ordering::Acquire);
                 }
@@ -431,29 +436,31 @@ impl Once {
     }
 }
 
-fn wait(state_and_queue: &AtomicUsize, mut current_state: usize) {
+fn wait(state_and_queue: &AtomicPtr<Masked>, mut current_state: *mut Masked) {
     // Note: the following code was carefully written to avoid creating a
     // mutable reference to `node` that gets aliased.
     loop {
         // Don't queue this thread if the status is no longer running,
         // otherwise we will not be woken up.
-        if current_state & STATE_MASK != RUNNING {
+        if current_state as usize & STATE_MASK != RUNNING {
             return;
         }
 
         // Create the node for our current thread.
+        let tag = current_state as usize & STATE_MASK;
+        let masked = unsafe { (current_state as *mut u8).sub(tag) };
         let node = Waiter {
             thread: Cell::new(Some(thread::current())),
             signaled: AtomicBool::new(false),
-            next: (current_state & !STATE_MASK) as *const Waiter,
+            next: masked as *const Waiter,
         };
-        let me = &node as *const Waiter as usize;
 
         // Try to slide in the node at the head of the linked list, making sure
         // that another thread didn't just replace the head of the linked list.
+        let new_state = unsafe { (&node as *const Waiter as *const u8).add(RUNNING) as *const Masked as *mut Masked };
         let exchange_result = state_and_queue.compare_exchange(
             current_state,
-            me | RUNNING,
+            new_state,
             Ordering::Release,
             Ordering::Relaxed,
         );
@@ -492,7 +499,7 @@ impl Drop for WaiterQueue<'_> {
             self.state_and_queue.swap(self.set_state_on_drop_to, Ordering::AcqRel);
 
         // We should only ever see an old state which was RUNNING.
-        assert_eq!(state_and_queue & STATE_MASK, RUNNING);
+        assert_eq!(state_and_queue as usize & STATE_MASK, RUNNING);
 
         // Walk the entire linked list of waiters and wake them up (in lifo
         // order, last to register is first to wake up).
@@ -501,7 +508,15 @@ impl Drop for WaiterQueue<'_> {
             // free `node` if there happens to be has a spurious wakeup.
             // So we have to take out the `thread` field and copy the pointer to
             // `next` first.
-            let mut queue = (state_and_queue & !STATE_MASK) as *const Waiter;
+            let tag = state_and_queue as usize & STATE_MASK;
+            // Subtracting the tag when the pointer is not within an object may
+            // cause undefined behavior, so we avoid subtract for that case.
+            // Not doing this seems to cause a segfault in `sub()`.
+            let mut queue = if state_and_queue as usize == tag {
+                crate::ptr::null()
+            } else {
+                (state_and_queue as *const u8).sub(tag) as *const Waiter
+            };
             while !queue.is_null() {
                 let next = (*queue).next;
                 let thread = (*queue).thread.take().unwrap();
@@ -557,7 +572,8 @@ impl OnceState {
 
     /// Poison the associated [`Once`] without explicitly panicking.
     // NOTE: This is currently only exposed for the `lazy` module
+    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
     pub(crate) fn poison(&self) {
-        self.set_state_on_drop_to.set(POISONED);
+        self.set_state_on_drop_to.set(POISONED as *mut Masked);
     }
 }

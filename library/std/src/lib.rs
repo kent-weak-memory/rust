@@ -215,6 +215,8 @@
     all(target_vendor = "fortanix", target_env = "sgx"),
     feature(slice_index_methods, coerce_unsized, sgx_platform)
 )]
+#![feature(cfg_target_abi)]
+#![cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), warn(usize_as_pointer))]
 #![deny(rustc::existing_doc_keyword)]
 // std is implemented with unstable features, many of which are internal
 // compiler details that will never be stable

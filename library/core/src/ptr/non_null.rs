@@ -81,6 +81,7 @@ impl<T: Sized> NonNull<T> {
     /// // Important: don't try to access the value of `ptr` without
     /// // initializing it first! The pointer is not null but isn't valid either!
     /// ```
+    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
     #[stable(feature = "nonnull", since = "1.25.0")]
     #[rustc_const_stable(feature = "const_nonnull_dangling", since = "1.36.0")]
     #[inline]

@@ -462,7 +462,7 @@ pub mod guard {
         Some(if remainder == 0 {
             stackaddr
         } else {
-            ((stackaddr as usize) + page_size - remainder) as *mut libc::c_void
+            (stackaddr as *mut u8).add(page_size - remainder) as *mut libc::c_void
         })
     }
 
