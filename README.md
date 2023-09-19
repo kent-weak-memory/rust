@@ -82,6 +82,9 @@ target = ["aarch64-apple-darwin", "aarch64-unknown-freebsd-purecap"]
 [target.aarch64-apple-darwin]
 llvm-config = "/path/to/cheribuild-output-and-source/output/morello-sdk/bin/llvm-config"
 
+[target.x86_64-unknown-linux-gnu]
+llvm-config = "/path/to/cheribuild-output-and-source/output/morello-sdk/bin/llvm-config"
+
 # This section tells the compiler to use custom scripts for linking Hybrid programs.
 [target.aarch64-unknown-freebsd]
 cc = "/path/to/rust/clang-freebsd.sh"
