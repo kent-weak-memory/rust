@@ -24,7 +24,9 @@
 use crate::ffi::CStr;
 use crate::marker;
 use crate::mem;
-use crate::sync::atomic::{self, AtomicUsize, Ordering};
+use crate::ptr;
+use crate::sync::atomic::{self, AtomicPtr, Ordering};
+use libc::c_void;
 
 pub(crate) macro weak {
     (fn $name:ident($($t:ty),*) -> $ret:ty) => (
@@ -36,25 +38,26 @@ pub(crate) macro weak {
 
 pub struct Weak<F> {
     name: &'static str,
-    addr: AtomicUsize,
+    func: AtomicPtr<c_void>,
     _marker: marker::PhantomData<F>,
 }
 
 impl<F> Weak<F> {
+    #[cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), allow(usize_as_pointer))]
     pub const fn new(name: &'static str) -> Weak<F> {
-        Weak { name, addr: AtomicUsize::new(1), _marker: marker::PhantomData }
+        Weak { name, func: AtomicPtr::new(1 as *mut c_void), _marker: marker::PhantomData }
     }
 
     pub fn get(&self) -> Option<F> {
-        assert_eq!(mem::size_of::<F>(), mem::size_of::<usize>());
         unsafe {
             // Relaxed is fine here because we fence before reading through the
             // pointer (see the comment below).
-            match self.addr.load(Ordering::Relaxed) {
-                1 => self.initialize(),
-                0 => None,
-                addr => {
-                    let func = mem::transmute_copy::<usize, F>(&addr);
+            match self.func.load(Ordering::Relaxed) {
+                func if func as usize == 1 => self.initialize(),
+                func if func.is_null() => None,
+                func => {
+                    assert_eq!(mem::size_of::<F>(), mem::size_of::<*mut c_void>());
+                    let func = mem::transmute_copy::<*mut c_void, F>(&func);
                     // The caller is presumably going to read through this value
                     // (by calling the function we've dlsymed). This means we'd
                     // need to have loaded it with at least C11's consume
@@ -84,21 +87,23 @@ impl<F> Weak<F> {
     unsafe fn initialize(&self) -> Option<F> {
         let val = fetch(self.name);
         // This synchronizes with the acquire fence in `get`.
-        self.addr.store(val, Ordering::Release);
+        self.func.store(val, Ordering::Release);
 
-        match val {
-            0 => None,
-            addr => Some(mem::transmute_copy::<usize, F>(&addr)),
+        if val.is_null() {
+            None
+        } else {
+            assert_eq!(mem::size_of::<F>(), mem::size_of::<*mut c_void>());
+            Some(mem::transmute_copy::<*mut c_void, F>(&val))
         }
     }
 }
 
-unsafe fn fetch(name: &str) -> usize {
+unsafe fn fetch(name: &str) -> *mut c_void {
     let name = match CStr::from_bytes_with_nul(name.as_bytes()) {
         Ok(cstr) => cstr,
-        Err(..) => return 0,
+        Err(..) => return ptr::null_mut(),
     };
-    libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) as usize
+    libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr())
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
