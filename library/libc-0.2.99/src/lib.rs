@@ -30,6 +30,7 @@
 )]
 #![cfg_attr(libc_const_extern_fn, feature(const_extern_fn))]
 
+#![feature(cfg_target_abi)]
 #![feature(rustc_private)]
 #![feature(native_link_modifiers)]
 #![feature(native_link_modifiers_bundle)]

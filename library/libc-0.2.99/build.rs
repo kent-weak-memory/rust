@@ -19,19 +19,31 @@ fn main() {
         );
     }
 
-    // The ABI of libc used by libstd is backward compatible with FreeBSD 10.
-    // The ABI of libc from crates.io is backward compatible with FreeBSD 11.
-    //
-    // On CI, we detect the actual FreeBSD version and match its ABI exactly,
-    // running tests to ensure that the ABI is correct.
-    match which_freebsd() {
-        Some(10) if libc_ci || rustc_dep_of_std => {
-            println!("cargo:rustc-cfg=freebsd10")
+    let target = env::var("TARGET").expect("TARGET was not set");
+    if target.contains("purecap") {
+        // Special case for CHERI BSD because it doesn't seem to provide (as
+        // of 2023-3-21) versioned symbols, or at least not ones that go back
+        // all the way to FreeBSD 11 (`readdir` and `readdir_r` for example).
+        // Adding special cases in build scripts to force the right version
+        // (FreeBSD 13) is hopefully less error prone than needing to create a
+        // script called `freebsd-version` and add it to `PATH` (for `libc`)
+        // and set environment variables (for `std`).
+        println!("cargo:rustc-cfg=freebsd13");
+    } else {
+        // The ABI of libc used by libstd is backward compatible with FreeBSD 10.
+        // The ABI of libc from crates.io is backward compatible with FreeBSD 11.
+        //
+        // On CI, we detect the actual FreeBSD version and match its ABI exactly,
+        // running tests to ensure that the ABI is correct.
+        match which_freebsd() {
+            Some(10) if libc_ci || rustc_dep_of_std => {
+                println!("cargo:rustc-cfg=freebsd10")
+            }
+            Some(11) if libc_ci => println!("cargo:rustc-cfg=freebsd11"),
+            Some(12) if libc_ci => println!("cargo:rustc-cfg=freebsd12"),
+            Some(13) if libc_ci => println!("cargo:rustc-cfg=freebsd13"),
+            Some(_) | None => println!("cargo:rustc-cfg=freebsd11"),
         }
-        Some(11) if libc_ci => println!("cargo:rustc-cfg=freebsd11"),
-        Some(12) if libc_ci => println!("cargo:rustc-cfg=freebsd12"),
-        Some(13) if libc_ci => println!("cargo:rustc-cfg=freebsd13"),
-        Some(_) | None => println!("cargo:rustc-cfg=freebsd11"),
     }
 
     // On CI: deny all warnings
