@@ -5,7 +5,7 @@ use crate::marker::PhantomData;
 use crate::mem::{size_of, zeroed};
 use crate::os::unix::io::RawFd;
 use crate::path::Path;
-use crate::ptr::{eq, read_unaligned};
+use crate::ptr::{eq, null_mut, read_unaligned};
 use crate::slice::from_raw_parts;
 use crate::sys::net::Socket;
 
@@ -58,11 +58,27 @@ pub(super) fn send_vectored_with_ancillary_to(
     ancillary: &mut SocketAncillary<'_>,
 ) -> io::Result<usize> {
     unsafe {
-        let (mut msg_name, msg_namelen) =
-            if let Some(path) = path { sockaddr_un(path)? } else { (zeroed(), 0) };
+        // It would be easier to indicate no name by zeroing `msg_name` and
+        // setting `msg_namelen` to zero like previous versions of this code
+        // did.
+        // Unfortunately, on FreeBSD that causes `sendmsg()` to return `EINVAL`
+        // due to `msg_name` being present, but shorter than expected.
+        // That `sendmsg()` can return `EINVAL` is (as of 2023-09-28)
+        // undocumented in the relevant man page, despite it being able to do
+        // this in at least three different cases.
+        // There is an issue about this that has been open since 2006:
+        // bugs.freebsd.org/bugzilla/show_bug.cgi?id=99356
+        let mut msg_name_data;
+        let (msg_name, msg_namelen) = if let Some(path) = path {
+            let (name, length) = sockaddr_un(path)?;
+            msg_name_data = name;
+            (&mut msg_name_data as *mut _ as *mut _, length)
+        } else {
+            (null_mut(), 0)
+        };
 
         let mut msg: libc::msghdr = zeroed();
-        msg.msg_name = &mut msg_name as *mut _ as *mut _;
+        msg.msg_name = msg_name;
         msg.msg_namelen = msg_namelen;
         msg.msg_iov = bufs.as_ptr() as *mut _;
         msg.msg_iovlen = bufs.len() as _;

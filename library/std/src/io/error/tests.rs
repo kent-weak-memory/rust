@@ -7,7 +7,7 @@ use crate::sys::os::error_string;
 
 #[test]
 fn test_size() {
-    assert!(size_of::<Error>() <= size_of::<[usize; 2]>());
+    assert!(size_of::<Error>() <= size_of::<*const ()>()*2);
 }
 
 #[test]
