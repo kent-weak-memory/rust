@@ -40,6 +40,7 @@ error: layout_of(A) = Layout {
                         pow2: 2,
                     },
                 },
+                range: None,
                 size: Size {
                     raw: 1,
                 },
@@ -77,6 +78,11 @@ error: layout_of(A) = Layout {
             pow2: 2,
         },
     },
+    range: Some(
+        Size {
+            raw: 1,
+        },
+    ),
     size: Size {
         raw: 1,
     },
@@ -128,6 +134,7 @@ error: layout_of(B) = Layout {
                         pow2: 2,
                     },
                 },
+                range: None,
                 size: Size {
                     raw: 1,
                 },
@@ -165,6 +172,11 @@ error: layout_of(B) = Layout {
             pow2: 2,
         },
     },
+    range: Some(
+        Size {
+            raw: 1,
+        },
+    ),
     size: Size {
         raw: 1,
     },
@@ -216,6 +228,7 @@ error: layout_of(C) = Layout {
                         pow2: 2,
                     },
                 },
+                range: None,
                 size: Size {
                     raw: 2,
                 },
@@ -253,6 +266,11 @@ error: layout_of(C) = Layout {
             pow2: 2,
         },
     },
+    range: Some(
+        Size {
+            raw: 2,
+        },
+    ),
     size: Size {
         raw: 2,
     },
@@ -304,6 +322,7 @@ error: layout_of(P) = Layout {
                         pow2: 2,
                     },
                 },
+                range: None,
                 size: Size {
                     raw: 4,
                 },
@@ -341,6 +360,11 @@ error: layout_of(P) = Layout {
             pow2: 2,
         },
     },
+    range: Some(
+        Size {
+            raw: 4,
+        },
+    ),
     size: Size {
         raw: 4,
     },
@@ -392,6 +416,7 @@ error: layout_of(T) = Layout {
                         pow2: 2,
                     },
                 },
+                range: None,
                 size: Size {
                     raw: 4,
                 },
@@ -429,6 +454,11 @@ error: layout_of(T) = Layout {
             pow2: 2,
         },
     },
+    range: Some(
+        Size {
+            raw: 4,
+        },
+    ),
     size: Size {
         raw: 4,
     },

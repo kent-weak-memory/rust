@@ -1,5 +1,5 @@
 error: casting an integer to a pointer will produce an invalid pointer on CHERI, and will result in crashes if it is ever dereferenced
-  --> $DIR/usize-as-pointer-warning.rs:8:17
+  --> $DIR/usize-as-pointer-warning.rs:8:20
    |
 LL |     let _pointer = value as *const u32;
    |                    ^^^^^^^^^^^^^^^^^^^
@@ -11,7 +11,7 @@ LL | #![deny(usize_as_pointer)]
    |         ^^^^^^^^^^^^^^^^
 
 error: casting an integer to a pointer will produce an invalid pointer on CHERI, and will result in crashes if it is ever dereferenced
-  --> $DIR/usize-as-pointer-warning.rs:11:17
+  --> $DIR/usize-as-pointer-warning.rs:11:20
    |
 LL |     let _pointer = if std::hint::black_box(false) { value } else { 0 } as WrappedPointer;
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

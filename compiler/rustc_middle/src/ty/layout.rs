@@ -309,6 +309,18 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
         }
     }
 
+    fn range_for_abi(&self, abi: &Abi, size: Size) -> Option<Size> {
+        match abi {
+            Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) =>
+                Some(self.data_layout().pointer_range),
+            Abi::Scalar(Scalar {..}) => Some(size),
+            // Special case for `()`
+            Abi::Aggregate{sized: true} if size.bytes() == 0 => Some(size),
+            Abi::Uninhabited if size.bytes() == 0 => Some(size),
+            _ => None,
+        }
+    }
+
     fn univariant_uninterned(
         &self,
         ty: Ty<'tcx>,
@@ -508,15 +520,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
             abi = Abi::Uninhabited;
         }
 
-        // TODO(seharris): this is hacky.
-        let range = match &abi {
-            Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) =>
-                Some(self.data_layout().pointer_range),
-            Abi::Scalar(Scalar {..}) => Some(size),
-            // Special case for `()`
-            Abi::Aggregate{sized: true} if size.bytes() == 0 => Some(size),
-            _ => None
-        };
+        let range = self.range_for_abi(&abi, size);
 
         Ok(Layout {
             variants: Variants::Single { index: VariantIdx::new(0) },
@@ -914,15 +918,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                         align = align.min(AbiAndPrefAlign::new(pack));
                     }
 
-                    // TODO(seharris): this is hacky and duplicated.
-                    let range = if let Abi::Scalar(scalar) = &abi {
-                        match scalar.value {
-                            Primitive::Pointer => Some(dl.pointer_range),
-                            _ => Some(size),
-                        }
-                    } else {
-                        None
-                    };
+                    let range = self.range_for_abi(&abi, size);
 
                     return Ok(tcx.intern_layout(Layout {
                         variants: Variants::Single { index },
@@ -1174,16 +1170,8 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                             let largest_niche =
                                 Niche::from_scalar(dl, offset, niche_scalar.clone());
 
-                            // TODO(seharris): heard you like duplication?
                             // TODO(seharris): pointers shouldn't collide with niches because there's no room, but can we enforce that more strongly?
-                            let range = if let Abi::Scalar(scalar) = &abi {
-                                match scalar.value {
-                                    Primitive::Pointer => Some(dl.pointer_range),
-                                    _ => Some(size),
-                                }
-                            } else {
-                                None
-                            };
+                            let range = self.range_for_abi(&abi, size);
 
 // Unclear
                             niche_filling_layout = Some(Layout {
@@ -1449,13 +1437,7 @@ impl<'tcx> LayoutCx<'tcx, TyCtxt<'tcx>> {
                     abi = Abi::Uninhabited;
                 }
 
-                // TODO(seharris): this is hacky.
-                let range = match &abi {
-                    Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) =>
-                        Some(self.data_layout().pointer_range),
-                    Abi::Scalar(Scalar {..}) => Some(size),
-                    _ => None
-                };
+                let range = self.range_for_abi(&abi, size);
 
 // Assemble tag and data layout (with possible pair optimisation)
                 let largest_niche = Niche::from_scalar(dl, Size::ZERO, tag.clone());
