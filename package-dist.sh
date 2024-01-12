@@ -98,5 +98,5 @@ linker = "/path/to/installation/bin/clang-freebsd.sh"
 linker = "/path/to/installation/bin/clang-morello.sh"
 EOF
 
-# cd .. || exit 1
-# tar czf "rust-build-$VERSION.tar.gz" "rust-build-$VERSION" || exit 1
+cd .. || exit 1
+tar czf "rust-build-$VERSION.tar.gz" "rust-build-$VERSION" || exit 1
