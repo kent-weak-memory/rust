@@ -3,9 +3,7 @@ profile = "codegen"
 changelog-seen = 2
 
 [build]
-# TODO: add "aarch64-unknown-freebsd-purecap" when building std for Morello works
-# TODO: remove "aarch64-unknown-freebsd" when it's no longer useful for testing cross-compiling
-target = ["x86_64-unknown-linux-gnu", "aarch64-unknown-freebsd"]
+target = ["x86_64-unknown-linux-gnu", "aarch64-unknown-freebsd-purecap", "aarch64-unknown-freebsd"]
 
 # Replace with whatever architecture you're building and running the compiler from.
 [target.x86_64-unknown-linux-gnu]
@@ -20,10 +18,11 @@ llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
 # llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
 # These wrappers force clang to use the right target and system libraries.
 # Without it, the build system appears to default to host libc/libm/etc, which are the wrong arch.
-# It'd be cleaner just to pass the extra flags, but I haven't found an option for that.
+# These options must also be passed to rustc in normal use, which is irritating.
 #
-# Note that this requires having a FreeBSD build, which you can get like this:
-# `cheribuild.py freebsd-aarch64`
+# It looks like it's possible to set linker and linker flags in the target config inside Rustc, but then we have to hardcode the sysroot path.
+# Because we're using build of FreeBSD controlled by Cheribuild, we need to make it easy for everyone to set their own sysroot path without rebuilding the compiler.
+# As a result, it looks like we have to keep using this slightly gross wrapper for the linker.
 #
 # The path here is just a path, change it to match your home and cheribuild paths.
 # The scripts will also need updating to match your home and cherbuild paths.
@@ -37,9 +36,7 @@ ar = "/home/cheribuild/output/morello-sdk/bin/ar"
 ranlib = "/home/cheribuild/output/morello-sdk/bin/ranlib"
 
 [target.aarch64-unknown-freebsd-purecap]
-# This doesn't appear to do anything, presumably only the one for the host has any effect?
-# llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
-# Options needed for building the standard library, as and when that's supported.
+# See explanations of these options given for aarch64-unknown-freebsd in the previous bit of this file.
 cc = "/home/rust-20211014/clang-morello.sh"
 cxx = "/home/rust-20211014/clang++-morello.sh"
 ar = "/home/cheribuild/output/morello-sdk/bin/ar"
