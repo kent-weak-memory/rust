@@ -3,6 +3,7 @@ use rustc_ast::ast::LitKind;
 use rustc_hir as hir;
 use rustc_middle::ty::{self, UintTy};
 
+// TODO(seharris): can we make this example produce an error so release builds stop warning about it not producing one?
 declare_lint! {
     /// The `usize_as_pointer` lint detects casts from usize to pointer types that
     /// are likely to cause crashes on CHERI.
@@ -10,7 +11,9 @@ declare_lint! {
     /// ### Example
     ///
     /// ```rust
-    /// 1000 as *const u32
+    /// let data = 42 as i32;
+    /// let address = &data as *const i32 as usize;
+    /// let _pointer = address as *const i32;
     /// ```
     ///
     /// {{produces}}
@@ -29,10 +32,8 @@ declare_lint! {
     /// If unstable features are an option, the strict provenance API can make
     /// this easier and produce much more understandable code.
     pub USIZE_AS_POINTER,
-
     Allow,
-
-    // TODO: where will this be visible?
+    // TODO(seharris): where will this be visible?
     "make users aware of issues with invalid pointers on CHERI-like targets"
 }
 
