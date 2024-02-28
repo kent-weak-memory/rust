@@ -3,7 +3,8 @@
 
 #![crate_type = "lib"]
 
-// CHECK: @VAR1 = constant <{ [4 x i8] }> <{ [4 x i8] c"\01\00\00\00" }>, section ".test_one"
+// NONCHERI: @VAR1 = constant <{ [4 x i8] }> <{ [4 x i8] c"\01\00\00\00" }>, section ".test_one"
+// CHERI: @VAR1 = addrspace(200) constant <{ [4 x i8] }> <{ [4 x i8] c"\01\00\00\00" }>, section ".test_one"
 #[no_mangle]
 #[link_section = ".test_one"]
 #[cfg(target_endian = "little")]
@@ -19,12 +20,14 @@ pub enum E {
     B(f32)
 }
 
-// CHECK: @VAR2 = constant {{.*}}, section ".test_two"
+// NONCHERI: @VAR2 = constant {{.*}}, section ".test_two"
+// CHERI: @VAR2 = addrspace(200) constant {{.*}}, section ".test_two"
 #[no_mangle]
 #[link_section = ".test_two"]
 pub static VAR2: E = E::A(666);
 
-// CHECK: @VAR3 = constant {{.*}}, section ".test_three"
+// NONCHERI: @VAR3 = constant {{.*}}, section ".test_three"
+// CHERI: @VAR3 = addrspace(200) constant {{.*}}, section ".test_three"
 #[no_mangle]
 #[link_section = ".test_three"]
 pub static VAR3: E = E::B(1.);

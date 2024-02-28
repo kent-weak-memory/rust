@@ -23,8 +23,8 @@ pub fn is_zero_slice(data: &[u8; 4]) -> bool {
 #[no_mangle]
 pub fn is_zero_array(data: &[u8; 4]) -> bool {
     // CHECK: start:
-    // CHECK-NEXT: %[[PTR:.+]] = bitcast [4 x i8]* {{.+}} to i32*
-    // CHECK-NEXT: %[[LOAD:.+]] = load i32, i32* %[[PTR]], align 1
+    // CHECK-NEXT: %[[PTR:.+]] = bitcast [4 x i8]{{( addrspace\(.*\))?}}* {{.+}} to i32{{( addrspace\(.*\))?}}*
+    // CHECK-NEXT: %[[LOAD:.+]] = load i32, i32{{( addrspace\(.*\))?}}* %[[PTR]], align 1
     // CHECK-NEXT: %[[EQ:.+]] = icmp eq i32 %[[LOAD]], 0
     // CHECK-NEXT: ret i1 %[[EQ]]
     *data == [0; 4]

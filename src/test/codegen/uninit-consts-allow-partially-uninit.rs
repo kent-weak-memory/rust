@@ -13,16 +13,19 @@ pub struct PartiallyUninit {
 }
 
 // This should be partially undef.
-// CHECK: [[PARTIALLY_UNINIT:@[0-9]+]] = private unnamed_addr constant <{ [4 x i8], [12 x i8] }> <{ [4 x i8] c"\EF\BE\AD\DE", [12 x i8] undef }>, align 4
+// NONCHERI: [[PARTIALLY_UNINIT:@[0-9]+]] = private unnamed_addr constant <{ [4 x i8], [12 x i8] }> <{ [4 x i8] c"\EF\BE\AD\DE", [12 x i8] undef }>, align 4
+// CHERI: [[PARTIALLY_UNINIT:@[0-9]+]] = private unnamed_addr addrspace(200) constant <{ [4 x i8], [12 x i8] }> <{ [4 x i8] c"\EF\BE\AD\DE", [12 x i8] undef }>, align 4
 
 // This shouldn't contain undef, since it's larger than the 1024 byte limit.
-// CHECK: [[UNINIT_PADDING_HUGE:@[0-9]+]] = private unnamed_addr constant <{ [32768 x i8] }> <{ [32768 x i8] c"{{.+}}" }>, align 4
+// NONCHERI: [[UNINIT_PADDING_HUGE:@[0-9]+]] = private unnamed_addr constant <{ [32768 x i8] }> <{ [32768 x i8] c"{{.+}}" }>, align 4
+// CHERI: [[UNINIT_PADDING_HUGE:@[0-9]+]] = private unnamed_addr addrspace(200) constant <{ [32768 x i8] }> <{ [32768 x i8] c"{{.+}}" }>, align 4
 
 // CHECK-LABEL: @partially_uninit
 #[no_mangle]
 pub const fn partially_uninit() -> PartiallyUninit {
     const X: PartiallyUninit = PartiallyUninit { x: 0xdeadbeef, y: MaybeUninit::uninit() };
-    // CHECK: call void @llvm.memcpy.p0i8.p0i8.i{{(32|64)}}(i8* align 4 %1, i8* align 4 getelementptr inbounds (<{ [4 x i8], [12 x i8] }>, <{ [4 x i8], [12 x i8] }>* [[PARTIALLY_UNINIT]], i32 0, i32 0, i32 0), i{{(32|64)}} 16, i1 false)
+    // NONCHERI: call void @llvm.memcpy.p0i8.p0i8.i{{(32|64)}}(i8* align 4 %1, i8* align 4 getelementptr inbounds (<{ [4 x i8], [12 x i8] }>, <{ [4 x i8], [12 x i8] }>* [[PARTIALLY_UNINIT]], i32 0, i32 0, i32 0), i{{(32|64)}} 16, i1 false)
+    // CHERI: call void @llvm.memcpy.p200i8.p200i8.i{{(32|64)}}(i8 addrspace(200)* align 4 %1, i8 addrspace(200)* align 4 getelementptr inbounds (<{ [4 x i8], [12 x i8] }>, <{ [4 x i8], [12 x i8] }> addrspace(200)* [[PARTIALLY_UNINIT]], i32 0, i32 0, i32 0), i{{(32|64)}} 16, i1 false)
     X
 }
 
@@ -30,6 +33,7 @@ pub const fn partially_uninit() -> PartiallyUninit {
 #[no_mangle]
 pub const fn uninit_padding_huge() -> [(u32, u8); 4096] {
     const X: [(u32, u8); 4096] = [(123, 45); 4096];
-    // CHECK: call void @llvm.memcpy.p0i8.p0i8.i{{(32|64)}}(i8* align 4 %1, i8* align 4 getelementptr inbounds (<{ [32768 x i8] }>, <{ [32768 x i8] }>* [[UNINIT_PADDING_HUGE]], i32 0, i32 0, i32 0), i{{(32|64)}} 32768, i1 false)
+    // NONCHERI: call void @llvm.memcpy.p0i8.p0i8.i{{(32|64)}}(i8* align 4 %1, i8* align 4 getelementptr inbounds (<{ [32768 x i8] }>, <{ [32768 x i8] }>* [[UNINIT_PADDING_HUGE]], i32 0, i32 0, i32 0), i{{(32|64)}} 32768, i1 false)
+    // CHERI: call void @llvm.memcpy.p200i8.p200i8.i{{(32|64)}}(i8 addrspace(200)* align 4 %1, i8 addrspace(200)* align 4 getelementptr inbounds (<{ [32768 x i8] }>, <{ [32768 x i8] }> addrspace(200)* [[UNINIT_PADDING_HUGE]], i32 0, i32 0, i32 0), i{{(32|64)}} 32768, i1 false)
     X
 }

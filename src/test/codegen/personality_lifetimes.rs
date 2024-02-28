@@ -21,13 +21,16 @@ pub fn test() {
     let _s = S;
     // Check that the personality slot alloca gets a lifetime start in each cleanup block, not just
     // in the first one.
-    // CHECK: [[SLOT:%[0-9]+]] = alloca { i8*, i32 }
+    // NONCHERI: [[SLOT:%[0-9]+]] = alloca { i8*, i32 }
+    // CHERI: [[SLOT:%[0-9]+]] = alloca { i8 addrspace(200)*, i32 }
     // CHECK-LABEL: cleanup:
-    // CHECK: [[BITCAST:%[0-9]+]] = bitcast { i8*, i32 }* [[SLOT]] to i8*
-    // CHECK-NEXT: call void @llvm.lifetime.start.{{.*}}({{.*}}, i8* [[BITCAST]])
+    // NONCHERI: [[BITCAST:%[0-9]+]] = bitcast { i8*, i32 }* [[SLOT]] to i8*
+    // CHERI: [[BITCAST:%[0-9]+]] = bitcast { i8 addrspace(200)*, i32 } addrspace(200)* [[SLOT]] to i8 addrspace(200)*
+    // CHECK-NEXT: call void @llvm.lifetime.start.{{.*}}({{.*}}, i8{{( addrspace\(.*\))?}}* [[BITCAST]])
     // CHECK-LABEL: cleanup1:
-    // CHECK: [[BITCAST1:%[0-9]+]] = bitcast { i8*, i32 }* [[SLOT]] to i8*
-    // CHECK-NEXT: call void @llvm.lifetime.start.{{.*}}({{.*}}, i8* [[BITCAST1]])
+    // NONCHERI: [[BITCAST1:%[0-9]+]] = bitcast { i8*, i32 }* [[SLOT]] to i8*
+    // CHERI: [[BITCAST1:%[0-9]+]] = bitcast { i8 addrspace(200)*, i32 } addrspace(200)* [[SLOT]] to i8 addrspace(200)*
+    // CHECK-NEXT: call void @llvm.lifetime.start.{{.*}}({{.*}}, i8{{( addrspace\(.*\))?}}* [[BITCAST1]])
     might_unwind();
     let _t = S;
     might_unwind();

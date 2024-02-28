@@ -10,7 +10,8 @@ extern "C-unwind" {
     fn may_unwind();
 }
 
-// CHECK: @rust_item_that_can_unwind() unnamed_addr #0
+// NONCHERI: @rust_item_that_can_unwind() unnamed_addr #0
+// CHERI: @rust_item_that_can_unwind() unnamed_addr addrspace(200) #0
 #[no_mangle]
 pub unsafe extern "C-unwind" fn rust_item_that_can_unwind() {
     may_unwind();

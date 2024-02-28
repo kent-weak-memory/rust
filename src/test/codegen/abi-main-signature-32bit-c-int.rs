@@ -7,4 +7,5 @@
 fn main() {
 }
 
-// CHECK: define i32 @main(i32{{( %0)?}}, i8**{{( %1)?}})
+// NONCHERI: define i32 @main(i32{{( %0)?}}, i8**{{( %1)?}})
+// CHERI: define i32 @main(i32{{( %0)?}}, i8 addrspace(200)* addrspace(200)*{{( %1)?}})

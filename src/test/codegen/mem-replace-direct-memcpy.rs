@@ -17,9 +17,11 @@ pub fn replace_byte(dst: &mut u8, src: u8) -> u8 {
 // CHECK-NOT: call void @llvm.memcpy
 // CHECK: ; core::ptr::read
 // CHECK-NOT: call void @llvm.memcpy
-// CHECK: call void @llvm.memcpy.p0i8.p0i8.i{{.*}}(i8* align 1 %{{.*}}, i8* align 1 %src, i{{.*}} 1, i1 false)
+// NONCHERI: call void @llvm.memcpy.p0i8.p0i8.i{{.*}}(i8* align 1 %{{.*}}, i8* align 1 %src, i{{.*}} 1, i1 false)
+// CHERI: call void @llvm.memcpy.p200i8.p200i8.i{{.*}}(i8 addrspace(200)* align 1 %{{.*}}, i8 addrspace(200)* align 1 %src, i{{.*}} 1, i1 false)
 // CHECK-NOT: call void @llvm.memcpy
 // CHECK: ; core::ptr::write
 // CHECK-NOT: call void @llvm.memcpy
-// CHECK: call void @llvm.memcpy.p0i8.p0i8.i{{.*}}(i8* align 1 %dst, i8* align 1 %src, i{{.*}} 1, i1 false)
+// NONCHERI: call void @llvm.memcpy.p0i8.p0i8.i{{.*}}(i8* align 1 %dst, i8* align 1 %src, i{{.*}} 1, i1 false)
+// CHERI: call void @llvm.memcpy.p200i8.p200i8.i{{.*}}(i8 addrspace(200)* align 1 %dst, i8 addrspace(200)* align 1 %src, i{{.*}} 1, i1 false)
 // CHECK-NOT: call void @llvm.memcpy

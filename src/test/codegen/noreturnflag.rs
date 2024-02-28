@@ -4,7 +4,8 @@
 
 #[no_mangle]
 pub fn foo() -> ! {
-// CHECK: @foo() unnamed_addr #0
+// NONCHERI: @foo() unnamed_addr #0
+// CHERI: @foo() unnamed_addr addrspace(200) #0
     loop {}
 }
 
@@ -12,7 +13,8 @@ pub enum EmptyEnum {}
 
 #[no_mangle]
 pub fn bar() -> EmptyEnum {
-// CHECK: @bar() unnamed_addr #0
+// NONCHERI: @bar() unnamed_addr #0
+// CHERI: @bar() unnamed_addr addrspace(200) #0
     loop {}
 }
 

@@ -2337,12 +2337,14 @@ impl<'test> TestCx<'test> {
         // useful flag.
         //
         // For now, though…
-        let prefix_for_target =
+        let prefix_msvc =
             if self.config.target.contains("msvc") { "MSVC" } else { "NONMSVC" };
+        let prefix_cheri =
+            if self.config.target.contains("purecap") { "CHERI" } else { "NONCHERI" };
         let prefixes = if let Some(rev) = self.revision {
-            format!("CHECK,{},{}", prefix_for_target, rev)
+            format!("CHECK,{},{},{}", prefix_msvc, prefix_cheri, rev)
         } else {
-            format!("CHECK,{}", prefix_for_target)
+            format!("CHECK,{},{}", prefix_msvc, prefix_cheri)
         };
         if self.config.llvm_version.unwrap_or(0) >= 130000 {
             filecheck.args(&["--allow-unused-prefixes", "--check-prefixes", &prefixes]);

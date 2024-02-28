@@ -7,12 +7,14 @@
 #![crate_type = "lib"]
 #![feature(c_unwind)]
 
-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
+// NONCHERI: @rust_item_that_cannot_unwind() unnamed_addr #0 {
+// CHERI: @rust_item_that_cannot_unwind() unnamed_addr addrspace(200) #0 {
 #[no_mangle]
 pub extern "C" fn rust_item_that_cannot_unwind() {
 }
 
-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
+// NONCHERI: @rust_item_that_can_unwind() unnamed_addr #1 {
+// CHERI: @rust_item_that_can_unwind() unnamed_addr addrspace(200) #1 {
 #[no_mangle]
 pub extern "C-unwind" fn rust_item_that_can_unwind() {
 }
