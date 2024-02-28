@@ -22,8 +22,8 @@ pub type locale_t = *mut ::c_void;
 
 pub type size_t = usize;
 pub type ptrdiff_t = isize;
-pub type intptr_t = isize;
-pub type uintptr_t = usize;
+pub type intptr_t = *const ();
+pub type uintptr_t = *const ();
 pub type ssize_t = isize;
 
 pub type pid_t = i32;

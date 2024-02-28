@@ -18,9 +18,8 @@ pub type uintmax_t = u64;
 
 pub type size_t = usize;
 pub type ptrdiff_t = isize;
-pub type intptr_t = isize;
-// TODO(seharris): this is wrong on CHERI.
-pub type uintptr_t = usize;
+pub type intptr_t = *const ();
+pub type uintptr_t = *const ();
 pub type ssize_t = isize;
 
 pub type pid_t = i32;

@@ -25,8 +25,8 @@ pub type c_ulonglong = u64;
 pub type intmax_t = i64;
 pub type uintmax_t = u64;
 
-pub type uintptr_t = usize;
-pub type intptr_t = isize;
+pub type uintptr_t = *const ();
+pub type intptr_t = *const ();
 pub type ptrdiff_t = isize;
 pub type size_t = ::uintptr_t;
 pub type ssize_t = ::intptr_t;
