@@ -614,6 +614,25 @@ pub enum MemoryEffects {
     InaccessibleMemOnly,
 }
 
+/// LLVMPreserveCheriTags
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub enum PreserveCheriTags {
+    Unknown,
+    Required,
+    Unnecessary,
+}
+
+impl PreserveCheriTags {
+    pub fn from_generic(value: rustc_codegen_ssa::common::PreserveCheriTags) -> Self {
+        match value {
+            rustc_codegen_ssa::common::PreserveCheriTags::Unknown => PreserveCheriTags::Unknown,
+            rustc_codegen_ssa::common::PreserveCheriTags::Required => PreserveCheriTags::Required,
+            rustc_codegen_ssa::common::PreserveCheriTags::Unnecessary => PreserveCheriTags::Unnecessary,
+        }
+    }
+}
+
 extern "C" {
     type Opaque;
 }
@@ -1695,6 +1714,7 @@ extern "C" {
         Src: &'a Value,
         SrcAlign: c_uint,
         Size: &'a Value,
+        PreserveTags: PreserveCheriTags,
         IsVolatile: bool,
     ) -> &'a Value;
     pub fn LLVMRustBuildMemMove<'a>(
@@ -1704,6 +1724,7 @@ extern "C" {
         Src: &'a Value,
         SrcAlign: c_uint,
         Size: &'a Value,
+        PreserveTags: PreserveCheriTags,
         IsVolatile: bool,
     ) -> &'a Value;
     pub fn LLVMRustBuildMemSet<'a>(

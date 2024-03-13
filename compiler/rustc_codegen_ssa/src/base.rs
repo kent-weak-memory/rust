@@ -4,7 +4,7 @@ use crate::back::write::{
     compute_per_cgu_lto_type, start_async_codegen, submit_codegened_module_to_llvm,
     submit_post_lto_module_to_llvm, submit_pre_lto_module_to_llvm, ComputedLtoType, OngoingCodegen,
 };
-use crate::common::{IntPredicate, RealPredicate, TypeKind};
+use crate::common::{IntPredicate, PreserveCheriTags, RealPredicate, TypeKind};
 use crate::errors;
 use crate::meth;
 use crate::mir;
@@ -405,7 +405,8 @@ pub fn memcpy_ty<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
         let temp = bx.load(bty, src, src_align);
         bx.store(temp, dst, dst_align);
     } else {
-        bx.memcpy(dst, dst_align, src, src_align, bx.cx().const_usize(size), flags);
+        // Handling of CHERI capabilities could probably be more efficient.
+        bx.memcpy(dst, dst_align, src, src_align, bx.cx().const_usize(size), flags, PreserveCheriTags::Unknown);
     }
 }
 

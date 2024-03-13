@@ -68,6 +68,13 @@ pub enum AtomicOrdering {
 }
 
 #[derive(Copy, Clone)]
+pub enum PreserveCheriTags {
+    Unknown,
+    Required,
+    Unnecessary,
+}
+
+#[derive(Copy, Clone)]
 pub enum SynchronizationScope {
     SingleThread,
     CrossThread,

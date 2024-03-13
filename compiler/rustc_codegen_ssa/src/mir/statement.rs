@@ -3,6 +3,7 @@ use rustc_middle::mir::NonDivergingIntrinsic;
 
 use super::FunctionCx;
 use super::LocalRef;
+use crate::common::PreserveCheriTags;
 use crate::traits::BuilderMethods;
 use crate::traits::*;
 
@@ -86,7 +87,8 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let align = pointee_layout.align;
                 let dst = dst_val.immediate();
                 let src = src_val.immediate();
-                bx.memcpy(dst, align, src, align, bytes, crate::MemFlags::empty());
+                // Handling of CHERI capabilities could probably be more efficient.
+                bx.memcpy(dst, align, src, align, bytes, crate::MemFlags::empty(), PreserveCheriTags::Unknown);
             }
             mir::StatementKind::FakeRead(..)
             | mir::StatementKind::Retag { .. }

@@ -6,6 +6,7 @@ use crate::type_::Type;
 use crate::type_of::LayoutLlvmExt;
 use crate::value::Value;
 
+use rustc_codegen_ssa::common::PreserveCheriTags;
 use rustc_codegen_ssa::mir::operand::OperandValue;
 use rustc_codegen_ssa::mir::place::PlaceRef;
 use rustc_codegen_ssa::traits::*;
@@ -251,6 +252,8 @@ impl<'ll, 'tcx> ArgAbiExt<'ll, 'tcx> for ArgAbi<'tcx, Ty<'tcx>> {
                     scratch_align,
                     bx.const_usize(self.layout.size.bytes()),
                     MemFlags::empty(),
+                    // Handling of CHERI capabilities could probably be more efficient.
+                    PreserveCheriTags::Unknown,
                 );
 
                 bx.lifetime_end(llscratch, scratch_size);

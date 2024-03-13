@@ -8,7 +8,7 @@ use super::type_::{ArgAbiMethods, BaseTypeMethods};
 use super::{HasCodegen, StaticBuilderMethods};
 
 use crate::common::{
-    AtomicOrdering, AtomicRmwBinOp, IntPredicate, RealPredicate, SynchronizationScope, TypeKind,
+    AtomicOrdering, AtomicRmwBinOp, IntPredicate, PreserveCheriTags, RealPredicate, SynchronizationScope, TypeKind,
 };
 use crate::mir::operand::OperandRef;
 use crate::mir::place::PlaceRef;
@@ -238,6 +238,7 @@ pub trait BuilderMethods<'a, 'tcx>:
         src_align: Align,
         size: Self::Value,
         flags: MemFlags,
+        preserve_tags: PreserveCheriTags,
     );
     fn memmove(
         &mut self,
@@ -247,6 +248,7 @@ pub trait BuilderMethods<'a, 'tcx>:
         src_align: Align,
         size: Self::Value,
         flags: MemFlags,
+        preserve_tags: PreserveCheriTags,
     );
     fn memset(
         &mut self,

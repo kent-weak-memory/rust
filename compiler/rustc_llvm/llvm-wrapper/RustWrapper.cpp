@@ -1478,24 +1478,47 @@ extern "C" LLVMValueRef LLVMRustGetInstrProfIncrementIntrinsic(LLVMModuleRef M) 
               (llvm::Intrinsic::ID)llvm::Intrinsic::instrprof_increment));
 }
 
+enum class LLVMPreserveCheriTags {
+    Unknown,
+    Required,
+    Unnecessary,
+};
+
+static PreserveCheriTags fromRust(LLVMPreserveCheriTags PreserveTags) {
+  switch (PreserveTags) {
+  case LLVMPreserveCheriTags::Unknown:
+    return PreserveCheriTags::Unknown;
+  case LLVMPreserveCheriTags::Required:
+    return PreserveCheriTags::Required;
+  case LLVMPreserveCheriTags::Unnecessary:
+    return PreserveCheriTags::Unnecessary;
+  }
+
+  report_fatal_error("Invalid LLVMPreserveCheriTags value!");
+}
+
 extern "C" LLVMValueRef LLVMRustBuildMemCpy(LLVMBuilderRef B,
                                             LLVMValueRef Dst, unsigned DstAlign,
                                             LLVMValueRef Src, unsigned SrcAlign,
-                                            LLVMValueRef Size, bool IsVolatile) {
+                                            LLVMValueRef Size, LLVMPreserveCheriTags PreserveTags,
+                                            bool IsVolatile) {
   return wrap(unwrap(B)->CreateMemCpy(
       unwrap(Dst), MaybeAlign(DstAlign),
       unwrap(Src), MaybeAlign(SrcAlign),
-      unwrap(Size), IsVolatile));
+      unwrap(Size), fromRust(PreserveTags),
+      IsVolatile));
 }
 
 extern "C" LLVMValueRef LLVMRustBuildMemMove(LLVMBuilderRef B,
                                              LLVMValueRef Dst, unsigned DstAlign,
                                              LLVMValueRef Src, unsigned SrcAlign,
-                                             LLVMValueRef Size, bool IsVolatile) {
+                                             LLVMValueRef Size, LLVMPreserveCheriTags PreserveTags,
+                                             bool IsVolatile) {
   return wrap(unwrap(B)->CreateMemMove(
       unwrap(Dst), MaybeAlign(DstAlign),
       unwrap(Src), MaybeAlign(SrcAlign),
-      unwrap(Size), IsVolatile));
+      unwrap(Size), fromRust(PreserveTags),
+      IsVolatile));
 }
 
 extern "C" LLVMValueRef LLVMRustBuildMemSet(LLVMBuilderRef B,

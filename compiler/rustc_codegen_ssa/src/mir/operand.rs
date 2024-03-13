@@ -2,7 +2,7 @@ use super::place::PlaceRef;
 use super::{FunctionCx, LocalRef};
 
 use crate::base;
-use crate::common::TypeKind;
+use crate::common::{PreserveCheriTags, TypeKind};
 use crate::glue;
 use crate::traits::*;
 use crate::MemFlags;
@@ -499,7 +499,8 @@ impl<'a, 'tcx, V: CodegenObject> OperandValue<V> {
         let neg_address = bx.neg(address);
         let offset = bx.and(neg_address, align_minus_1);
         let dst = bx.inbounds_gep(bx.type_i8(), alloca, &[offset]);
-        bx.memcpy(dst, min_align, llptr, min_align, size, MemFlags::empty());
+        // Handling of CHERI capabilities could probably be more efficent.
+        bx.memcpy(dst, min_align, llptr, min_align, size, MemFlags::empty(), PreserveCheriTags::Unknown);
 
         // Store the allocated region and the extra to the indirect place.
         let indirect_operand = OperandValue::Pair(dst, llextra);

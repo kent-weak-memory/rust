@@ -1,7 +1,7 @@
 use super::operand::{OperandRef, OperandValue};
 use super::place::PlaceRef;
 use super::FunctionCx;
-use crate::common::IntPredicate;
+use crate::common::{IntPredicate, PreserveCheriTags};
 use crate::errors;
 use crate::errors::InvalidMonomorphization;
 use crate::glue;
@@ -30,10 +30,12 @@ fn copy_intrinsic<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
     let align = layout.align.abi;
     let size = bx.mul(bx.const_usize(size.bytes()), count);
     let flags = if volatile { MemFlags::VOLATILE } else { MemFlags::empty() };
+    // Handling of CHERI capabilities could probably be more efficient.
+    let preserve_tags = PreserveCheriTags::Unknown;
     if allow_overlap {
-        bx.memmove(dst, align, src, align, size, flags);
+        bx.memmove(dst, align, src, align, size, flags, preserve_tags);
     } else {
-        bx.memcpy(dst, align, src, align, size, flags);
+        bx.memcpy(dst, align, src, align, size, flags, preserve_tags);
     }
 }
 
