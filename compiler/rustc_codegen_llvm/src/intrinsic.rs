@@ -307,16 +307,16 @@ impl<'ll, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                         // For rusty ABIs, small aggregates are actually passed
                         // as `RegKind::Integer` (see `FnAbi::adjust_for_abi`),
                         // so we re-use that same threshold here.
-                        layout.size() <= self.data_layout().pointer_size * 2
+                        layout.memory_size() <= self.data_layout().pointer_memory_size * 2
                     }
                 };
 
                 let a = args[0].immediate();
                 let b = args[1].immediate();
-                if layout.size().bytes() == 0 {
+                if layout.memory_size().bytes() == 0 {
                     self.const_bool(true)
                 } else if use_integer_compare {
-                    let integer_ty = self.type_ix(layout.size().bits());
+                    let integer_ty = self.type_ix(layout.data_size().bits());
                     let ptr_ty = self.type_ptr_to(integer_ty);
                     let a_ptr = self.bitcast(a, ptr_ty);
                     let a_val = self.load(integer_ty, a_ptr, layout.align().abi);
@@ -327,7 +327,7 @@ impl<'ll, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                     let i8p_ty = self.type_i8p();
                     let a_ptr = self.bitcast(a, i8p_ty);
                     let b_ptr = self.bitcast(b, i8p_ty);
-                    let n = self.const_usize(layout.size().bytes());
+                    let n = self.const_usize(layout.memory_size().bytes());
                     let cmp = self.call_intrinsic("memcmp", &[a_ptr, b_ptr, n]);
                     match self.cx.sess().target.arch.as_ref() {
                         "avr" | "msp430" => self.icmp(IntPredicate::IntEQ, cmp, self.const_i16(0)),
@@ -1174,11 +1174,11 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
         let (i_xn, in_elem_bitwidth) = match in_elem.kind() {
             ty::Int(i) => (
                 args[0].immediate(),
-                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_size.bits()),
+                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_data_size.bits()),
             ),
             ty::Uint(i) => (
                 args[0].immediate(),
-                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_size.bits()),
+                i.bit_width().unwrap_or_else(|| bx.data_layout().pointer_data_size.bits()),
             ),
             _ => return_error!(InvalidMonomorphization::VectorArgument {
                 span,
@@ -1334,14 +1334,14 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
                 vec_len,
                 p0s,
                 // Normalize to prevent crash if v: IntTy::Isize
-                v.normalize(bx.target_spec().pointer_width).bit_width().unwrap()
+                v.normalize(bx.target_spec().pointer_data_size).bit_width().unwrap()
             ),
             ty::Uint(v) => format!(
                 "v{}{}i{}",
                 vec_len,
                 p0s,
                 // Normalize to prevent crash if v: UIntTy::Usize
-                v.normalize(bx.target_spec().pointer_width).bit_width().unwrap()
+                v.normalize(bx.target_spec().pointer_data_size).bit_width().unwrap()
             ),
             ty::Float(v) => format!("v{}{}f{}", vec_len, p0s, v.bit_width()),
             _ => unreachable!(),
@@ -1952,11 +1952,11 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
             // disallowed before here, so this unwrap is safe.
             ty::Int(i) => (
                 Style::Int(true),
-                i.normalize(bx.tcx().sess.target.pointer_width).bit_width().unwrap(),
+                i.normalize(bx.tcx().sess.target.pointer_data_size).bit_width().unwrap(),
             ),
             ty::Uint(u) => (
                 Style::Int(false),
-                u.normalize(bx.tcx().sess.target.pointer_width).bit_width().unwrap(),
+                u.normalize(bx.tcx().sess.target.pointer_data_size).bit_width().unwrap(),
             ),
             ty::Float(f) => (Style::Float, f.bit_width()),
             _ => (Style::Unsupported, 0),
@@ -1964,11 +1964,11 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
         let (out_style, out_width) = match out_elem.kind() {
             ty::Int(i) => (
                 Style::Int(true),
-                i.normalize(bx.tcx().sess.target.pointer_width).bit_width().unwrap(),
+                i.normalize(bx.tcx().sess.target.pointer_data_size).bit_width().unwrap(),
             ),
             ty::Uint(u) => (
                 Style::Int(false),
-                u.normalize(bx.tcx().sess.target.pointer_width).bit_width().unwrap(),
+                u.normalize(bx.tcx().sess.target.pointer_data_size).bit_width().unwrap(),
             ),
             ty::Float(f) => (Style::Float, f.bit_width()),
             _ => (Style::Unsupported, 0),
@@ -2099,7 +2099,7 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
         let lhs = args[0].immediate();
         let rhs = args[1].immediate();
         let is_add = name == sym::simd_saturating_add;
-        let ptr_bits = bx.tcx().data_layout.pointer_size.bits() as _;
+        let ptr_bits = bx.tcx().data_layout.pointer_data_size.bits() as _;
         let (signed, elem_width, elem_ty) = match *in_elem.kind() {
             ty::Int(i) => (true, i.bit_width().unwrap_or(ptr_bits), bx.cx.type_int_from_ty(i)),
             ty::Uint(i) => (false, i.bit_width().unwrap_or(ptr_bits), bx.cx.type_uint_from_ty(i)),
@@ -2137,10 +2137,10 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
 fn int_type_width_signed(ty: Ty<'_>, cx: &CodegenCx<'_, '_>) -> Option<(u64, bool)> {
     match ty.kind() {
         ty::Int(t) => {
-            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_width)), true))
+            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_data_size)), true))
         }
         ty::Uint(t) => {
-            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_width)), false))
+            Some((t.bit_width().unwrap_or(u64::from(cx.tcx.sess.target.pointer_data_size)), false))
         }
         _ => None,
     }

@@ -96,7 +96,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 if let OperandValue::Immediate(v) = cg_elem.val {
                     let zero = bx.const_usize(0);
                     let start = dest.project_index(bx, zero).llval;
-                    let size = bx.const_usize(dest.layout.size.bytes());
+                    let size = bx.const_usize(dest.layout.memory_size.bytes());
 
                     // Use llvm.memset.p0i8.* to initialize all zero arrays
                     if bx.cx().const_to_opt_u128(v, false) == Some(0) {
@@ -200,7 +200,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
         cast: TyAndLayout<'tcx>,
     ) -> Option<OperandValue<Bx::Value>> {
         // Check for transmutes that are always UB.
-        if operand.layout.size != cast.size
+        if operand.layout.memory_size != cast.memory_size
             || operand.layout.abi.is_uninhabited()
             || cast.abi.is_uninhabited()
         {
@@ -241,8 +241,9 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let OperandValueKind::Immediate(in_scalar) = operand_kind else {
                     bug!("Found {operand_kind:?} for operand {operand:?}");
                 };
+                // TODO(seharris) should we check `data_size` is the same?
                 if let OperandValueKind::Immediate(out_scalar) = cast_kind
-                    && in_scalar.size(self.cx) == out_scalar.size(self.cx)
+                    && in_scalar.memory_size(self.cx) == out_scalar.memory_size(self.cx)
                         {
                             let operand_bty = bx.backend_type(operand.layout);
                             let cast_bty = bx.backend_type(cast);
@@ -262,9 +263,10 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let OperandValueKind::Pair(in_a, in_b) = operand_kind else {
                     bug!("Found {operand_kind:?} for operand {operand:?}");
                 };
+                // TODO(seharris) should we check `data_size` is the same?
                 if let OperandValueKind::Pair(out_a, out_b) = cast_kind
-                    && in_a.size(self.cx) == out_a.size(self.cx)
-                    && in_b.size(self.cx) == out_b.size(self.cx)
+                    && in_a.memory_size(self.cx) == out_a.memory_size(self.cx)
+                    && in_b.memory_size(self.cx) == out_b.memory_size(self.cx)
                 {
                     let in_a_ibty = bx.scalar_pair_element_backend_type(operand.layout, 0, false);
                     let in_b_ibty = bx.scalar_pair_element_backend_type(operand.layout, 1, false);
@@ -295,7 +297,8 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
         to_scalar: abi::Scalar,
         to_backend_ty: Bx::Type,
     ) -> Bx::Value {
-        debug_assert_eq!(from_scalar.size(self.cx), to_scalar.size(self.cx));
+        debug_assert_eq!(from_scalar.memory_size(self.cx), to_scalar.memory_size(self.cx));
+        debug_assert_eq!(from_scalar.data_size(self.cx), to_scalar.data_size(self.cx));
 
         use abi::Primitive::*;
         imm = bx.from_immediate(imm);
@@ -351,7 +354,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 bx.assume(cmp);
             }
 
-            let type_max = scalar.size(self.cx).unsigned_int_max();
+            let type_max = scalar.data_size(self.cx).unsigned_int_max();
             if end < type_max {
                 let high = bx.const_uint_big(backend_ty, end);
                 let cmp = bx.icmp(IntPredicate::IntULE, imm, high);
@@ -686,7 +689,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let val = match null_op {
                     mir::NullOp::SizeOf => {
                         assert!(bx.cx().type_is_sized(ty));
-                        layout.size.bytes()
+                        layout.memory_size.bytes()
                     }
                     mir::NullOp::AlignOf => {
                         assert!(bx.cx().type_is_sized(ty));
@@ -988,12 +991,13 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     // Need to generate an `alloc` to get a pointer from an immediate
                     (OperandValueKind::Immediate(..) | OperandValueKind::Pair(..), OperandValueKind::Ref) => false,
 
+                    // TODO(seharris) should test `data_size` is the same?
                     // When we have scalar immediates, we can only convert things
                     // where the sizes match, to avoid endianness questions.
                     (OperandValueKind::Immediate(a), OperandValueKind::Immediate(b)) =>
-                        a.size(self.cx) == b.size(self.cx),
+                        a.memory_size(self.cx) == b.memory_size(self.cx),
                     (OperandValueKind::Pair(a0, a1), OperandValueKind::Pair(b0, b1)) =>
-                        a0.size(self.cx) == b0.size(self.cx) && a1.size(self.cx) == b1.size(self.cx),
+                        a0.memory_size(self.cx) == b0.memory_size(self.cx) && a1.memory_size(self.cx) == b1.memory_size(self.cx),
 
                     // Send mixings between scalars and pairs through the memory route
                     // FIXME: Maybe this could use insertvalue/extractvalue instead?

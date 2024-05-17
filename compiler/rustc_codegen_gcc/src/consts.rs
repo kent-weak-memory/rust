@@ -282,7 +282,7 @@ pub fn const_alloc_to_gcc<'gcc, 'tcx>(cx: &CodegenCx<'gcc, 'tcx>, alloc: ConstAl
     let alloc = alloc.inner();
     let mut llvals = Vec::with_capacity(alloc.provenance().ptrs().len() + 1);
     let dl = cx.data_layout();
-    let pointer_size = dl.pointer_size.bytes() as usize;
+    let pointer_memory_size = dl.pointer_memory_size.bytes() as usize;
 
     let mut next_offset = 0;
     for &(offset, alloc_id) in alloc.provenance().ptrs().iter() {
@@ -304,7 +304,7 @@ pub fn const_alloc_to_gcc<'gcc, 'tcx>(cx: &CodegenCx<'gcc, 'tcx>, alloc: ConstAl
                 // This `inspect` is okay since it is within the bounds of the allocation, it doesn't
                 // affect interpreter execution (we inspect the result after interpreter execution),
                 // and we properly interpret the provenance as a relocation pointer offset.
-                alloc.inspect_with_uninit_and_ptr_outside_interpreter(offset..(offset + pointer_size)),
+                alloc.inspect_with_uninit_and_ptr_outside_interpreter(offset..(offset + pointer_memory_size)),
             )
             .expect("const_alloc_to_llvm: could not read relocation pointer")
             as u64;
@@ -316,10 +316,10 @@ pub fn const_alloc_to_gcc<'gcc, 'tcx>(cx: &CodegenCx<'gcc, 'tcx>, alloc: ConstAl
                 interpret::Pointer::new(alloc_id, Size::from_bytes(ptr_offset)),
                 &cx.tcx,
             ),
-            abi::Scalar::Initialized { value: Primitive::Pointer(address_space), valid_range: WrappingRange::full(dl.pointer_size) },
+            abi::Scalar::Initialized { value: Primitive::Pointer(address_space), valid_range: WrappingRange::full(dl.pointer_data_size) },
             cx.type_i8p_ext(address_space),
         ));
-        next_offset = offset + pointer_size;
+        next_offset = offset + pointer_memory_size;
     }
     if alloc.len() >= next_offset {
         let range = next_offset..alloc.len();

@@ -1395,7 +1395,7 @@ pub trait PrettyPrinter<'tcx>:
         ty: Ty<'tcx>,
     ) -> Result<Self::Const, Self::Error> {
         match scalar {
-            Scalar::Ptr(ptr, _size) => self.pretty_print_const_scalar_ptr(ptr, ty),
+            Scalar::Ptr(ptr, _data_size, _memory_size) => self.pretty_print_const_scalar_ptr(ptr, ty),
             Scalar::Int(int) => {
                 self.pretty_print_const_scalar_int(int, ty, /* print_ty */ true)
             }
@@ -1418,9 +1418,13 @@ pub trait PrettyPrinter<'tcx>:
                         if let ty::ConstKind::Value(ty::ValTree::Leaf(int)) = len.kind() {
                             match self.tcx().try_get_global_alloc(alloc_id) {
                                 Some(GlobalAlloc::Memory(alloc)) => {
-                                    let len = int.assert_bits(self.tcx().data_layout.pointer_size);
-                                    let range =
-                                        AllocRange { start: offset, size: Size::from_bytes(len) };
+                                    let len = int.assert_bits(self.tcx().data_layout.pointer_data_size);
+                                    let size = Size::from_bytes(len);
+                                    let range = AllocRange {
+                                        start: offset,
+                                        data_size: Some(size),
+                                        memory_size: size,
+                                    };
                                     if let Ok(byte_str) =
                                         alloc.inner().get_bytes_strip_provenance(&self.tcx(), range)
                                     {
@@ -1494,7 +1498,7 @@ pub trait PrettyPrinter<'tcx>:
             }
             // Pointer types
             ty::Ref(..) | ty::RawPtr(_) | ty::FnPtr(_) => {
-                let data = int.assert_bits(self.tcx().data_layout.pointer_size);
+                let data = int.assert_bits(self.tcx().data_layout.pointer_data_size);
                 self = self.typed_value(
                     |mut this| {
                         write!(this, "0x{:x}", data)?;
@@ -1507,7 +1511,7 @@ pub trait PrettyPrinter<'tcx>:
             // Nontrivial types with scalar bit representation
             _ => {
                 let print = |mut this: Self| {
-                    if int.size() == Size::ZERO {
+                    if int.data_size() == Size::ZERO {
                         write!(this, "transmute(())")?;
                     } else {
                         write!(this, "transmute(0x{:x})", int)?;

@@ -1935,15 +1935,14 @@ impl<'tcx> Operand<'tcx> {
     ) -> Operand<'tcx> {
         debug_assert!({
             let param_env_and_ty = ty::ParamEnv::empty().and(ty);
-            let type_size = tcx
+            ley layout = tcx
                 .layout_of(param_env_and_ty)
-                .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e))
-                .size;
-            let scalar_size = match val {
-                Scalar::Int(int) => int.size(),
+                .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e));
+            let (scalar_data_size, scalar_memory_size) = match val {
+                Scalar::Int(int) => (int.data_size(), int.memory_size()),
                 _ => panic!("Invalid scalar type {:?}", val),
             };
-            scalar_size == type_size
+            scalar_data_size == layout.data_size.unwrap() && scalar_memory_size == layout.memory_size
         });
         Operand::Constant(Box::new(Constant {
             span,
@@ -2258,7 +2257,7 @@ pub enum ConstantKind<'tcx> {
 impl<'tcx> Constant<'tcx> {
     pub fn check_static_ptr(&self, tcx: TyCtxt<'_>) -> Option<DefId> {
         match self.literal.try_to_scalar() {
-            Some(Scalar::Ptr(ptr, _size)) => match tcx.global_alloc(ptr.provenance) {
+            Some(Scalar::Ptr(ptr, _data_size, _memory_size)) => match tcx.global_alloc(ptr.provenance) {
                 GlobalAlloc::Static(def_id) => {
                     assert!(!tcx.is_thread_local_static(def_id));
                     Some(def_id)
@@ -2371,7 +2370,7 @@ impl<'tcx> ConstantKind<'tcx> {
             Self::Val(val, t) => {
                 assert_eq!(*t, ty);
                 let size =
-                    tcx.layout_of(param_env.with_reveal_all_normalized(tcx).and(ty)).ok()?.size;
+                    tcx.layout_of(param_env.with_reveal_all_normalized(tcx).and(ty)).ok()?.data_size.unwrap();
                 val.try_to_bits(size)
             }
             Self::Unevaluated(uneval, ty) => {
@@ -2380,7 +2379,8 @@ impl<'tcx> ConstantKind<'tcx> {
                         let size = tcx
                             .layout_of(param_env.with_reveal_all_normalized(tcx).and(*ty))
                             .ok()?
-                            .size;
+                            .data_size
+                            .unwrap();
                         val.try_to_bits(size)
                     }
                     Err(_) => None,
@@ -2431,13 +2431,12 @@ impl<'tcx> ConstantKind<'tcx> {
         bits: u128,
         param_env_ty: ty::ParamEnvAnd<'tcx, Ty<'tcx>>,
     ) -> Self {
-        let size = tcx
+        let layout = tcx
             .layout_of(param_env_ty)
             .unwrap_or_else(|e| {
                 bug!("could not compute layout for {:?}: {:?}", param_env_ty.value, e)
-            })
-            .size;
-        let cv = ConstValue::Scalar(Scalar::from_uint(bits, size));
+            });
+        let cv = ConstValue::Scalar(Scalar::from_uint(bits, layout.data_size.unwrap(), layout.memory_size));
 
         Self::Val(cv, param_env_ty.value)
     }
@@ -2869,7 +2868,7 @@ fn pretty_print_const_value<'tcx>(
                 }
             }
             (ConstValue::ByRef { alloc, offset }, ty::Array(t, n)) if *t == u8_type => {
-                let n = n.try_to_bits(tcx.data_layout.pointer_size).unwrap();
+                let n = n.try_to_bits(tcx.data_layout.pointer_data_size).unwrap();
                 // cast is ok because we already checked for pointer size (32 or 64 bit) above
                 let range = AllocRange { start: offset, size: Size::from_bytes(n) };
                 let byte_str = alloc.inner().get_bytes_strip_provenance(&tcx, range).unwrap();

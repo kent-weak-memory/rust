@@ -262,16 +262,16 @@ pub fn struct_fields<'gcc, 'tcx>(cx: &CodegenCx<'gcc, 'tcx>, layout: TyAndLayout
         result.push(cx.type_padding_filler(padding, padding_align));
 
         result.push(field.gcc_type(cx));
-        offset = target_offset + field.size;
+        offset = target_offset + field.memory_size;
         prev_effective_align = effective_field_align;
     }
     if layout.is_sized() && field_count > 0 {
-        if offset > layout.size {
-            bug!("layout: {:#?} stride: {:?} offset: {:?}", layout, layout.size, offset);
+        if offset > layout.memory_size {
+            bug!("layout: {:#?} stride: {:?} offset: {:?}", layout, layout.memory_size, offset);
         }
-        let padding = layout.size - offset;
+        let padding = layout.memory_size - offset;
         let padding_align = prev_effective_align;
-        assert_eq!(offset.align_to(padding_align) + padding, layout.size);
+        assert_eq!(offset.align_to(padding_align) + padding, layout.memory_size);
         result.push(cx.type_padding_filler(padding, padding_align));
         assert_eq!(result.len(), 1 + field_count * 2);
     }

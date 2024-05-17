@@ -67,18 +67,18 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
     /// If the range has length 0, returns provenance that crosses the edge between `start-1` and
     /// `start`.
     fn range_get_ptrs(&self, range: AllocRange, cx: &impl HasDataLayout) -> &[(Size, Prov)] {
-        // We have to go back `pointer_size - 1` bytes, as that one would still overlap with
+        // We have to go back `pointer_memory_size - 1` bytes, as that one would still overlap with
         // the beginning of this range.
         let adjusted_start = Size::from_bytes(
-            range.start.bytes().saturating_sub(cx.data_layout().pointer_size.bytes() - 1),
+            range.start.bytes().saturating_sub(cx.data_layout().pointer_memory_size.bytes() - 1),
         );
-        self.ptrs.range(adjusted_start..range.end())
+        self.ptrs.range(adjusted_start..range.end_memory())
     }
 
     /// Returns all byte-wise provenance in the given range.
     fn range_get_bytes(&self, range: AllocRange) -> &[(Size, Prov)] {
         if let Some(bytes) = self.bytes.as_ref() {
-            bytes.range(range.start..range.end())
+            bytes.range(range.start..range.end_memory())
         } else {
             &[]
         }
@@ -86,7 +86,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
 
     /// Get the provenance of a single byte.
     pub fn get(&self, offset: Size, cx: &impl HasDataLayout) -> Option<Prov> {
-        let prov = self.range_get_ptrs(alloc_range(offset, Size::from_bytes(1)), cx);
+        let prov = self.range_get_ptrs(alloc_range(offset, Size::from_bytes(1), Size::from_bytes(1)), cx);
         debug_assert!(prov.len() <= 1);
         if let Some(entry) = prov.first() {
             // If it overlaps with this byte, it is on this byte.
@@ -120,7 +120,8 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
     }
 
     pub fn insert_ptr(&mut self, offset: Size, prov: Prov, cx: &impl HasDataLayout) {
-        debug_assert!(self.range_empty(alloc_range(offset, cx.data_layout().pointer_size), cx));
+        let data_layout = cx.data_layout();
+        debug_assert!(self.range_empty(alloc_range(offset, Some(data_layout.pointer_data_size), data_layout.pointer_memory_size), cx));
         self.ptrs.insert(offset, prov);
     }
 
@@ -128,7 +129,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
     /// If there is provenance overlapping with the edges, might result in an error.
     pub fn clear(&mut self, range: AllocRange, cx: &impl HasDataLayout) -> AllocResult {
         let start = range.start;
-        let end = range.end();
+        let end = range.end_memory();
         // Clear the bytewise part -- this is easy.
         if Prov::OFFSET_IS_ADDR {
             if let Some(bytes) = self.bytes.as_mut() {
@@ -150,7 +151,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
 
             (
                 provenance.first().unwrap().0,
-                provenance.last().unwrap().0 + cx.data_layout().pointer_size,
+                provenance.last().unwrap().0 + cx.data_layout().pointer_memory_size,
             )
         };
 
@@ -168,7 +169,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
             }
         }
         if last > end {
-            let begin_of_last = last - cx.data_layout().pointer_size;
+            let begin_of_last = last - cx.data_layout().pointer_memory_size;
             if !Prov::OFFSET_IS_ADDR {
                 // We can't split up the provenance into less than a pointer.
                 return Err(AllocError::PartialPointerOverwrite(begin_of_last));
@@ -212,15 +213,15 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
             // shift offsets from source allocation to destination allocation
             (offset - src.start) + dest_offset // `Size` operations
         };
-        let ptr_size = cx.data_layout().pointer_size;
+        let ptr_memory_size = cx.data_layout().pointer_memory_size;
 
         // # Pointer-sized provenances
         // Get the provenances that are entirely within this range.
         // (Different from `range_get_ptrs` which asks if they overlap the range.)
         // Only makes sense if we are copying at least one pointer worth of bytes.
         let mut dest_ptrs_box = None;
-        if src.size >= ptr_size {
-            let adjusted_end = Size::from_bytes(src.end().bytes() - (ptr_size.bytes() - 1));
+        if src.size >= ptr_memory_size {
+            let adjusted_end = Size::from_bytes(src.end().bytes() - (ptr_memory_size.bytes() - 1));
             let ptrs = self.ptrs.range(src.start..adjusted_end);
             // If `count` is large, this is rather wasteful -- we are allocating a big array here, which
             // is mostly filled with redundant information since it's just N copies of the same `Prov`s
@@ -241,8 +242,8 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
         // This includes the existing bytewise provenance in the range, and ptr provenance
         // that overlaps with the begin/end of the range.
         let mut dest_bytes_box = None;
-        let begin_overlap = self.range_get_ptrs(alloc_range(src.start, Size::ZERO), cx).first();
-        let end_overlap = self.range_get_ptrs(alloc_range(src.end(), Size::ZERO), cx).first();
+        let begin_overlap = self.range_get_ptrs(alloc_range(src.start, None, Size::ZERO), cx).first();
+        let end_overlap = self.range_get_ptrs(alloc_range(src.end(), None, Size::ZERO), cx).first();
         if !Prov::OFFSET_IS_ADDR {
             // There can't be any bytewise provenance, and we cannot split up the begin/end overlap.
             if let Some(entry) = begin_overlap {
@@ -258,7 +259,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
             if let Some(entry) = begin_overlap {
                 trace!("start overlapping entry: {entry:?}");
                 // For really small copies, make sure we don't run off the end of the `src` range.
-                let entry_end = cmp::min(entry.0 + ptr_size, src.end());
+                let entry_end = cmp::min(entry.0 + ptr_memory_size, src.end());
                 for offset in src.start..entry_end {
                     bytes.push((offset, entry.1));
                 }

@@ -156,8 +156,8 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
     pub fn is_zst(&self) -> bool {
         match self.abi {
             Abi::Scalar(_) | Abi::ScalarPair(..) | Abi::Vector { .. } => false,
-            Abi::Uninhabited => self.size.bytes() == 0,
-            Abi::Aggregate { sized } => sized && self.size.bytes() == 0,
+            Abi::Uninhabited => self.memory_size.bytes() == 0,
+            Abi::Aggregate { sized } => sized && self.memory_size.bytes() == 0,
         }
     }
 }

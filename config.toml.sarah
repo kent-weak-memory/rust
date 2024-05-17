@@ -1,0 +1,48 @@
+# Includes one of the default files in src/bootstrap/defaults
+profile = "codegen"
+changelog-seen = 2
+
+[build]
+target = ["x86_64-unknown-linux-gnu", "aarch64-unknown-freebsd-purecap", "aarch64-unknown-freebsd"]
+
+# Replace with whatever architecture you're building and running the compiler from.
+[target.x86_64-unknown-linux-gnu]
+# Use Morello build of LLVM, this seems to control what the compiler is linked with.
+# The Morello fork seems to support all the normal architectures, plus Morello-specific options.
+# We need the Morello-specific options so that we can cross compile.
+# You'll need a Morello SDK build: `cheribuild.py cheribsd-morello-purecap`
+llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
+
+[target.aarch64-unknown-freebsd]
+# This doesn't appear to do anything, presumably only the one for the host has any effect?
+# llvm-config = "/home/cheribuild/output/morello-sdk/bin/llvm-config"
+# These wrappers force clang to use the right target and system libraries.
+# Without it, the build system appears to default to host libc/libm/etc, which are the wrong arch.
+# These options must also be passed to rustc in normal use, which is irritating.
+#
+# It looks like it's possible to set linker and linker flags in the target config inside Rustc, but then we have to hardcode the sysroot path.
+# Because we're using build of FreeBSD controlled by Cheribuild, we need to make it easy for everyone to set their own sysroot path without rebuilding the compiler.
+# As a result, it looks like we have to keep using this slightly gross wrapper for the linker.
+#
+# The path here is just a path, change it to match your home and cheribuild paths.
+# The scripts will also need updating to match your home and cherbuild paths.
+cc = "/home/rust-20211014/clang-freebsd.sh"
+cxx = "/home/rust-20211014/clang++-freebsd.sh"
+linker = "/home/rust-20211014/clang-freebsd.sh"
+# Use Morello SDK's binutils for compilation.
+# The host's binutils might be fine here, but may as well use the Morello tools for consistency.
+# Leaving these options out entirely seems to confuse the build system somehow.
+ar = "/home/cheribuild/output/morello-sdk/bin/ar"
+ranlib = "/home/cheribuild/output/morello-sdk/bin/ranlib"
+
+[target.aarch64-unknown-freebsd-purecap]
+# See explanations of these options given for aarch64-unknown-freebsd in the previous bit of this file.
+cc = "/home/rust-20211014/clang-morello.sh"
+cxx = "/home/rust-20211014/clang++-morello.sh"
+ar = "/home/cheribuild/output/morello-sdk/bin/ar"
+ranlib = "/home/cheribuild/output/morello-sdk/bin/ranlib"
+linker = "/home/rust-20211014/clang-morello.sh"
+
+# You can compile programs with the above targets like this:
+# `build/x86_64-unknown-linux-gnu/stage1/bin/rustc --out-dir /tmp/build --target aarch64-unknown-freebsd -C linker=/home/rust-20211014/clang-freebsd.sh test.rs`
+# Output appears in /tmp/build, which helps avoid splurging intermediate files about accidentally.

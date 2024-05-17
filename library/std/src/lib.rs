@@ -234,6 +234,8 @@
     feature(slice_index_methods, coerce_unsized, sgx_platform)
 )]
 #![cfg_attr(windows, feature(round_char_boundary))]
+#![feature(cfg_target_abi)]
+#![cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), warn(usize_as_pointer))]
 //
 // Language features:
 // tidy-alphabetical-start
@@ -241,7 +243,9 @@
 #![feature(allocator_internals)]
 #![feature(allow_internal_unsafe)]
 #![feature(allow_internal_unstable)]
+#![feature(asm)]
 #![feature(c_unwind)]
+#![feature(cfg_target_abi)]
 #![feature(cfg_target_thread_local)]
 #![feature(concat_idents)]
 #![feature(const_mut_refs)]

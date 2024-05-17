@@ -114,7 +114,7 @@ fn encode_const<'tcx>(
 
     if let Some(scalar_int) = c.try_to_scalar_int() {
         let signed = c.ty().is_signed();
-        match scalar_int.size().bits() {
+        match scalar_int.data_size().bits() {
             8 if signed => push_signed_value(&mut s, scalar_int.try_to_i8().unwrap(), 0),
             16 if signed => push_signed_value(&mut s, scalar_int.try_to_i16().unwrap(), 0),
             32 if signed => push_signed_value(&mut s, scalar_int.try_to_i32().unwrap(), 0),
@@ -126,7 +126,7 @@ fn encode_const<'tcx>(
             64 => push_unsigned_value(&mut s, scalar_int.try_to_u64().unwrap()),
             128 => push_unsigned_value(&mut s, scalar_int.try_to_u128().unwrap()),
             _ => {
-                bug!("encode_const: unexpected size `{:?}`", scalar_int.size().bits());
+                bug!("encode_const: unexpected size `{:?}`", scalar_int.data_size().bits());
             }
         };
     } else {
@@ -781,24 +781,24 @@ fn transform_ty<'tcx>(tcx: TyCtxt<'tcx>, ty: Ty<'tcx>, options: TransformTyOptio
                 //
                 // (See https://rust-lang.github.io/unsafe-code-guidelines/layout/scalars.html#isize-and-usize.)
                 match ty.kind() {
-                    ty::Int(IntTy::Isize) => match tcx.sess.target.pointer_width {
+                    ty::Int(IntTy::Isize) => match tcx.sess.target.pointer_data_size {
                         16 => ty = tcx.types.i16,
                         32 => ty = tcx.types.i32,
                         64 => ty = tcx.types.i64,
                         128 => ty = tcx.types.i128,
                         _ => bug!(
-                            "transform_ty: unexpected pointer width `{}`",
-                            tcx.sess.target.pointer_width
+                            "transform_ty: unexpected pointer data size `{}`",
+                            tcx.sess.target.pointer_data_size
                         ),
                     },
-                    ty::Uint(UintTy::Usize) => match tcx.sess.target.pointer_width {
+                    ty::Uint(UintTy::Usize) => match tcx.sess.target.pointer_data_size {
                         16 => ty = tcx.types.u16,
                         32 => ty = tcx.types.u32,
                         64 => ty = tcx.types.u64,
                         128 => ty = tcx.types.u128,
                         _ => bug!(
-                            "transform_ty: unexpected pointer width `{}`",
-                            tcx.sess.target.pointer_width
+                            "transform_ty: unexpected pointer data size `{}`",
+                            tcx.sess.target.pointer_data_size
                         ),
                     },
                     _ => (),

@@ -76,8 +76,8 @@ pub struct Allocation<Prov: Provenance = AllocId, Extra = (), Bytes = Box<[u8]>>
     bytes: Bytes,
     /// Maps from byte addresses to extra provenance data for each pointer.
     /// Only the first byte of a pointer is inserted into the map; i.e.,
-    /// every entry in this map applies to `pointer_size` consecutive bytes starting
-    /// at the given offset.
+    /// every entry in this map applies to `pointer_memory_size` consecutive
+    /// bytes starting at the given offset.
     provenance: ProvenanceMap<Prov>,
     /// Denotes which part of this allocation is initialized.
     init_mask: InitMask,
@@ -214,21 +214,32 @@ impl AllocError {
 #[derive(Copy, Clone)]
 pub struct AllocRange {
     pub start: Size,
-    pub size: Size,
+    /// How much of the range contains actual data rather than metadata.
+    /// This must be less than or equal to `memory_size`.
+    /// This is useful for targets like CHERI where pointers contain extra
+    /// metadata at runtime that is managed by the target's hardware.
+    /// This value is set to `None` when the range being described contains
+    /// multiple fields and thus could contain multiple holes for metadata.
+    pub data_size: Option<Size>,
+    /// Overall size of the range including any gaps for metadata.
+    pub memory_size: Size,
 }
 
 impl fmt::Debug for AllocRange {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{:#x}..{:#x}]", self.start.bytes(), self.end().bytes())
+        write!(f, "[{:#x}..{:#x}]", self.start.bytes(), self.end_memory().bytes())
     }
 }
 
-/// Free-starting constructor for less syntactic overhead.
+/// Free-standing constructor for less syntactic overhead.
 #[inline(always)]
-pub fn alloc_range(start: Size, size: Size) -> AllocRange {
-    AllocRange { start, size }
+pub fn alloc_range(start: Size, data_size: Option<Size>, memory_size: Size) -> AllocRange {
+    assert!(data_size.is_none() || data_size.unwrap() <= memory_size, "AllocRange valid data must be within overall size of range");
+    AllocRange { start, data_size, memory_size }
 }
 
+/*
+TODO(seharris): check where this is used and possibly get rid of it.
 impl From<Range<Size>> for AllocRange {
     #[inline]
     fn from(r: Range<Size>) -> Self {
@@ -242,19 +253,25 @@ impl From<Range<usize>> for AllocRange {
         AllocRange::from(Size::from_bytes(r.start)..Size::from_bytes(r.end))
     }
 }
+*/
 
 impl AllocRange {
     #[inline(always)]
-    pub fn end(self) -> Size {
-        self.start + self.size // This does overflow checking.
+    pub fn end_data_or_memory(self) -> Size {
+        self.start + self.data_size.unwrap_or(self.memory_size) // This does overflow checking.
+    }
+    
+    #[inline(always)]
+    pub fn end_memory(self) -> Size {
+        self.start + self.memory_size // This does overflow checking.
     }
 
     /// Returns the `subrange` within this range; panics if it is not a subrange.
     #[inline]
     pub fn subrange(self, subrange: AllocRange) -> AllocRange {
         let sub_start = self.start + subrange.start;
-        let range = alloc_range(sub_start, subrange.size);
-        assert!(range.end() <= self.end(), "access outside the bounds for given AllocRange");
+        let range = alloc_range(sub_start, subrange.data_size, subrange.memory_size);
+        assert!(range.end_memory() <= self.end_memory(), "access outside the bounds for given AllocRange");
         range
     }
 }
@@ -351,7 +368,7 @@ impl<Bytes: AllocBytes> Allocation<AllocId, (), Bytes> {
         let mut bytes = self.bytes.adjust_to_align(self.align);
 
         let mut new_provenance = Vec::with_capacity(self.provenance.ptrs().len());
-        let ptr_size = cx.data_layout().pointer_size.bytes_usize();
+        let ptr_size = cx.data_layout().pointer_data_size.bytes_usize();
         let endian = cx.data_layout().endian;
         for &(offset, alloc_id) in self.provenance.ptrs().iter() {
             let idx = offset.bytes_usize();
@@ -417,7 +434,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
     /// on that.
     #[inline]
     pub fn get_bytes_unchecked(&self, range: AllocRange) -> &[u8] {
-        &self.bytes[range.start.bytes_usize()..range.end().bytes_usize()]
+        &self.bytes[range.start.bytes_usize()..range.end_data_or_memory().bytes_usize()]
     }
 
     /// Checks that these bytes are initialized, and then strip provenance (if possible) and return
@@ -460,7 +477,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
         self.mark_init(range, true);
         self.provenance.clear(range, cx)?;
 
-        Ok(&mut self.bytes[range.start.bytes_usize()..range.end().bytes_usize()])
+        Ok(&mut self.bytes[range.start.bytes_usize()..range.end_data_or_memory().bytes_usize()])
     }
 
     /// A raw pointer variant of `get_bytes_mut` that avoids invalidating existing aliases into this memory.
@@ -472,9 +489,9 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
         self.mark_init(range, true);
         self.provenance.clear(range, cx)?;
 
-        assert!(range.end().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
+        assert!(range.end_memory().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
         let begin_ptr = self.bytes.as_mut_ptr().wrapping_add(range.start.bytes_usize());
-        let len = range.end().bytes_usize() - range.start.bytes_usize();
+        let len = range.end_data_or_memory().bytes_usize() - range.start.bytes_usize();
         Ok(ptr::slice_from_raw_parts_mut(begin_ptr, len))
     }
 }
@@ -516,7 +533,9 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
         let bits = read_target_uint(cx.data_layout().endian, bytes).unwrap();
 
         if read_provenance {
-            assert_eq!(range.size, cx.data_layout().pointer_size);
+            let data_layout = cx.data_layout();
+            assert_eq!(range.data_size, Some(data_layout.pointer_data_size));
+            assert_eq!(range.memory_size, data_layout.pointer_memory_size);
 
             // When reading data with provenance, the easy case is finding provenance exactly where we
             // are reading, then we can put data and provenance back together and return that.
@@ -542,7 +561,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
             // If we can just ignore provenance, do exactly that.
             if Prov::OFFSET_IS_ADDR {
                 // We just strip provenance.
-                return Ok(Scalar::from_uint(bits, range.size));
+                return Ok(Scalar::from_uint(bits, range.data_size.unwrap(), range.memory_size));
             }
         }
 
@@ -552,7 +571,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
             return Err(AllocError::ReadPointerAsBytes);
         }
         // There is no provenance, we can just return the bits.
-        Ok(Scalar::from_uint(bits, range.size))
+        Ok(Scalar::from_uint(bits, range.data_size.unwrap(), range.memory_size))
     }
 
     /// Writes a *non-ZST* scalar.
@@ -572,7 +591,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 
         // `to_bits_or_ptr_internal` is the right method because we just want to store this data
         // as-is into memory.
-        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.size)? {
+        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.data_size.unwrap(), range.memory_size)? {
             Right(ptr) => {
                 let (provenance, offset) = ptr.into_parts();
                 (u128::from(offset.bytes()), Some(provenance))
@@ -586,7 +605,9 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 
         // See if we have to also store some provenance.
         if let Some(provenance) = provenance {
-            assert_eq!(range.size, cx.data_layout().pointer_size);
+            let data_layout = cx.data_layout();
+            assert_eq!(range.data_size, Some(data_layout.pointer_data_size));
+            assert_eq!(range.memory_size, data_layout.pointer_memory_size);
             self.provenance.insert_ptr(range.start, provenance, cx);
         }
 

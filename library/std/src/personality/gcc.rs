@@ -217,6 +217,14 @@ cfg_if::cfg_if! {
                             exception_object as uintptr_t,
                         );
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, 0);
+                        // TODO(seharris) check this code executes, consider removing it.
+                        // TODO(seharris) don't forget to remove `#![feature(asm)]` from lib.rs if removing this code.
+                        #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+                        {
+                            let is_valid: u64;
+                            asm!("gctag {0}, {1}", out(reg) is_valid, in(reg) lpad);
+                            assert!(is_valid == 1);
+                        }
                         uw::_Unwind_SetIP(context, lpad);
                         uw::_URC_INSTALL_CONTEXT
                     }
@@ -271,16 +279,26 @@ cfg_if::cfg_if! {
 unsafe fn find_eh_action(context: *mut uw::_Unwind_Context) -> Result<EHAction, ()> {
     let lsda = uw::_Unwind_GetLanguageSpecificData(context) as *const u8;
     let mut ip_before_instr: c_int = 0;
-    let ip = uw::_Unwind_GetIPInfo(context, &mut ip_before_instr);
+    let mut ip = uw::_Unwind_GetIPInfo(context, &mut ip_before_instr) as usize;
+    // Handle special case for Morello.
+    // LSB is used to indicate capability mode, and isn't part of the
+    // actual instruction location.
+    //
+    // Based on changes in
+    // `morello-llvm-project/libcxxabi/src/cxa_personality.cpp`
+    // from Morello LLVM release 1.5 (2022-10-5).
+    if cfg!(all(target_arch = "aarch64", target_abi = "purecap")) && ip&1 != 0 {
+        ip = ip-1;
+    }
     let eh_context = EHContext {
         // The return address points 1 byte past the call instruction,
         // which could be in the next IP range in LSDA range table.
         //
         // `ip = -1` has special meaning, so use wrapping sub to allow for that
         ip: if ip_before_instr != 0 { ip } else { ip.wrapping_sub(1) },
-        func_start: uw::_Unwind_GetRegionStart(context),
-        get_text_start: &|| uw::_Unwind_GetTextRelBase(context),
-        get_data_start: &|| uw::_Unwind_GetDataRelBase(context),
+        func_start: uw::_Unwind_GetRegionStart(context) as usize,
+        get_text_start: &|| uw::_Unwind_GetTextRelBase(context) as usize,
+        get_data_start: &|| uw::_Unwind_GetDataRelBase(context) as usize,
     };
     eh::find_eh_action(lsda, &eh_context)
 }

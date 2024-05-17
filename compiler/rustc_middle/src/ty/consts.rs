@@ -265,13 +265,13 @@ impl<'tcx> Const<'tcx> {
     #[inline]
     /// Creates a constant with the given integer value and interns it.
     pub fn from_bits(tcx: TyCtxt<'tcx>, bits: u128, ty: ParamEnvAnd<'tcx, Ty<'tcx>>) -> Self {
-        let size = tcx
+        let layout = tcx
             .layout_of(ty)
-            .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e))
-            .size;
+            .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e));
+        let scalar = ScalarInt::try_from_uint(bits, layout.data_size.unwrap(), layout.memory_size).unwrap();
         ty::Const::new_value(
             tcx,
-            ty::ValTree::from_scalar_int(ScalarInt::try_from_uint(bits, size).unwrap()),
+            ty::ValTree::from_scalar_int(scalar),
             ty.value,
         )
     }
@@ -305,7 +305,7 @@ impl<'tcx> Const<'tcx> {
         ty: Ty<'tcx>,
     ) -> Option<u128> {
         assert_eq!(self.ty(), ty);
-        let size = tcx.layout_of(param_env.with_reveal_all_normalized(tcx).and(ty)).ok()?.size;
+        let size = tcx.layout_of(param_env.with_reveal_all_normalized(tcx).and(ty)).ok()?.data_size.unwrap();
         // if `ty` does not depend on generic parameters, use an empty param_env
         self.eval(tcx, param_env).try_to_bits(size)
     }

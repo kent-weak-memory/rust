@@ -287,7 +287,7 @@ fn build_enum_variant_struct_type_di_node<'ll, 'tcx>(
                         cx,
                         struct_type_di_node,
                         &field_name,
-                        (field_layout.size, field_layout.align.abi),
+                        (field_layout.memory_size, field_layout.align.abi),
                         variant_layout.fields.offset(field_index),
                         DIFlags::FlagZero,
                         type_di_node(cx, field_layout.ty),
@@ -443,17 +443,17 @@ fn compute_discriminant_value<'ll, 'tcx>(
                     .valid_range;
 
                 let min = valid_range.start.min(valid_range.end);
-                let min = tag.size(cx).truncate(min);
+                let min = tag.data_size(cx).truncate(min);
 
                 let max = valid_range.start.max(valid_range.end);
-                let max = tag.size(cx).truncate(max);
+                let max = tag.data_size(cx).truncate(max);
 
                 DiscrResult::Range(min, max)
             } else {
                 let value = (variant_index.as_u32() as u128)
                     .wrapping_sub(niche_variants.start().as_u32() as u128)
                     .wrapping_add(niche_start);
-                let value = tag.size(cx).truncate(value);
+                let value = tag.data_size(cx).truncate(value);
                 DiscrResult::Value(value)
             }
         }

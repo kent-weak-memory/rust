@@ -395,7 +395,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
             let count = count.load_scalar(fx);
 
             let elem_ty = substs.type_at(0);
-            let elem_size: u64 = fx.layout_of(elem_ty).size.bytes();
+            let elem_size: u64 = fx.layout_of(elem_ty).memory_size.bytes();
             assert_eq!(args.len(), 3);
             let byte_amount =
                 if elem_size != 1 { fx.bcx.ins().imul_imm(count, elem_size as i64) } else { count };
@@ -411,7 +411,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
             let count = count.load_scalar(fx);
 
             let elem_ty = substs.type_at(0);
-            let elem_size: u64 = fx.layout_of(elem_ty).size.bytes();
+            let elem_size: u64 = fx.layout_of(elem_ty).memory_size.bytes();
             assert_eq!(args.len(), 3);
             let byte_amount =
                 if elem_size != 1 { fx.bcx.ins().imul_imm(count, elem_size as i64) } else { count };
@@ -436,7 +436,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
                 let (size, _align) = crate::unsize::size_and_align_of_dst(fx, layout, info);
                 size
             } else {
-                fx.bcx.ins().iconst(fx.pointer_type, layout.size.bytes() as i64)
+                fx.bcx.ins().iconst(fx.pointer_type, layout.memory_size.bytes() as i64)
             };
             ret.write_cvalue(fx, CValue::by_val(size, usize_layout));
         }
@@ -518,7 +518,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
             let offset = offset.load_scalar(fx);
 
             let pointee_ty = base.layout().ty.builtin_deref(true).unwrap().ty;
-            let pointee_size = fx.layout_of(pointee_ty).size.bytes();
+            let pointee_size = fx.layout_of(pointee_ty).memory_size.bytes();
             let ptr_diff = if pointee_size != 1 {
                 fx.bcx.ins().imul_imm(offset, pointee_size as i64)
             } else {
@@ -542,7 +542,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
             let count = count.load_scalar(fx);
 
             let pointee_ty = dst.layout().ty.builtin_deref(true).unwrap().ty;
-            let pointee_size = fx.layout_of(pointee_ty).size.bytes();
+            let pointee_size = fx.layout_of(pointee_ty).memory_size.bytes();
             let count = if pointee_size != 1 {
                 fx.bcx.ins().imul_imm(count, pointee_size as i64)
             } else {
@@ -676,7 +676,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
             let base = base.load_scalar(fx);
             let ty = substs.type_at(0);
 
-            let pointee_size: u64 = fx.layout_of(ty).size.bytes();
+            let pointee_size: u64 = fx.layout_of(ty).memory_size.bytes();
             let diff_bytes = fx.bcx.ins().isub(ptr, base);
             // FIXME this can be an exact division.
             let val = if intrinsic == sym::ptr_offset_from_unsigned {
@@ -1128,7 +1128,7 @@ fn codegen_regular_intrinsic_call<'tcx>(
             let lhs_ref = lhs_ref.load_scalar(fx);
             let rhs_ref = rhs_ref.load_scalar(fx);
 
-            let size = fx.layout_of(substs.type_at(0)).layout.size();
+            let size = fx.layout_of(substs.type_at(0)).layout.memory_size();
             // FIXME add and use emit_small_memcmp
             let is_eq_value = if size == Size::ZERO {
                 // No bytes means they're trivially equal

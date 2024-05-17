@@ -2,7 +2,7 @@ errors_target_inconsistent_architecture =
     inconsistent target specification: "data-layout" claims architecture is {$dl}-endian, while "target-endian" is `{$target}`
 
 errors_target_inconsistent_pointer_width =
-    inconsistent target specification: "data-layout" claims pointers are {$pointer_size}-bit, while "target-pointer-width" is `{$target}`
+    inconsistent target specification: "data-layout" claims pointers are {$pointer_memory_size}-bit ({$pointer_data_size}-bit data), while "target-pointer-memory-size" is `{$target_memory_size}` and "target-pointer-data-size" is `{$target_data_size}`
 
 errors_target_invalid_address_space =
     invalid address space `{$addr_space}` for `{$cause}` in "data-layout": {$err}

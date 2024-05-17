@@ -40,7 +40,7 @@ fn numeric_intrinsic<Prov>(name: Symbol, bits: u128, kind: Primitive) -> Scalar<
         sym::bitreverse => (bits << extra).reverse_bits(),
         _ => bug!("not a numeric intrinsic: {}", name),
     };
-    Scalar::from_uint(bits_out, size)
+    Scalar::from_uint(bits_out, size, size)
 }
 
 /// Directly returns an `Allocation` containing an absolute path representation of the given type.
@@ -190,7 +190,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let ty = substs.type_at(0);
                 let layout_of = self.layout_of(ty)?;
                 let val = self.read_scalar(&args[0])?;
-                let bits = val.to_bits(layout_of.size)?;
+                let bits = val.to_bits(layout_of.data_size.unwrap())?;
                 let kind = match layout_of.abi {
                     Abi::Scalar(scalar) => scalar.primitive(),
                     _ => span_bug!(
@@ -239,10 +239,10 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // rotate_right: (X << ((BW - S) % BW)) | (X >> (S % BW))
                 let layout = self.layout_of(substs.type_at(0))?;
                 let val = self.read_scalar(&args[0])?;
-                let val_bits = val.to_bits(layout.size)?;
+                let val_bits = val.to_bits(layout.data_size.unwrap())?;
                 let raw_shift = self.read_scalar(&args[1])?;
-                let raw_shift_bits = raw_shift.to_bits(layout.size)?;
-                let width_bits = u128::from(layout.size.bits());
+                let raw_shift_bits = raw_shift.to_bits(layout.data_size.unwrap())?;
+                let width_bits = u128::from(layout.data_size.unwrap().bits());
                 let shift_bits = raw_shift_bits % width_bits;
                 let inv_shift_bits = (width_bits - shift_bits) % width_bits;
                 let result_bits = if intrinsic_name == sym::rotate_left {
@@ -251,7 +251,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     (val_bits >> shift_bits) | (val_bits << inv_shift_bits)
                 };
                 let truncated_bits = self.truncate(result_bits, layout);
-                let result = Scalar::from_uint(truncated_bits, layout.size);
+                let result = Scalar::from_uint(truncated_bits, layout.data_size.unwrap(), layout.memory_size);
                 self.write_scalar(result, dest)?;
             }
             sym::copy => {
@@ -265,7 +265,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let offset_count = self.read_target_isize(&args[1])?;
                 let pointee_ty = substs.type_at(0);
 
-                let pointee_size = i64::try_from(self.layout_of(pointee_ty)?.size.bytes()).unwrap();
+                let pointee_size = i64::try_from(self.layout_of(pointee_ty)?.memory_size.bytes()).unwrap();
                 let offset_bytes = offset_count.wrapping_mul(pointee_size);
                 let offset_ptr = ptr.wrapping_signed_offset(offset_bytes, self);
                 self.write_pointer(offset_ptr, dest)?;
@@ -371,7 +371,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let pointee_layout = self.layout_of(substs.type_at(0))?;
                 // If ret_layout is unsigned, we checked that so is the distance, so we are good.
                 let val = ImmTy::from_int(dist, ret_layout);
-                let size = ImmTy::from_int(pointee_layout.size.bytes(), ret_layout);
+                let size = ImmTy::from_int(pointee_layout.memory_size.bytes(), ret_layout);
                 self.exact_div(&val, &size, dest)?;
             }
 
@@ -514,7 +514,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // First, check x % y != 0 (or if that computation overflows).
         let (res, overflow, _ty) = self.overflowing_binary_op(BinOp::Rem, &a, &b)?;
         assert!(!overflow); // All overflow is UB, so this should never return on overflow.
-        if res.assert_bits(a.layout.size) != 0 {
+        if res.assert_bits(a.layout.memory_size) != 0 {
             throw_ub_custom!(
                 fluent::const_eval_exact_div_has_remainder,
                 a = format!("{a}"),
@@ -534,33 +534,34 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         assert!(matches!(mir_op, BinOp::Add | BinOp::Sub));
         let (val, overflowed, _ty) = self.overflowing_binary_op(mir_op, l, r)?;
         Ok(if overflowed {
-            let size = l.layout.size;
-            let num_bits = size.bits();
+            let memory_size = l.layout.memory_size;
+            let data_size = l.layout.data_size.unwrap();
+            let num_bits = data_size.bits();
             if l.layout.abi.is_signed() {
                 // For signed ints the saturated value depends on the sign of the first
                 // term since the sign of the second term can be inferred from this and
                 // the fact that the operation has overflowed (if either is 0 no
                 // overflow can occur)
-                let first_term: u128 = l.to_scalar().to_bits(l.layout.size)?;
+                let first_term: u128 = l.to_scalar().to_bits(data_size)?;
                 let first_term_positive = first_term & (1 << (num_bits - 1)) == 0;
                 if first_term_positive {
                     // Negative overflow not possible since the positive first term
                     // can only increase an (in range) negative term for addition
                     // or corresponding negated positive term for subtraction
-                    Scalar::from_int(size.signed_int_max(), size)
+                    Scalar::from_int(data_size.signed_int_max(), data_size, memory_size)
                 } else {
                     // Positive overflow not possible for similar reason
                     // max negative
-                    Scalar::from_int(size.signed_int_min(), size)
+                    Scalar::from_int(data_size.signed_int_min(), data_size, memory_size)
                 }
             } else {
                 // unsigned
                 if matches!(mir_op, BinOp::Add) {
                     // max unsigned
-                    Scalar::from_uint(size.unsigned_int_max(), size)
+                    Scalar::from_uint(size.unsigned_int_max(), data_size, memory_size)
                 } else {
                     // underflow to 0
-                    Scalar::from_uint(0u128, size)
+                    Scalar::from_uint(0u128, data_size, memory_size)
                 }
             }
         } else {
@@ -578,7 +579,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         offset_count: i64,
     ) -> InterpResult<'tcx, Pointer<Option<M::Provenance>>> {
         // We cannot overflow i64 as a type's size must be <= isize::MAX.
-        let pointee_size = i64::try_from(self.layout_of(pointee_ty)?.size.bytes()).unwrap();
+        let pointee_size = i64::try_from(self.layout_of(pointee_ty)?.memory_size.bytes()).unwrap();
         // The computed offset, in bytes, must not overflow an isize.
         // `checked_mul` enforces a too small bound, but no actual allocation can be big enough for
         // the difference to be noticeable.
@@ -611,7 +612,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     ) -> InterpResult<'tcx> {
         let count = self.read_target_usize(&count)?;
         let layout = self.layout_of(src.layout.ty.builtin_deref(true).unwrap().ty)?;
-        let (size, align) = (layout.size, layout.align.abi);
+        let (size, align) = (layout.memory_size, layout.align.abi);
         // `checked_mul` enforces a too small bound (the correct one would probably be target_isize_max),
         // but no actual allocation can be big enough for the difference to be noticeable.
         let size = size.checked_mul(count, self).ok_or_else(|| {
@@ -641,7 +642,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         // `checked_mul` enforces a too small bound (the correct one would probably be target_isize_max),
         // but no actual allocation can be big enough for the difference to be noticeable.
-        let len = layout.size.checked_mul(count, self).ok_or_else(|| {
+        let len = layout.memory_size.checked_mul(count, self).ok_or_else(|| {
             err_ub_custom!(fluent::const_eval_size_overflow, name = "write_bytes")
         })?;
 
@@ -672,8 +673,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             alloc_ref.get_bytes_strip_provenance()
         };
 
-        let lhs_bytes = get_bytes(self, lhs, layout.size)?;
-        let rhs_bytes = get_bytes(self, rhs, layout.size)?;
+        let lhs_bytes = get_bytes(self, lhs, layout.data_size.unwrap())?;
+        let rhs_bytes = get_bytes(self, rhs, layout.data_size.unwrap())?;
         Ok(Scalar::from_bool(lhs_bytes == rhs_bytes))
     }
 }

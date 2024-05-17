@@ -710,9 +710,9 @@ fn codegen_stmt<'tcx>(
                     let times = fx
                         .monomorphize(times)
                         .eval(fx.tcx, ParamEnv::reveal_all())
-                        .try_to_bits(fx.tcx.data_layout.pointer_size)
+                        .try_to_bits(fx.tcx.data_layout.pointer_data_size)
                         .unwrap();
-                    if operand.layout().size.bytes() == 0 {
+                    if operand.layout().memory_size.bytes() == 0 {
                         // Do nothing for ZST's
                     } else if fx.clif_type(operand.layout().ty) == Some(types::I8) {
                         let times = fx.bcx.ins().iconst(fx.pointer_type, times as i64);
@@ -759,7 +759,7 @@ fn codegen_stmt<'tcx>(
                     assert!(lval.layout().ty.is_sized(fx.tcx, ParamEnv::reveal_all()));
                     let layout = fx.layout_of(fx.monomorphize(ty));
                     let val = match null_op {
-                        NullOp::SizeOf => layout.size.bytes(),
+                        NullOp::SizeOf => layout.memory_size.bytes(),
                         NullOp::AlignOf => layout.align.abi.bytes(),
                         NullOp::OffsetOf(fields) => {
                             layout.offset_of_subfield(fx, fields.iter().map(|f| f.index())).bytes()
@@ -825,7 +825,7 @@ fn codegen_stmt<'tcx>(
                 let dst = dst.load_scalar(fx);
                 let src = codegen_operand(fx, src).load_scalar(fx);
                 let count = codegen_operand(fx, count).load_scalar(fx);
-                let elem_size: u64 = pointee.size.bytes();
+                let elem_size: u64 = pointee.memory_size.bytes();
                 let bytes = if elem_size != 1 {
                     fx.bcx.ins().imul_imm(count, elem_size as i64)
                 } else {
@@ -890,7 +890,7 @@ pub(crate) fn codegen_place<'tcx>(
                         let elem_layout = fx.layout_of(*elem_ty);
                         let ptr = cplace.to_ptr();
                         cplace = CPlace::for_ptr(
-                            ptr.offset_i64(fx, elem_layout.size.bytes() as i64 * (from as i64)),
+                            ptr.offset_i64(fx, elem_layout.memory_size.bytes() as i64 * (from as i64)),
                             fx.layout_of(Ty::new_array(fx.tcx, *elem_ty, to - from)),
                         );
                     }
@@ -899,7 +899,7 @@ pub(crate) fn codegen_place<'tcx>(
                         let elem_layout = fx.layout_of(*elem_ty);
                         let (ptr, len) = cplace.to_ptr_unsized();
                         cplace = CPlace::for_ptr_with_extra(
-                            ptr.offset_i64(fx, elem_layout.size.bytes() as i64 * (from as i64)),
+                            ptr.offset_i64(fx, elem_layout.memory_size.bytes() as i64 * (from as i64)),
                             fx.bcx.ins().iadd_imm(len, -(from as i64 + to as i64)),
                             cplace.layout(),
                         );

@@ -188,7 +188,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
                         );
                         alloc
                             .inner()
-                            .get_bytes_strip_provenance(fx, alloc_range(offset, size))
+                            .get_bytes_strip_provenance(fx, alloc_range(offset, Some(size), size))
                             .unwrap()
                     }
                     _ => unreachable!("{:?}", idx_const),
@@ -892,7 +892,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
 
             let (lane_count, ptr_lane_ty) = ptr.layout().ty.simd_size_and_type(fx.tcx);
             let pointee_ty = ptr_lane_ty.builtin_deref(true).unwrap().ty;
-            let pointee_size = fx.layout_of(pointee_ty).size.bytes();
+            let pointee_size = fx.layout_of(pointee_ty).memory_size.bytes();
             let (ret_lane_count, ret_lane_ty) = ret.layout().ty.simd_size_and_type(fx.tcx);
             let ret_lane_layout = fx.layout_of(ret_lane_ty);
             assert_eq!(lane_count, ret_lane_count);

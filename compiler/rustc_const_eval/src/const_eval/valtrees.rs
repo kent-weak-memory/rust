@@ -221,13 +221,13 @@ fn create_pointee_place<'tcx>(
             _ => unsized_inner_ty,
         };
         let unsized_inner_ty_size =
-            tcx.layout_of(ty::ParamEnv::empty().and(unsized_inner_ty)).unwrap().layout.size();
+            tcx.layout_of(ty::ParamEnv::empty().and(unsized_inner_ty)).unwrap().layout.memory_size();
         debug!(?unsized_inner_ty, ?unsized_inner_ty_size, ?num_elems);
 
         // for custom DSTs only the last field/element is unsized, but we need to also allocate
         // space for the other fields/elements
         let layout = tcx.layout_of(ty::ParamEnv::empty().and(ty)).unwrap();
-        let size_of_sized_part = layout.layout.size();
+        let size_of_sized_part = layout.layout.memory_size();
 
         // Get the size of the memory behind the DST
         let dst_size = unsized_inner_ty_size.checked_mul(num_elems as u64, &tcx).unwrap();

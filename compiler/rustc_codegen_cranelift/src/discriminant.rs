@@ -26,16 +26,17 @@ pub(crate) fn codegen_set_discriminant<'tcx>(
             tag_encoding: TagEncoding::Direct,
             variants: _,
         } => {
+            // TODO(seharris): I'm not sure which sort of size to use for these constants.
             let ptr = place.place_field(fx, FieldIdx::new(tag_field));
             let to = layout.ty.discriminant_for_variant(fx.tcx, variant_index).unwrap().val;
             let to = if ptr.layout().abi.is_signed() {
                 ty::ScalarInt::try_from_int(
-                    ptr.layout().size.sign_extend(to) as i128,
-                    ptr.layout().size,
+                    ptr.layout().data_size.unwrap().sign_extend(to) as i128,
+                    ptr.layout().data_size.unwrap(),
                 )
                 .unwrap()
             } else {
-                ty::ScalarInt::try_from_uint(to, ptr.layout().size).unwrap()
+                ty::ScalarInt::try_from_uint(to, ptr.layout().data_size.unwrap()).unwrap()
             };
             let discr = CValue::const_val(fx, ptr.layout(), to);
             ptr.write_cvalue(fx, discr);
@@ -87,12 +88,12 @@ pub(crate) fn codegen_get_discriminant<'tcx>(
                 .map_or(u128::from(index.as_u32()), |discr| discr.val);
             let discr_val = if dest_layout.abi.is_signed() {
                 ty::ScalarInt::try_from_int(
-                    dest_layout.size.sign_extend(discr_val) as i128,
-                    dest_layout.size,
+                    dest_layout.data_size.unwrap().sign_extend(discr_val) as i128,
+                    dest_layout.data_size.unwrap(),
                 )
                 .unwrap()
             } else {
-                ty::ScalarInt::try_from_uint(discr_val, dest_layout.size).unwrap()
+                ty::ScalarInt::try_from_uint(discr_val, dest_layout.data_size.unwrap()).unwrap()
             };
             let res = CValue::const_val(fx, dest_layout, discr_val);
             dest.write_cvalue(fx, res);

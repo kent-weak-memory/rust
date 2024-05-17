@@ -242,7 +242,7 @@ impl<'tcx> Cx<'tcx> {
                 .unwrap_or_else(|e| {
                     panic!("could not compute layout for {:?}: {:?}", param_env_ty, e)
                 })
-                .size;
+                .data_size.unwrap();
 
             let lit = ScalarInt::try_from_uint(discr_offset as u128, size).unwrap();
             let kind = ExprKind::NonHirLiteral { lit, user_ty: None };

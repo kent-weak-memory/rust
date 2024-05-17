@@ -4,7 +4,8 @@ use crate::spec::{Cc, LinkerFlavor, Lld, Target, TargetOptions};
 pub fn target() -> Target {
     Target {
         llvm_target: "aarch64-unknown-unknown".into(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memory_size: 64,
         // from: https://llvm.org/docs/LangRef.html#data-layout
         // e         = little endian
         // m:e       = ELF mangling: Private symbols get a .L prefix

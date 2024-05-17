@@ -16,7 +16,7 @@ pub(super) fn sanity_check_layout<'tcx>(
         assert!(layout.abi.is_uninhabited());
     }
 
-    if layout.size.bytes() % layout.align.abi.bytes() != 0 {
+    if layout.memory_size.bytes() % layout.align.abi.bytes() != 0 {
         bug!("size is not a multiple of align, in the following layout:\n{layout:#?}");
     }
 
@@ -56,7 +56,7 @@ pub(super) fn sanity_check_layout<'tcx>(
         };
         if fields.next().is_none() {
             let (offset, first) = first;
-            if offset == Size::ZERO && first.layout.size() == layout.size {
+            if offset == Size::ZERO && first.layout.memory_size() == layout.memory_size {
                 // This is a newtype, so keep recursing.
                 // FIXME(RalfJung): I don't think it would be correct to do any checks for
                 // alignment here, so we don't. Is that correct?
@@ -85,7 +85,7 @@ pub(super) fn sanity_check_layout<'tcx>(
             "alignment mismatch between ABI and layout in {layout:#?}"
         );
         assert_eq!(
-            layout.layout.size(),
+            layout.layout.memory_size(),
             size,
             "size mismatch between ABI and layout in {layout:#?}"
         );
@@ -129,7 +129,7 @@ pub(super) fn sanity_check_layout<'tcx>(
                             Size::ZERO,
                             "`Scalar` field at non-0 offset in {inner:#?}",
                         );
-                        assert_eq!(field.size, size, "`Scalar` field with bad size in {inner:#?}",);
+                        assert_eq!(field.memory_size, size, "`Scalar` field with bad size in {inner:#?}",);
                         assert_eq!(
                             field.align.abi, align,
                             "`Scalar` field with bad align in {inner:#?}",
@@ -193,9 +193,9 @@ pub(super) fn sanity_check_layout<'tcx>(
                     (offset2, field2, offset1, field1)
                 };
                 // The fields should be at the right offset, and match the `scalar` layout.
-                let size1 = scalar1.size(cx);
+                let size1 = scalar1.memory_size(cx);
                 let align1 = scalar1.align(cx).abi;
-                let size2 = scalar2.size(cx);
+                let size2 = scalar2.memory_size(cx);
                 let align2 = scalar2.align(cx).abi;
                 assert_eq!(
                     offset1,
@@ -203,7 +203,7 @@ pub(super) fn sanity_check_layout<'tcx>(
                     "`ScalarPair` first field at non-0 offset in {inner:#?}",
                 );
                 assert_eq!(
-                    field1.size, size1,
+                    field1.memory_size, size1,
                     "`ScalarPair` first field with bad size in {inner:#?}",
                 );
                 assert_eq!(
@@ -221,7 +221,7 @@ pub(super) fn sanity_check_layout<'tcx>(
                     "`ScalarPair` second field at bad offset in {inner:#?}",
                 );
                 assert_eq!(
-                    field2.size, size2,
+                    field2.memory_size, size2,
                     "`ScalarPair` second field with bad size in {inner:#?}",
                 );
                 assert_eq!(
@@ -250,11 +250,11 @@ pub(super) fn sanity_check_layout<'tcx>(
             assert!(matches!(variant.variants, Variants::Single { .. }));
             // Variants should have the same or a smaller size as the full thing,
             // and same for alignment.
-            if variant.size > layout.size {
+            if variant.memory_size > layout.memory_size {
                 bug!(
                     "Type with size {} bytes has variant with size {} bytes: {layout:#?}",
-                    layout.size.bytes(),
-                    variant.size.bytes(),
+                    layout.memory_size.bytes(),
+                    variant.memory_size.bytes(),
                 )
             }
             if variant.align.abi > layout.align.abi {
@@ -265,7 +265,7 @@ pub(super) fn sanity_check_layout<'tcx>(
                 )
             }
             // Skip empty variants.
-            if variant.size == Size::ZERO
+            if variant.memory_size == Size::ZERO
                 || variant.fields.count() == 0
                 || variant.abi.is_uninhabited()
             {
@@ -278,7 +278,7 @@ pub(super) fn sanity_check_layout<'tcx>(
             }
             // The top-level ABI and the ABI of the variants should be coherent.
             let scalar_coherent =
-                |s1: Scalar, s2: Scalar| s1.size(cx) == s2.size(cx) && s1.align(cx) == s2.align(cx);
+                |s1: Scalar, s2: Scalar| s1.data_size(cx) == s2.data_size(cx) && s1.memory_size(cx) == s2.memory_size(cx) && s1.align(cx) == s2.align(cx);
             let abi_coherent = match (layout.abi, variant.abi) {
                 (Abi::Scalar(s1), Abi::Scalar(s2)) => scalar_coherent(s1, s2),
                 (Abi::ScalarPair(a1, b1), Abi::ScalarPair(a2, b2)) => {

@@ -108,7 +108,7 @@ impl CodeStats {
         // Except for Generators, whose variants are already sorted according to
         // their yield points in `variant_info_for_generator`.
         if kind != DataTypeKind::Generator {
-            variants.sort_by_key(|info| cmp::Reverse(info.size));
+            variants.sort_by_key(|info| cmp::Reverse(info.memory_size));
         }
         let info = TypeSizeInfo {
             kind,
@@ -184,10 +184,10 @@ impl CodeStats {
 
                 // We want to print fields by increasing offset. We also want
                 // zero-sized fields before non-zero-sized fields, otherwise
-                // the loop below goes wrong; hence the `f.size` in the sort
-                // key.
+                // the loop below goes wrong; hence the `f.memory_size` in the
+                // sort key.
                 let mut fields = fields.clone();
-                fields.sort_by_key(|f| (f.offset, f.size));
+                fields.sort_by_key(|f| (f.offset, f.memory_size));
 
                 for field in fields {
                     let FieldInfo { kind, ref name, offset, size, align } = field;

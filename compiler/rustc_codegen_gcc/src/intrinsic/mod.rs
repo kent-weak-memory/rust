@@ -273,17 +273,17 @@ impl<'a, 'gcc, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'a, 'gcc, 'tcx> {
                             // For rusty ABIs, small aggregates are actually passed
                             // as `RegKind::Integer` (see `FnAbi::adjust_for_abi`),
                             // so we re-use that same threshold here.
-                            layout.size() <= self.data_layout().pointer_size * 2
+                            layout.memory_size() <= self.data_layout().pointer_data_size * 2
                         }
                     };
 
                     let a = args[0].immediate();
                     let b = args[1].immediate();
-                    if layout.size().bytes() == 0 {
+                    if layout.memory_size().bytes() == 0 {
                         self.const_bool(true)
                     }
                     /*else if use_integer_compare {
-                        let integer_ty = self.type_ix(layout.size.bits()); // FIXME(antoyo): LLVM creates an integer of 96 bits for [i32; 3], but gcc doesn't support this, so it creates an integer of 128 bits.
+                        let integer_ty = self.type_ix(layout.memory_size.bits()); // FIXME(antoyo): LLVM creates an integer of 96 bits for [i32; 3], but gcc doesn't support this, so it creates an integer of 128 bits.
                         let ptr_ty = self.type_ptr_to(integer_ty);
                         let a_ptr = self.bitcast(a, ptr_ty);
                         let a_val = self.load(integer_ty, a_ptr, layout.align.abi);
@@ -295,7 +295,7 @@ impl<'a, 'gcc, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'a, 'gcc, 'tcx> {
                         let void_ptr_type = self.context.new_type::<*const ()>();
                         let a_ptr = self.bitcast(a, void_ptr_type);
                         let b_ptr = self.bitcast(b, void_ptr_type);
-                        let n = self.context.new_cast(None, self.const_usize(layout.size().bytes()), self.sizet_type);
+                        let n = self.context.new_cast(None, self.const_usize(layout.memory_size().bytes()), self.sizet_type);
                         let builtin = self.context.get_builtin_function("memcmp");
                         let cmp = self.context.new_call(None, builtin, &[a_ptr, b_ptr, n]);
                         self.icmp(IntPredicate::IntEQ, cmp, self.const_i32(0))
@@ -473,7 +473,7 @@ impl<'gcc, 'tcx> ArgAbiExt<'gcc, 'tcx> for ArgAbi<'tcx, Ty<'tcx>> {
                     self.layout.align.abi,
                     llscratch,
                     scratch_align,
-                    bx.const_usize(self.layout.size.bytes()),
+                    bx.const_usize(self.layout.memory_size.bytes()),
                     MemFlags::empty(),
                 );
 
@@ -511,7 +511,7 @@ fn int_type_width_signed<'gcc, 'tcx>(ty: Ty<'tcx>, cx: &CodegenCx<'gcc, 'tcx>) -
     match ty.kind() {
         ty::Int(t) => Some((
             match t {
-                rustc_middle::ty::IntTy::Isize => u64::from(cx.tcx.sess.target.pointer_width),
+                rustc_middle::ty::IntTy::Isize => u64::from(cx.tcx.sess.target.pointer_data_size),
                 rustc_middle::ty::IntTy::I8 => 8,
                 rustc_middle::ty::IntTy::I16 => 16,
                 rustc_middle::ty::IntTy::I32 => 32,
@@ -522,7 +522,7 @@ fn int_type_width_signed<'gcc, 'tcx>(ty: Ty<'tcx>, cx: &CodegenCx<'gcc, 'tcx>) -
         )),
         ty::Uint(t) => Some((
             match t {
-                rustc_middle::ty::UintTy::Usize => u64::from(cx.tcx.sess.target.pointer_width),
+                rustc_middle::ty::UintTy::Usize => u64::from(cx.tcx.sess.target.pointer_data_size),
                 rustc_middle::ty::UintTy::U8 => 8,
                 rustc_middle::ty::UintTy::U16 => 16,
                 rustc_middle::ty::UintTy::U32 => 32,

@@ -284,7 +284,7 @@ fn adjust_for_rust_scalar<'tcx>(
                 | PointerKind::SharedRef { frozen: false }
                 | PointerKind::MutableRef { unpin: false } => Size::ZERO,
                 PointerKind::SharedRef { frozen: true }
-                | PointerKind::MutableRef { unpin: true } => pointee.size,
+                | PointerKind::MutableRef { unpin: true } => pointee.memory_size,
             };
 
             // The aliasing rules for `Box<T>` are still not decided, but currently we emit
@@ -515,14 +515,21 @@ fn fn_abi_adjust_for_abi<'tcx>(
                 _ => return,
             }
 
-            let size = arg.layout.size;
-            if arg.layout.is_unsized() || size > Pointer(AddressSpace::DATA).size(cx) {
+            // Use data size when available:
+            // - integers less that fit usize will fit registers
+            // - pointers, even when using CHERI capabilities, will fit registers
+            // - aggregates that fit usize will fit registers
+            // - everything else is too big, even if it would technically fit in a
+            //   capability register
+            // TODO(seharris): can we use 128 bit capability registers for other things?
+            let data_size = arg.layout.data_size.unwrap_or(arg.layout.memory_size);
+            if arg.layout.is_unsized() || data_size > cx.data_layout.pointer_data_size {
                 arg.make_indirect();
             } else {
                 // We want to pass small aggregates as immediates, but using
                 // a LLVM aggregate type for this leads to bad optimizations,
                 // so we pick an appropriately sized integer type instead.
-                arg.cast_to(Reg { kind: RegKind::Integer, size });
+                arg.cast_to(Reg { kind: RegKind::Integer, size: arg.layout.memory_size });
             }
 
             // If we deduced that this parameter was read-only, add that to the attribute list now.

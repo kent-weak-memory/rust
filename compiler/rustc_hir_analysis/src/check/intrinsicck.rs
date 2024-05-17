@@ -58,7 +58,7 @@ impl<'a, 'tcx> InlineAsmCtxt<'a, 'tcx> {
         if ty.has_non_region_infer() {
             bug!("inference variable in asm operand ty: {:?} {:?}", expr, ty);
         }
-        let asm_ty_isize = match self.tcx.sess.target.pointer_width {
+        let asm_ty_isize = match self.tcx.sess.target.pointer_memory_size {
             16 => InlineAsmType::I16,
             32 => InlineAsmType::I32,
             64 => InlineAsmType::I64,
@@ -114,7 +114,7 @@ impl<'a, 'tcx> InlineAsmCtxt<'a, 'tcx> {
                         Some(InlineAsmType::VecI128(size))
                     }
                     ty::Int(IntTy::Isize) | ty::Uint(UintTy::Usize) => {
-                        Some(match self.tcx.sess.target.pointer_width {
+                        Some(match self.tcx.sess.target.pointer_memory_size {
                             16 => InlineAsmType::VecI16(size),
                             32 => InlineAsmType::VecI32(size),
                             64 => InlineAsmType::VecI64(size),

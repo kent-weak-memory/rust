@@ -117,7 +117,7 @@ fn uncached_gcc_type<'gcc, 'tcx>(cx: &CodegenCx<'gcc, 'tcx>, layout: TyAndLayout
 
     match layout.fields {
         FieldsShape::Primitive | FieldsShape::Union(_) => {
-            let fill = cx.type_padding_filler(layout.size, layout.align.abi);
+            let fill = cx.type_padding_filler(layout.memory_size, layout.align.abi);
             let packed = false;
             match name {
                 None => cx.type_struct(&[fill], packed),
@@ -311,7 +311,7 @@ impl<'tcx> LayoutGccExt<'tcx> for TyAndLayout<'tcx> {
                 Size::ZERO
             }
             else {
-                a.size(cx).align_to(b.align(cx).abi)
+                a.memory_size(cx).align_to(b.align(cx).abi)
             };
         self.scalar_gcc_type_at(cx, scalar, offset)
     }

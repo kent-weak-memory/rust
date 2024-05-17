@@ -82,7 +82,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     .layout
                     .pointee_info_at(bx, rustc_target::abi::Size::ZERO)
                     .expect("Expected pointer");
-                let bytes = bx.mul(count, bx.const_usize(pointee_layout.size.bytes()));
+                let bytes = bx.mul(count, bx.const_usize(pointee_layout.memory_size.bytes()));
 
                 let align = pointee_layout.align;
                 let dst = dst_val.immediate();

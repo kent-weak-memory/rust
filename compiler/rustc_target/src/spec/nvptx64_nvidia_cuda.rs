@@ -5,7 +5,8 @@ pub fn target() -> Target {
         arch: "nvptx64".into(),
         data_layout: "e-i64:64-i128:128-v16:16-v32:32-n16:32:64".into(),
         llvm_target: "nvptx64-nvidia-cuda".into(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memory_size: 64,
 
         options: TargetOptions {
             os: "cuda".into(),

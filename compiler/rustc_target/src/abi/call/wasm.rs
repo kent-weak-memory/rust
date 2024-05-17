@@ -8,7 +8,7 @@ where
 {
     if val.layout.is_aggregate() {
         if let Some(unit) = val.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()) {
-            let size = val.layout.size;
+            let size = val.layout.memory_size;
             if unit.size == size {
                 val.cast_to(Uniform { unit, total: size });
                 return true;

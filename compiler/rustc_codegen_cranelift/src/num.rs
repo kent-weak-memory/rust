@@ -386,7 +386,7 @@ pub(crate) fn codegen_ptr_binop<'tcx>(
             BinOp::Offset => {
                 let pointee_ty = in_lhs.layout().ty.builtin_deref(true).unwrap().ty;
                 let (base, offset) = (in_lhs, in_rhs.load_scalar(fx));
-                let pointee_size = fx.layout_of(pointee_ty).size.bytes();
+                let pointee_size = fx.layout_of(pointee_ty).memory_size.bytes();
                 let ptr_diff = fx.bcx.ins().imul_imm(offset, pointee_size as i64);
                 let base_val = base.load_scalar(fx);
                 let res = fx.bcx.ins().iadd(base_val, ptr_diff);

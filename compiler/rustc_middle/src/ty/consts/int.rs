@@ -28,7 +28,7 @@ impl ConstInt {
 impl std::fmt::Debug for ConstInt {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self { int, signed, is_ptr_sized_integral } = *self;
-        let size = int.size().bytes();
+        let size = int.data_size().bytes();
         let raw = int.data;
         if signed {
             let bit_size = size * 8;
@@ -129,10 +129,16 @@ impl IntoDiagnosticArg for ConstInt {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(packed)]
 pub struct ScalarInt {
-    /// The first `size` bytes of `data` are the value.
+    /// The first `data_size` bytes of `data` are the value.
     /// Do not try to read less or more bytes than that. The remaining bytes must be 0.
     data: u128,
-    size: NonZeroU8,
+    /// Size of data component of value in bytes.
+    data_size: NonZeroU8,
+    /// Size of entire value in bytes, including any metadata that is only
+    /// present at run time.
+    /// This appears on targets like CHERI, which uses the extra space for
+    /// bounds information on pointers.
+    memory_size: NonZeroU8,
 }
 
 // Cannot derive these, as the derives take references to the fields, and we
@@ -144,38 +150,58 @@ impl<CTX> crate::ty::HashStable<CTX> for ScalarInt {
         // Since `Self` is a packed struct, that would create a possibly unaligned reference,
         // which is UB.
         { self.data }.hash_stable(hcx, hasher);
-        self.size.get().hash_stable(hcx, hasher);
+        self.data_size.get().hash_stable(hcx, hasher);
+        self.memory_size.get().hash_stable(hcx, hasher);
     }
 }
 
 impl<S: Encoder> Encodable<S> for ScalarInt {
     fn encode(&self, s: &mut S) {
-        let size = self.size.get();
-        s.emit_u8(size);
-        s.emit_raw_bytes(&self.data.to_le_bytes()[..size as usize]);
+        let data_size = self.data_size.get();
+        s.emit_u8(data_size);
+        s.emit_u8(self.memory_size.get());
+        s.emit_raw_bytes(&self.data.to_le_bytes()[..data_size as usize]);
     }
 }
 
 impl<D: Decoder> Decodable<D> for ScalarInt {
     fn decode(d: &mut D) -> ScalarInt {
         let mut data = [0u8; 16];
-        let size = d.read_u8();
-        data[..size as usize].copy_from_slice(d.read_raw_bytes(size as usize));
-        ScalarInt { data: u128::from_le_bytes(data), size: NonZeroU8::new(size).unwrap() }
+        let data_size = d.read_u8();
+        let memory_size = d.read_u8();
+        data[..data_size as usize].copy_from_slice(d.read_raw_bytes(data_size as usize));
+        ScalarInt {
+            data: u128::from_le_bytes(data),
+            data_size: NonZeroU8::new(data_size).unwrap(),
+            memory_size: NonZeroU8::new(memory_size).unwrap(),
+        }
     }
 }
 
 impl ScalarInt {
-    pub const TRUE: ScalarInt = ScalarInt { data: 1_u128, size: NonZeroU8::new(1).unwrap() };
+    pub const TRUE: ScalarInt = ScalarInt {
+        data: 1_u128,
+        data_size: NonZeroU8::new(1).unwrap(),
+        memory_size: NonZeroU8::new(1).unwrap(),
+    };
 
-    pub const FALSE: ScalarInt = ScalarInt { data: 0_u128, size: NonZeroU8::new(1).unwrap() };
+    pub const FALSE: ScalarInt = ScalarInt {
+        data: 0_u128,
+        data_size: NonZeroU8::new(1).unwrap(),
+        memory_size: NonZeroU8::new(1).unwrap(),
+    };
 
     #[inline]
-    pub fn size(self) -> Size {
-        Size::from_bytes(self.size.get())
+    pub fn data_size(self) -> Size {
+        Size::from_bytes(self.data_size.get())
     }
 
-    /// Make sure the `data` fits in `size`.
+    #[inline]
+    pub fn memory_size(self) -> Size {
+        Size::from_bytes(self.memory_size.get())
+    }
+
+    /// Make sure the `data` fits in `data_size`.
     /// This is guaranteed by all constructors here, but having had this check saved us from
     /// bugs many times in the past, so keeping it around is definitely worth it.
     #[inline(always)]
@@ -186,17 +212,18 @@ impl ScalarInt {
         // is a packed struct, that would create a possibly unaligned reference, which
         // is UB.
         debug_assert_eq!(
-            self.size().truncate(self.data),
+            self.data_size().truncate(self.data),
             { self.data },
             "Scalar value {:#x} exceeds size of {} bytes",
             { self.data },
-            self.size
+            self.data_size
         );
     }
 
     #[inline]
     pub fn null(size: Size) -> Self {
-        Self { data: 0, size: NonZeroU8::new(size.bytes() as u8).unwrap() }
+        let size = NonZeroU8::new(size.bytes() as u8).unwrap();
+        Self { data: 0, data_size: size, memory_size: size }
     }
 
     #[inline]
@@ -205,22 +232,30 @@ impl ScalarInt {
     }
 
     #[inline]
-    pub fn try_from_uint(i: impl Into<u128>, size: Size) -> Option<Self> {
+    pub fn try_from_uint(i: impl Into<u128>, data_size: size, memory_size: Size) -> Option<Self> {
         let data = i.into();
         if size.truncate(data) == data {
-            Some(Self { data, size: NonZeroU8::new(size.bytes() as u8).unwrap() })
+            Some(Self {
+                data,
+                data_size: NonZeroU8::new(data_size.bytes() as u8).unwrap(),
+                memory_size: NonZeroU8::new(memory_size.bytes() as u8).unwrap(),
+            })
         } else {
             None
         }
     }
 
     #[inline]
-    pub fn try_from_int(i: impl Into<i128>, size: Size) -> Option<Self> {
+    pub fn try_from_int(i: impl Into<i128>, data_size: Size, memory_size: Size) -> Option<Self> {
         let i = i.into();
         // `into` performed sign extension, we have to truncate
         let truncated = size.truncate(i as u128);
         if size.sign_extend(truncated) as i128 == i {
-            Some(Self { data: truncated, size: NonZeroU8::new(size.bytes() as u8).unwrap() })
+            Some(Self {
+                data: truncated,
+                data_size: NonZeroU8::new(data_size.bytes() as u8).unwrap(),
+                memory_size: NonZeroU8::new(memory_size.bytes() as u8).unwrap(),
+            })
         } else {
             None
         }
@@ -228,128 +263,139 @@ impl ScalarInt {
 
     #[inline]
     pub fn assert_bits(self, target_size: Size) -> u128 {
-        self.to_bits(target_size).unwrap_or_else(|size| {
-            bug!("expected int of size {}, but got size {}", target_size.bytes(), size.bytes())
+        self.to_bits(target_size).unwrap_or_else(|data_size, memory_size| {
+            bug!("expected int of size {}, but got size {} ({} in memory)", target_size.bytes(), data_size.bytes(), memory_size.bytes())
         })
     }
 
     #[inline]
-    pub fn to_bits(self, target_size: Size) -> Result<u128, Size> {
+    pub fn to_bits(self, target_size: Size) -> Result<u128, (Size, Size)> {
         assert_ne!(target_size.bytes(), 0, "you should never look at the bits of a ZST");
-        if target_size.bytes() == u64::from(self.size.get()) {
+        if target_size.bytes() == u64::from(self.data_size.get()) {
             self.check_data();
             Ok(self.data)
         } else {
-            Err(self.size())
+            Err((self.data_size(), self.memory_size()))
         }
     }
 
     #[inline]
-    pub fn try_to_target_usize(&self, tcx: TyCtxt<'_>) -> Result<u64, Size> {
-        Ok(self.to_bits(tcx.data_layout.pointer_size)? as u64)
+    pub fn try_to_target_usize(&self, tcx: TyCtxt<'_>) -> Result<u64, (Size, Size)> {
+        Ok(self.to_bits(tcx.data_layout.pointer_data_size)? as u64)
     }
 
     /// Tries to convert the `ScalarInt` to an unsigned integer of the given size.
-    /// Fails if the size of the `ScalarInt` is not equal to `size` and returns the
-    /// `ScalarInt`s size in that case.
+    /// Fails if the data size of the `ScalarInt` is not equal to `size` and returns the
+    /// `ScalarInt`s data and memory size in that case.
     #[inline]
-    pub fn try_to_uint(self, size: Size) -> Result<u128, Size> {
+    pub fn try_to_uint(self, size: Size) -> Result<u128, (Size, Size)> {
         self.to_bits(size)
     }
 
-    // Tries to convert the `ScalarInt` to `bool`. Fails if the `size` of the `ScalarInt`
-    // in not equal to `Size { raw: 1 }` or if the value is not 0 or 1 and returns the `size`
-    // value of the `ScalarInt` in that case.
+    /// Tries to convert the `ScalarInt` to `bool`.
+    /// Fails if the `data_size` of the `ScalarInt` is not equal to
+    /// `Size { raw: 1 }` or if the value is not 0 or 1 and returns the
+    /// `data_size` and `memory_size` pair of the `ScalarInt` in that case.
     #[inline]
-    pub fn try_to_bool(self) -> Result<bool, Size> {
+    pub fn try_to_bool(self) -> Result<bool, (Size, Size)> {
         match self.try_to_u8()? {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(self.size()),
+            _ => Err((self.data_size(), self.memory_size())),
         }
     }
 
-    // Tries to convert the `ScalarInt` to `u8`. Fails if the `size` of the `ScalarInt`
-    // in not equal to `Size { raw: 1 }` and returns the `size` value of the `ScalarInt` in
-    // that case.
+    /// Tries to convert the `ScalarInt` to `u8`.
+    /// Fails if the `data_size` of the `ScalarInt` in not equal to
+    /// `Size { raw: 1 }` and returns the `data_size` and `memory_size` pair of
+    /// the `ScalarInt` in that case.
     #[inline]
-    pub fn try_to_u8(self) -> Result<u8, Size> {
+    pub fn try_to_u8(self) -> Result<u8, (Size, Size)> {
         self.to_bits(Size::from_bits(8)).map(|v| u8::try_from(v).unwrap())
     }
 
-    /// Tries to convert the `ScalarInt` to `u16`. Fails if the size of the `ScalarInt`
-    /// in not equal to `Size { raw: 2 }` and returns the `size` value of the `ScalarInt` in
-    /// that case.
+    /// Tries to convert the `ScalarInt` to `u16`.
+    /// Fails if the data size of the `ScalarInt` is not equal to
+    /// `Size { raw: 2 }` and returns the `data_size` and `memory_size` pair of
+    /// the `ScalarInt` in that case.
     #[inline]
-    pub fn try_to_u16(self) -> Result<u16, Size> {
+    pub fn try_to_u16(self) -> Result<u16, (Size, Size)> {
         self.to_bits(Size::from_bits(16)).map(|v| u16::try_from(v).unwrap())
     }
 
-    /// Tries to convert the `ScalarInt` to `u32`. Fails if the `size` of the `ScalarInt`
-    /// in not equal to `Size { raw: 4 }` and returns the `size` value of the `ScalarInt` in
-    /// that case.
+    /// Tries to convert the `ScalarInt` to `u32`.
+    /// Fails if the `data_size` of the `ScalarInt` is not equal to
+    /// `Size { raw: 4 }` and returns the `data_size` and `memory_size` pair of
+    /// the `ScalarInt` in that case.
     #[inline]
-    pub fn try_to_u32(self) -> Result<u32, Size> {
+    pub fn try_to_u32(self) -> Result<u32, (Size, Size)> {
         self.to_bits(Size::from_bits(32)).map(|v| u32::try_from(v).unwrap())
     }
 
-    /// Tries to convert the `ScalarInt` to `u64`. Fails if the `size` of the `ScalarInt`
-    /// in not equal to `Size { raw: 8 }` and returns the `size` value of the `ScalarInt` in
-    /// that case.
+    /// Tries to convert the `ScalarInt` to `u64`.
+    /// Fails if the `data_size` of the `ScalarInt` is not equal to
+    /// `Size { raw: 8 }` and returns the `data_size` and `memory_size` pair of
+    /// the `ScalarInt` in that case.
     #[inline]
-    pub fn try_to_u64(self) -> Result<u64, Size> {
+    pub fn try_to_u64(self) -> Result<u64, (Size, Size)> {
         self.to_bits(Size::from_bits(64)).map(|v| u64::try_from(v).unwrap())
     }
 
-    /// Tries to convert the `ScalarInt` to `u128`. Fails if the `size` of the `ScalarInt`
-    /// in not equal to `Size { raw: 16 }` and returns the `size` value of the `ScalarInt` in
-    /// that case.
+    /// Tries to convert the `ScalarInt` to `u128`.
+    /// Fails if the `data_size` of the `ScalarInt` is not equal to
+    /// `Size { raw: 16 }` and returns the `data_size` and `memory_size` pair of
+    /// the `ScalarInt` in that case.
     #[inline]
-    pub fn try_to_u128(self) -> Result<u128, Size> {
+    pub fn try_to_u128(self) -> Result<u128, (Size, Size)> {
         self.to_bits(Size::from_bits(128))
     }
 
     /// Tries to convert the `ScalarInt` to a signed integer of the given size.
-    /// Fails if the size of the `ScalarInt` is not equal to `size` and returns the
-    /// `ScalarInt`s size in that case.
+    /// Fails if the data size of the `ScalarInt` is not equal to `size` and
+    /// returns the `ScalarInt`s data and memory size in that case.
     #[inline]
-    pub fn try_to_int(self, size: Size) -> Result<i128, Size> {
+    pub fn try_to_int(self, size: Size) -> Result<i128, (Size, Size)> {
         let b = self.to_bits(size)?;
         Ok(size.sign_extend(b) as i128)
     }
 
     /// Tries to convert the `ScalarInt` to i8.
-    /// Fails if the size of the `ScalarInt` is not equal to `Size { raw: 1 }`
-    /// and returns the `ScalarInt`s size in that case.
-    pub fn try_to_i8(self) -> Result<i8, Size> {
+    /// Fails if the data size of the `ScalarInt` is not equal to
+    /// `Size { raw: 1 }` and returns the `ScalarInt`s data and memory size in
+    /// that case.
+    pub fn try_to_i8(self) -> Result<i8, (Size, Size)> {
         self.try_to_int(Size::from_bits(8)).map(|v| i8::try_from(v).unwrap())
     }
 
     /// Tries to convert the `ScalarInt` to i16.
-    /// Fails if the size of the `ScalarInt` is not equal to `Size { raw: 2 }`
-    /// and returns the `ScalarInt`s size in that case.
-    pub fn try_to_i16(self) -> Result<i16, Size> {
+    /// Fails if the data size of the `ScalarInt` is not equal to
+    /// `Size { raw: 2 }` and returns the `ScalarInt`s data and memory size in
+    /// that case.
+    pub fn try_to_i16(self) -> Result<i16, (Size, Size)> {
         self.try_to_int(Size::from_bits(16)).map(|v| i16::try_from(v).unwrap())
     }
 
     /// Tries to convert the `ScalarInt` to i32.
-    /// Fails if the size of the `ScalarInt` is not equal to `Size { raw: 4 }`
-    /// and returns the `ScalarInt`s size in that case.
-    pub fn try_to_i32(self) -> Result<i32, Size> {
+    /// Fails if the data size of the `ScalarInt` is not equal to
+    /// `Size { raw: 4 }` and returns the `ScalarInt`s data and memory size in
+    /// that case.
+    pub fn try_to_i32(self) -> Result<i32, (Size, Size)> {
         self.try_to_int(Size::from_bits(32)).map(|v| i32::try_from(v).unwrap())
     }
 
     /// Tries to convert the `ScalarInt` to i64.
-    /// Fails if the size of the `ScalarInt` is not equal to `Size { raw: 8 }`
-    /// and returns the `ScalarInt`s size in that case.
-    pub fn try_to_i64(self) -> Result<i64, Size> {
+    /// Fails if the data size of the `ScalarInt` is not equal to
+    /// `Size { raw: 8 }` and returns the `ScalarInt`s data and memory size in
+    /// that case.
+    pub fn try_to_i64(self) -> Result<i64, (Size, Size)> {
         self.try_to_int(Size::from_bits(64)).map(|v| i64::try_from(v).unwrap())
     }
 
     /// Tries to convert the `ScalarInt` to i128.
-    /// Fails if the size of the `ScalarInt` is not equal to `Size { raw: 16 }`
-    /// and returns the `ScalarInt`s size in that case.
-    pub fn try_to_i128(self) -> Result<i128, Size> {
+    /// Fails if the data size of the `ScalarInt` is not equal to
+    /// `Size { raw: 16 }` and returns the `ScalarInt`s data and memory size in
+    /// that case.
+    pub fn try_to_i128(self) -> Result<i128, (Size, Size)> {
         self.try_to_int(Size::from_bits(128))
     }
 }
@@ -360,10 +406,8 @@ macro_rules! from {
             impl From<$ty> for ScalarInt {
                 #[inline]
                 fn from(u: $ty) -> Self {
-                    Self {
-                        data: u128::from(u),
-                        size: NonZeroU8::new(std::mem::size_of::<$ty>() as u8).unwrap(),
-                    }
+                    let size = NonZeroU8::new(std::mem::size_of::<$ty>() as u8).unwrap();
+                    Self { data: u128::from(u), data_size: size, memory_size: size }
                 }
             }
         )*
@@ -374,9 +418,9 @@ macro_rules! try_from {
     ($($ty:ty),*) => {
         $(
             impl TryFrom<ScalarInt> for $ty {
-                type Error = Size;
+                type Error = (Size, Size);
                 #[inline]
-                fn try_from(int: ScalarInt) -> Result<Self, Size> {
+                fn try_from(int: ScalarInt) -> Result<Self, (Size, Size)> {
                     // The `unwrap` cannot fail because to_bits (if it succeeds)
                     // is guaranteed to return a value that fits into the size.
                     int.to_bits(Size::from_bytes(std::mem::size_of::<$ty>()))
@@ -391,13 +435,13 @@ from!(u8, u16, u32, u64, u128, bool);
 try_from!(u8, u16, u32, u64, u128);
 
 impl TryFrom<ScalarInt> for bool {
-    type Error = Size;
+    type Error = (Size, Size);
     #[inline]
-    fn try_from(int: ScalarInt) -> Result<Self, Size> {
+    fn try_from(int: ScalarInt) -> Result<Self, (Size, Size)> {
         int.to_bits(Size::from_bytes(1)).and_then(|u| match u {
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(Size::from_bytes(1)),
+            _ => Err((Size::from_bytes(1), Size::from_bytes(1))),
         })
     }
 }
@@ -405,7 +449,8 @@ impl TryFrom<ScalarInt> for bool {
 impl From<char> for ScalarInt {
     #[inline]
     fn from(c: char) -> Self {
-        Self { data: c as u128, size: NonZeroU8::new(std::mem::size_of::<char>() as u8).unwrap() }
+        let size = NonZeroU8::new(std::mem::size_of::<char>() as u8).unwrap();
+        Self { data: c as u128, data_size: size, memory_size: size }
     }
 }
 
@@ -432,14 +477,15 @@ impl From<Single> for ScalarInt {
     #[inline]
     fn from(f: Single) -> Self {
         // We trust apfloat to give us properly truncated data.
-        Self { data: f.to_bits(), size: NonZeroU8::new((Single::BITS / 8) as u8).unwrap() }
+        let size = NonZeroU8::new((Single::BITS / 8) as u8).unwrap();
+        Self { data: f.to_bits(), data_size: size, memory_size: size }
     }
 }
 
 impl TryFrom<ScalarInt> for Single {
-    type Error = Size;
+    type Error = (Size, Size);
     #[inline]
-    fn try_from(int: ScalarInt) -> Result<Self, Size> {
+    fn try_from(int: ScalarInt) -> Result<Self, (Size, Size)> {
         int.to_bits(Size::from_bytes(4)).map(Self::from_bits)
     }
 }
@@ -448,12 +494,13 @@ impl From<Double> for ScalarInt {
     #[inline]
     fn from(f: Double) -> Self {
         // We trust apfloat to give us properly truncated data.
-        Self { data: f.to_bits(), size: NonZeroU8::new((Double::BITS / 8) as u8).unwrap() }
+        let size = NonZeroU8::new((Double::BITS / 8) as u8).unwrap();
+        Self { data: f.to_bits(), data_size: size, memory_size: size }
     }
 }
 
 impl TryFrom<ScalarInt> for Double {
-    type Error = Size;
+    type Error = (Size, Size);
     #[inline]
     fn try_from(int: ScalarInt) -> Result<Self, Size> {
         int.to_bits(Size::from_bytes(8)).map(Self::from_bits)
@@ -474,28 +521,28 @@ impl fmt::LowerHex for ScalarInt {
             // Like regular ints, alternate flag adds leading `0x`.
             write!(f, "0x")?;
         }
-        // Format as hex number wide enough to fit any value of the given `size`.
+        // Format as hex number wide enough to fit any value of the given `data_size`.
         // So data=20, size=1 will be "0x14", but with size=4 it'll be "0x00000014".
         // Using a block `{self.data}` here to force a copy instead of using `self.data`
         // directly, because `write!` takes references to its formatting arguments and
         // would thus borrow `self.data`. Since `Self`
         // is a packed struct, that would create a possibly unaligned reference, which
         // is UB.
-        write!(f, "{:01$x}", { self.data }, self.size.get() as usize * 2)
+        write!(f, "{:01$x}", { self.data }, self.data_size.get() as usize * 2)
     }
 }
 
 impl fmt::UpperHex for ScalarInt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.check_data();
-        // Format as hex number wide enough to fit any value of the given `size`.
+        // Format as hex number wide enough to fit any value of the given `data_size`.
         // So data=20, size=1 will be "0x14", but with size=4 it'll be "0x00000014".
         // Using a block `{self.data}` here to force a copy instead of using `self.data`
         // directly, because `write!` takes references to its formatting arguments and
         // would thus borrow `self.data`. Since `Self`
         // is a packed struct, that would create a possibly unaligned reference, which
         // is UB.
-        write!(f, "{:01$X}", { self.data }, self.size.get() as usize * 2)
+        write!(f, "{:01$X}", { self.data }, self.data_size.get() as usize * 2)
     }
 }
 

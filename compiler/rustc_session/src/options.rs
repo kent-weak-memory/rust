@@ -1262,6 +1262,10 @@ options! {
     // - compiler/rustc_interface/src/tests.rs
     // - src/doc/rustc/src/codegen-options/index.md
 
+    // EXPERIMENTAL: drop compiler emitted bounds checks.
+    drop_bounds_checks: bool = (false, parse_bool, [TRACKED],
+        "EXPERIMENTAL: drop compiler emitted bounds checks (default: no)"),
+
     // tidy-alphabetical-start
     ar: String = (String::new(), parse_string, [UNTRACKED],
         "this option is deprecated and does nothing"),

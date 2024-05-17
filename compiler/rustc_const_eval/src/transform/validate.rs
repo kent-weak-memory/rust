@@ -927,7 +927,7 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
             TerminatorKind::SwitchInt { targets, discr } => {
                 let switch_ty = discr.ty(&self.body.local_decls, self.tcx);
 
-                let target_width = self.tcx.sess.target.pointer_width;
+                let target_width = self.tcx.sess.target.pointer_data_size;
 
                 let size = Size::from_bits(match switch_ty.kind() {
                     ty::Uint(uint) => uint.normalize(target_width).bit_width().unwrap(),

@@ -166,7 +166,7 @@ pub(crate) fn codegen_const_value<'tcx>(
                     place.to_cvalue(fx)
                 }
             }
-            Scalar::Ptr(ptr, _size) => {
+            Scalar::Ptr(ptr, _data_size, _memory_size) => {
                 let (alloc_id, offset) = ptr.into_parts(); // we know the `offset` is relative
                 let base_addr = match fx.tcx.global_alloc(alloc_id) {
                     GlobalAlloc::Memory(alloc) => {
@@ -422,7 +422,7 @@ fn define_all_allocs(tcx: TyCtxt<'_>, module: &mut dyn Module, cx: &mut Constant
             let addend = {
                 let endianness = tcx.data_layout.endian;
                 let offset = offset.bytes() as usize;
-                let ptr_size = tcx.data_layout.pointer_size;
+                let ptr_size = tcx.data_layout.pointer_data_size;
                 let bytes = &alloc.inspect_with_uninit_and_ptr_outside_interpreter(
                     offset..offset + ptr_size.bytes() as usize,
                 );
@@ -510,7 +510,7 @@ pub(crate) fn mir_operand_get_const_val<'tcx>(
                                         return None;
                                     }
                                     let const_val = mir_operand_get_const_val(fx, operand)?;
-                                    if fx.layout_of(*ty).size
+                                    if fx.layout_of(*ty).data_size.unwrap()
                                         != const_val.try_to_scalar_int()?.size()
                                     {
                                         return None;

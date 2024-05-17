@@ -21,12 +21,12 @@ pub(crate) fn lit_to_const<'tcx>(
                     format!("couldn't compute width of literal: {:?}", lit_input.lit),
                 ))
             })?
-            .size;
+            .memory_size;
         trace!("trunc {} with size {} and shift {}", n, width.bits(), 128 - width.bits());
         let result = width.truncate(n);
         trace!("trunc result: {}", result);
 
-        Ok(ScalarInt::try_from_uint(result, width)
+        Ok(ScalarInt::try_from_uint(result, width, width)
             .unwrap_or_else(|| bug!("expected to create ScalarInt from uint {:?}", result)))
     };
 

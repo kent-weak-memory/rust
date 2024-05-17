@@ -7,7 +7,8 @@ use crate::spec::{Cc, LinkerFlavor, Lld, PanicStrategy, RelocModel, Target, Targ
 pub fn target() -> Target {
     Target {
         llvm_target: "mipsel-unknown-none".into(),
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memory_size: 32,
         data_layout: "e-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64".into(),
         arch: "mips".into(),
 

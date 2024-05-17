@@ -100,7 +100,7 @@ fn layout_of_uncached<'tcx>(
     let param_env = cx.param_env;
     let dl = cx.data_layout();
     let scalar_unit = |value: Primitive| {
-        let size = value.size(dl);
+        let size = value.data_size(dl).unwrap();
         assert!(size.bits() <= 128);
         Scalar::Initialized { value, valid_range: WrappingRange::full(size) }
     };
@@ -238,8 +238,8 @@ fn layout_of_uncached<'tcx>(
                 .try_eval_target_usize(tcx, param_env)
                 .ok_or_else(|| error(cx, LayoutError::Unknown(ty)))?;
             let element = cx.layout_of(element)?;
-            let size = element
-                .size
+            let memory_size = element
+                .memory_size
                 .checked_mul(count, dl)
                 .ok_or_else(|| error(cx, LayoutError::SizeOverflow(ty)))?;
 
@@ -253,22 +253,22 @@ fn layout_of_uncached<'tcx>(
 
             tcx.mk_layout(LayoutS {
                 variants: Variants::Single { index: FIRST_VARIANT },
-                fields: FieldsShape::Array { stride: element.size, count },
+                fields: FieldsShape::Array { stride: element.memory_size, count },
                 abi,
                 largest_niche,
                 align: element.align,
-                size,
+                memory_size,
             })
         }
         ty::Slice(element) => {
             let element = cx.layout_of(element)?;
             tcx.mk_layout(LayoutS {
                 variants: Variants::Single { index: FIRST_VARIANT },
-                fields: FieldsShape::Array { stride: element.size, count: 0 },
+                fields: FieldsShape::Array { stride: element.memory_size, count: 0 },
                 abi: Abi::Aggregate { sized: false },
                 largest_niche: None,
                 align: element.align,
-                size: Size::ZERO,
+                memory_size: Size::ZERO,
             })
         }
         ty::Str => tcx.mk_layout(LayoutS {
@@ -277,7 +277,7 @@ fn layout_of_uncached<'tcx>(
             abi: Abi::Aggregate { sized: false },
             largest_niche: None,
             align: dl.i8_align,
-            size: Size::ZERO,
+            memory_size: Size::ZERO,
         }),
 
         // Odd unit types.
@@ -410,18 +410,18 @@ fn layout_of_uncached<'tcx>(
             };
 
             // Compute the size and alignment of the vector:
-            let size = e_ly
-                .size
+            let memory_size = e_ly
+                .memory_size
                 .checked_mul(e_len, dl)
                 .ok_or_else(|| error(cx, LayoutError::SizeOverflow(ty)))?;
-            let align = dl.vector_align(size);
-            let size = size.align_to(align.abi);
+            let align = dl.vector_align(memory_size);
+            let memory_size = memory_size.align_to(align.abi);
 
             // Compute the placement of the vector fields:
             let fields = if is_array {
                 FieldsShape::Arbitrary { offsets: [Size::ZERO].into(), memory_index: [0].into() }
             } else {
-                FieldsShape::Array { stride: e_ly.size, count: e_len }
+                FieldsShape::Array { stride: e_ly.memory_size, count: e_len }
             };
 
             tcx.mk_layout(LayoutS {
@@ -429,7 +429,7 @@ fn layout_of_uncached<'tcx>(
                 fields,
                 abi: Abi::Vector { element: e_abi, count: e_len },
                 largest_niche: e_ly.largest_niche,
-                size,
+                memory_size,
                 align,
             })
         }
@@ -736,7 +736,7 @@ fn generator_layout<'tcx>(
         StructKind::AlwaysSized,
     )?;
 
-    let (prefix_size, prefix_align) = (prefix.size, prefix.align);
+    let (prefix_size, prefix_align) = (prefix.memory_size, prefix.align);
 
     // Split the prefix layout into the "outer" fields (upvars and
     // discriminant) and the "promoted" fields. Promoted fields will
@@ -775,7 +775,7 @@ fn generator_layout<'tcx>(
         _ => bug!(),
     };
 
-    let mut size = prefix.size;
+    let mut memory_size = prefix.memory_size;
     let mut align = prefix.align;
     let variants = info
         .variant_fields
@@ -853,13 +853,13 @@ fn generator_layout<'tcx>(
                 memory_index: combined_memory_index,
             };
 
-            size = size.max(variant.size);
+            memory_size = memory_size.max(variant.memory_size);
             align = align.max(variant.align);
             Ok(variant)
         })
         .try_collect::<IndexVec<VariantIdx, _>>()?;
 
-    size = size.align_to(align.abi);
+    memory_size = memory_size.align_to(align.abi);
 
     let abi = if prefix.abi.is_uninhabited() || variants.iter().all(|v| v.abi.is_uninhabited()) {
         Abi::Uninhabited
@@ -877,7 +877,7 @@ fn generator_layout<'tcx>(
         fields: outer_fields,
         abi,
         largest_niche: prefix.largest_niche,
-        size,
+        memory_size,
         align,
     });
     debug!("generator layout ({:?}): {:#?}", ty, layout);
@@ -913,7 +913,7 @@ fn record_layout_for_printing_outlined<'tcx>(
             kind,
             type_desc,
             layout.align.abi,
-            layout.size,
+            layout.memory_size,
             packed,
             opt_discr_size,
             variants,
@@ -961,12 +961,12 @@ fn variant_info_for_adt<'tcx>(
             .map(|(i, &name)| {
                 let field_layout = layout.field(cx, i);
                 let offset = layout.fields.offset(i);
-                min_size = min_size.max(offset + field_layout.size);
+                min_size = min_size.max(offset + field_layout.memory_size);
                 FieldInfo {
                     kind: FieldKind::AdtField,
                     name,
                     offset: offset.bytes(),
-                    size: field_layout.size.bytes(),
+                    size: field_layout.memory_size.bytes(),
                     align: field_layout.align.abi.bytes(),
                 }
             })
@@ -976,7 +976,7 @@ fn variant_info_for_adt<'tcx>(
             name: n,
             kind: if layout.is_unsized() { SizeKind::Min } else { SizeKind::Exact },
             align: layout.align.abi.bytes(),
-            size: if min_size.bytes() == 0 { layout.size.bytes() } else { min_size.bytes() },
+            size: if min_size.bytes() == 0 { layout.memory_size.bytes() } else { min_size.bytes() },
             fields: field_info,
         }
     };
@@ -1011,7 +1011,7 @@ fn variant_info_for_adt<'tcx>(
             (
                 variant_infos,
                 match tag_encoding {
-                    TagEncoding::Direct => Some(tag.size(cx)),
+                    TagEncoding::Direct => Some(tag.memory_size(cx)),
                     _ => None,
                 },
             )
@@ -1041,12 +1041,12 @@ fn variant_info_for_generator<'tcx>(
         .map(|(field_idx, (_, name))| {
             let field_layout = layout.field(cx, field_idx);
             let offset = layout.fields.offset(field_idx);
-            upvars_size = upvars_size.max(offset + field_layout.size);
+            upvars_size = upvars_size.max(offset + field_layout.memory_size);
             FieldInfo {
                 kind: FieldKind::Upvar,
                 name: *name,
                 offset: offset.bytes(),
-                size: field_layout.size.bytes(),
+                size: field_layout.memory_size.bytes(),
                 align: field_layout.align.abi.bytes(),
             }
         })
@@ -1065,7 +1065,7 @@ fn variant_info_for_generator<'tcx>(
                     let field_layout = variant_layout.field(cx, field_idx);
                     let offset = variant_layout.fields.offset(field_idx);
                     // The struct is as large as the last field's end
-                    variant_size = variant_size.max(offset + field_layout.size);
+                    variant_size = variant_size.max(offset + field_layout.memory_size);
                     FieldInfo {
                         kind: FieldKind::GeneratorLocal,
                         name: generator.field_names[*local].unwrap_or(Symbol::intern(&format!(
@@ -1073,7 +1073,7 @@ fn variant_info_for_generator<'tcx>(
                             local.as_usize()
                         ))),
                         offset: offset.bytes(),
-                        size: field_layout.size.bytes(),
+                        size: field_layout.memory_size.bytes(),
                         align: field_layout.align.abi.bytes(),
                     }
                 })
@@ -1102,7 +1102,7 @@ fn variant_info_for_generator<'tcx>(
             // better, but this "works" for now.
             if layout.fields.offset(tag_field) >= variant_size {
                 variant_size += match tag_encoding {
-                    TagEncoding::Direct => tag.size(cx),
+                    TagEncoding::Direct => tag.memory_size(cx),
                     _ => Size::ZERO,
                 };
             }
@@ -1128,7 +1128,7 @@ fn variant_info_for_generator<'tcx>(
     (
         variant_infos,
         match tag_encoding {
-            TagEncoding::Direct => Some(tag.size(cx)),
+            TagEncoding::Direct => Some(tag.memory_size(cx)),
             _ => None,
         },
     )

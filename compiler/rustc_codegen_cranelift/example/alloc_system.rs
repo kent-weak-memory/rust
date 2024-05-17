@@ -21,7 +21,7 @@ mod realloc_fallback {
             let new_layout = Layout::from_size_align_unchecked(new_size, old_layout.align());
             let new_ptr = GlobalAlloc::alloc(self, new_layout);
             if !new_ptr.is_null() {
-                let size = cmp::min(old_layout.size(), new_size);
+                let size = cmp::min(old_layout.memory_size(), new_size);
                 ptr::copy_nonoverlapping(ptr, new_ptr, size);
                 GlobalAlloc::dealloc(self, ptr, old_layout);
             }
@@ -48,7 +48,7 @@ mod platform {
         unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
             let ptr = self.alloc(layout.clone());
             if !ptr.is_null() {
-                ptr::write_bytes(ptr, 0, layout.size());
+                ptr::write_bytes(ptr, 0, layout.memory_size());
             }
             ptr
         }
@@ -63,7 +63,7 @@ mod platform {
     }
     unsafe fn aligned_malloc(layout: &Layout) -> *mut u8 {
         let mut out = ptr::null_mut();
-        let ret = posix_memalign(&mut out, layout.align(), layout.size());
+        let ret = posix_memalign(&mut out, layout.align(), layout.memory_size());
         if ret != 0 { ptr::null_mut() } else { out as *mut u8 }
     }
 }
@@ -97,7 +97,7 @@ mod platform {
     }
     #[inline]
     unsafe fn allocate_with_flags(layout: Layout, flags: DWORD) -> *mut u8 {
-        let size = layout.size() + layout.align();
+        let size = layout.memory_size() + layout.align();
         let ptr = HeapAlloc(GetProcessHeap(), flags, size);
         (if ptr.is_null() { ptr } else { align_ptr(ptr, layout.align()) }) as *mut u8
     }

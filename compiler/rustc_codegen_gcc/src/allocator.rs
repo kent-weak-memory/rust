@@ -14,7 +14,7 @@ use crate::GccContext;
 pub(crate) unsafe fn codegen(tcx: TyCtxt<'_>, mods: &mut GccContext, _module_name: &str, kind: AllocatorKind, alloc_error_handler_kind: AllocatorKind) {
     let context = &mods.context;
     let usize =
-        match tcx.sess.target.pointer_width {
+        match tcx.sess.target.pointer_data_size {
             16 => context.new_type::<u16>(),
             32 => context.new_type::<u32>(),
             64 => context.new_type::<u64>(),

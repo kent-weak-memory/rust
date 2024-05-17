@@ -820,7 +820,7 @@ impl<'a, 'tcx> MirVisitor<'tcx> for MirUsedCollector<'a, 'tcx> {
         let ty = self.monomorphize(ty);
         let layout = self.tcx.layout_of(ty::ParamEnv::reveal_all().and(ty));
         if let Ok(layout) = layout {
-            if layout.size > limit {
+            if layout.memory_size > limit {
                 debug!(?layout);
                 let source_info = self.body.source_info(location);
                 debug!(?source_info);
@@ -840,7 +840,7 @@ impl<'a, 'tcx> MirVisitor<'tcx> for MirUsedCollector<'a, 'tcx> {
                     source_info.span,
                     LargeAssignmentsLint {
                         span: source_info.span,
-                        size: layout.size.bytes(),
+                        size: layout.memory_size.bytes(),
                         limit: limit.bytes(),
                     },
                 )
@@ -1382,7 +1382,7 @@ fn collect_const_value<'tcx>(
     output: &mut MonoItems<'tcx>,
 ) {
     match value {
-        ConstValue::Scalar(Scalar::Ptr(ptr, _size)) => collect_miri(tcx, ptr.provenance, output),
+        ConstValue::Scalar(Scalar::Ptr(ptr, _data_size, _memory_size)) => collect_miri(tcx, ptr.provenance, output),
         ConstValue::Slice { data: alloc, start: _, end: _ } | ConstValue::ByRef { alloc, .. } => {
             for &id in alloc.inner().provenance().ptrs().values() {
                 collect_miri(tcx, id, output);

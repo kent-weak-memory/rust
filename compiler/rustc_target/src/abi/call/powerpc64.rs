@@ -25,8 +25,8 @@ where
     arg.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()).and_then(|unit| {
         // ELFv1 only passes one-member aggregates transparently.
         // ELFv2 passes up to eight uniquely addressable members.
-        if (abi == ELFv1 && arg.layout.size > unit.size)
-            || arg.layout.size > unit.size.checked_mul(8, cx).unwrap()
+        if (abi == ELFv1 && arg.layout.memory_size > unit.size)
+            || arg.layout.memory_size > unit.size.checked_mul(8, cx).unwrap()
         {
             return None;
         }
@@ -34,10 +34,10 @@ where
         let valid_unit = match unit.kind {
             RegKind::Integer => false,
             RegKind::Float => true,
-            RegKind::Vector => arg.layout.size.bits() == 128,
+            RegKind::Vector => arg.layout.memory_size.bits() == 128,
         };
 
-        valid_unit.then_some(Uniform { unit, total: arg.layout.size })
+        valid_unit.then_some(Uniform { unit, total: arg.layout.memory_size })
     })
 }
 
@@ -62,7 +62,7 @@ where
         return;
     }
 
-    let size = ret.layout.size;
+    let size = ret.layout.memory_size;
     let bits = size.bits();
     if bits <= 128 {
         let unit = if cx.data_layout().endian == Endian::Big {
@@ -99,7 +99,7 @@ where
         return;
     }
 
-    let size = arg.layout.size;
+    let size = arg.layout.memory_size;
     let (unit, total) = if size.bits() <= 64 {
         // Aggregates smaller than a doubleword should appear in
         // the least-significant bits of the parameter doubleword.

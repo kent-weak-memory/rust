@@ -9,7 +9,7 @@ use rustc_serialize::{Decodable, Encodable};
 use rustc_target::abi::Size;
 use rustc_type_ir::{TyDecoder, TyEncoder};
 
-use super::AllocRange;
+use super::{AllocRange, alloc_range};
 
 type Block = u64;
 
@@ -41,15 +41,15 @@ impl InitMask {
         InitMask { len: size, blocks }
     }
 
-    /// Checks whether the `range` is entirely initialized.
+    /// Checks whether the data part of `range` is entirely initialized.
     ///
     /// Returns `Ok(())` if it's initialized. Otherwise returns a range of byte
     /// indexes for the first contiguous span of the uninitialized access.
     #[inline]
     pub fn is_range_initialized(&self, range: AllocRange) -> Result<(), AllocRange> {
-        let end = range.end();
+        let end = range.end_data_or_memory();
         if end > self.len {
-            return Err(AllocRange::from(self.len..end));
+            return Err(alloc_range(self.len, None, end-self.end)); // `Size` subtraction (overflow-checked)
         }
 
         match self.blocks {
@@ -64,11 +64,11 @@ impl InitMask {
         }
     }
 
-    /// Sets a specified range to a value. If the range is out-of-bounds, the mask will grow to
-    /// accommodate it entirely.
+    /// Sets the data part of a specified range to a value. If the range is
+    /// out-of-bounds, the mask will grow to accommodate it entirely.
     pub fn set_range(&mut self, range: AllocRange, new_state: bool) {
         let start = range.start;
-        let end = range.end();
+        let end = range.end_data_or_memory();
 
         let is_full_overwrite = start == Size::ZERO && end >= self.len;
 
@@ -280,7 +280,7 @@ impl InitMaskMaterialized {
         match uninit_start {
             Some(uninit_start) => {
                 let uninit_end = self.find_bit(uninit_start, end, true).unwrap_or(end);
-                Err(AllocRange::from(uninit_start..uninit_end))
+                Err(alloc_range(uninit_start, None, uninit_end-uninit_start))
             }
             None => Ok(()),
         }
@@ -589,7 +589,7 @@ impl InitMask {
     #[inline]
     pub fn range_as_init_chunks(&self, range: AllocRange) -> InitChunkIter<'_> {
         let start = range.start;
-        let end = range.end();
+        let end = range.end_memory();
         assert!(end <= self.len);
 
         let is_init = if start < end {
@@ -707,8 +707,8 @@ impl InitMask {
         // we won't need materialized blocks either.
         if defined.ranges.len() <= 1 {
             let start = range.start;
-            let end = range.start + range.size * repeat; // `Size` operations
-            self.set_range(AllocRange::from(start..end), defined.initial);
+            let length = range.memory_size * repeat; // `Size` operations
+            self.set_range(alloc_range(start, None, length), defined.initial);
             return;
         }
 
@@ -716,7 +716,7 @@ impl InitMask {
         let blocks = self.materialize_blocks();
 
         for mut j in 0..repeat {
-            j *= range.size.bytes();
+            j *= range.memory_size.bytes();
             j += range.start.bytes();
             let mut cur = defined.initial;
             for range in &defined.ranges {

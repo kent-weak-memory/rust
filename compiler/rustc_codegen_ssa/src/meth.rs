@@ -31,7 +31,7 @@ impl<'a, 'tcx> VirtualIndex {
             let typeid = bx
                 .typeid_metadata(typeid_for_trait_ref(bx.tcx(), expect_dyn_trait_in_self(ty)))
                 .unwrap();
-            let vtable_byte_offset = self.0 * bx.data_layout().pointer_size.bytes();
+            let vtable_byte_offset = self.0 * bx.data_layout().pointer_memory_size.bytes();
             let func = bx.type_checked_load(llvtable, vtable_byte_offset, typeid);
             bx.pointercast(func, llty)
         } else {
@@ -53,14 +53,23 @@ impl<'a, 'tcx> VirtualIndex {
         // Load the data pointer from the object.
         debug!("get_int({:?}, {:?})", llvtable, self);
 
-        let llty = bx.type_isize();
-        let llvtable = bx.pointercast(llvtable, bx.type_ptr_to(llty));
-        let usize_align = bx.tcx().data_layout.pointer_align.abi;
-        let gep = bx.inbounds_gep(llty, llvtable, &[bx.const_usize(self.0)]);
-        let ptr = bx.load(llty, gep, usize_align);
+        // Cast vtable to array of pointers so indexing matches the rest of the
+        // compiler.
+        let slot_type = bx.type_i8p();
+        let slot_array = bx.pointercast(llvtable, bx.type_ptr_to(slot_type));
+
+        // Index into array to get requested slot.
+        let slot_pointer = bx.inbounds_gep(slot_type, slot_array, &[bx.const_usize(self.0)]);
+
+        // Cast slot pointer to usize.
+        let value_type = bx.type_isize();
+        let value_pointer = bx.pointercast(slot_pointer, bx.type_ptr_to(value_type));
+        let usize_align = bx.tcx().data_layout.ptr_data_sized_integer().align(bx).abi;
+        let value = bx.load(value_type, value_pointer, usize_align);
+
         // VTable loads are invariant.
-        bx.set_invariant_load(ptr);
-        ptr
+        bx.set_invariant_load(value);
+        value
     }
 }
 

@@ -6,7 +6,8 @@
 #![crate_type = "lib"]
 #![feature(c_unwind)]
 
-// CHECK: @rust_item_that_can_unwind() unnamed_addr [[ATTR0:#[0-9]+]]
+// NONCHERI: @rust_item_that_can_unwind() unnamed_addr [[ATTR0:#[0-9]+]]
+// CHERI: @rust_item_that_can_unwind() unnamed_addr addrspace(200) [[ATTR0:#[0-9]+]]
 #[no_mangle]
 pub unsafe extern "C-unwind" fn rust_item_that_can_unwind() {
     // Handle both legacy and v0 symbol mangling.

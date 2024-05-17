@@ -25,9 +25,11 @@ pub fn replace_big(dst: &mut Big, src: Big) -> Big {
 // For a large type, we expect exactly three `memcpy`s
 // CHECK-LABEL: define internal void @{{.+}}mem{{.+}}replace{{.+}}sret(%Big)
 // CHECK-NOT: call void @llvm.memcpy
-// CHECK: call void @llvm.memcpy.{{.+}}({{i8\*|ptr}} align 8 %0, {{i8\*|ptr}} align 8 %dest, i{{.*}} 56, i1 false)
+// NONCHERI: call void @llvm.memcpy.{{.+}}({{i8\*|ptr}} align 8 %0, {{i8\*|ptr}} align 8 %dest, i{{.*}} 56, i1 false)
+// CHERI: call void @llvm.memcpy.{{.+}}({{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 8 %0, {{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 8 %dest, i{{.*}} 56, i1 false)
 // CHECK-NOT: call void @llvm.memcpy
-// CHECK: call void @llvm.memcpy.{{.+}}({{i8\*|ptr}} align 8 %dest, {{i8\*|ptr}} align 8 %src, i{{.*}} 56, i1 false)
+// NONCHERI: call void @llvm.memcpy.{{.+}}({{i8\*|ptr}} align 8 %dest, {{i8\*|ptr}} align 8 %src, i{{.*}} 56, i1 false)
+// CHERI: call void @llvm.memcpy.{{.+}}({{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 8 %dest, {{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 8 %src, i{{.*}} 56, i1 false)
 // CHECK-NOT: call void @llvm.memcpy
 
 // CHECK-NOT: call void @llvm.memcpy

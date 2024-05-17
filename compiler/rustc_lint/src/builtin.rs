@@ -724,7 +724,7 @@ impl<'tcx> LateLintPass<'tcx> for MissingCopyImplementations {
         // Default value of clippy::trivially_copy_pass_by_ref
         const MAX_SIZE: u64 = 256;
 
-        if let Some(size) = cx.layout_of(ty).ok().map(|l| l.size.bytes()) {
+        if let Some(size) = cx.layout_of(ty).ok().map(|l| l.memory_size.bytes()) {
             if size > MAX_SIZE {
                 return;
             }

@@ -711,7 +711,7 @@ pub fn write_allocations<'tcx>(
 
     fn alloc_ids_from_const_val(val: ConstValue<'_>) -> impl Iterator<Item = AllocId> + '_ {
         match val {
-            ConstValue::Scalar(interpret::Scalar::Ptr(ptr, _)) => {
+            ConstValue::Scalar(interpret::Scalar::Ptr(ptr, _, _)) => {
                 Either::Left(Either::Left(std::iter::once(ptr.provenance)))
             }
             ConstValue::Scalar(interpret::Scalar::Int { .. }) => {
@@ -827,8 +827,8 @@ impl<'a, 'tcx, Prov: Provenance, Extra, Bytes: AllocBytes> std::fmt::Display
 {
     fn fmt(&self, w: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let RenderAllocation { tcx, alloc } = *self;
-        write!(w, "size: {}, align: {})", alloc.size().bytes(), alloc.align.bytes())?;
-        if alloc.size() == Size::ZERO {
+        write!(w, "size: {}, align: {})", alloc.memory_size().bytes(), alloc.align.bytes())?;
+        if alloc.memory_size() == Size::ZERO {
             // We are done.
             return write!(w, " {{}}");
         }
@@ -873,9 +873,9 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
     w: &mut dyn std::fmt::Write,
     prefix: &str,
 ) -> std::fmt::Result {
-    let num_lines = alloc.size().bytes_usize().saturating_sub(BYTES_PER_LINE);
+    let num_lines = alloc.memory_size().bytes_usize().saturating_sub(BYTES_PER_LINE);
     // Number of chars needed to represent all line numbers.
-    let pos_width = hex_number_length(alloc.size().bytes());
+    let pos_width = hex_number_length(alloc.memory_size().bytes());
 
     if num_lines > 0 {
         write!(w, "{}0x{:02$x} │ ", prefix, 0, pos_width)?;
@@ -886,17 +886,18 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
     let mut i = Size::ZERO;
     let mut line_start = Size::ZERO;
 
-    let ptr_size = tcx.data_layout.pointer_size;
+    let pointer_data_size = tcx.data_layout.pointer_data_size;
+    let pointer_memory_size = tcx.data_layout.pointer_memory_size;
 
     let mut ascii = String::new();
 
     let oversized_ptr = |target: &mut String, width| {
         if target.len() > width {
-            write!(target, " ({} ptr bytes)", ptr_size.bytes()).unwrap();
+            write!(target, " ({} ptr bytes)", pointer_memory_size.bytes()).unwrap();
         }
     };
 
-    while i < alloc.size() {
+    while i < alloc.memory_size() {
         // The line start already has a space. While we could remove that space from the line start
         // printing and unconditionally print a space here, that would cause the single-line case
         // to have a single space before it, which looks weird.
@@ -905,24 +906,24 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
         }
         if let Some(prov) = alloc.provenance().get_ptr(i) {
             // Memory with provenance must be defined
-            assert!(alloc.init_mask().is_range_initialized(alloc_range(i, ptr_size)).is_ok());
+            assert!(alloc.init_mask().is_range_initialized(alloc_range(i, Some(pointer_data_size), pointer_memory_size)).is_ok());
             let j = i.bytes_usize();
             let offset = alloc
-                .inspect_with_uninit_and_ptr_outside_interpreter(j..j + ptr_size.bytes_usize());
+                .inspect_with_uninit_and_ptr_outside_interpreter(j..j + pointer_memory_size.bytes_usize());
             let offset = read_target_uint(tcx.data_layout.endian, offset).unwrap();
             let offset = Size::from_bytes(offset);
             let provenance_width = |bytes| bytes * 3;
             let ptr = Pointer::new(prov, offset);
             let mut target = format!("{:?}", ptr);
-            if target.len() > provenance_width(ptr_size.bytes_usize() - 1) {
+            if target.len() > provenance_width(pointer_memory_size.bytes_usize() - 1) {
                 // This is too long, try to save some space.
                 target = format!("{:#?}", ptr);
             }
-            if ((i - line_start) + ptr_size).bytes_usize() > BYTES_PER_LINE {
+            if ((i - line_start) + pointer_memory_size).bytes_usize() > BYTES_PER_LINE {
                 // This branch handles the situation where a provenance starts in the current line
                 // but ends in the next one.
                 let remainder = Size::from_bytes(BYTES_PER_LINE) - (i - line_start);
-                let overflow = ptr_size - remainder;
+                let overflow = pointer_memory_size - remainder;
                 let remainder_width = provenance_width(remainder.bytes_usize()) - 2;
                 let overflow_width = provenance_width(overflow.bytes_usize() - 1) + 1;
                 ascii.push('╾'); // HEAVY LEFT AND LIGHT RIGHT
@@ -948,24 +949,24 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
                     ascii.push('─');
                 }
                 ascii.push('╼'); // LIGHT LEFT AND HEAVY RIGHT
-                i += ptr_size;
+                i += pointer_memory_size;
                 continue;
             } else {
                 // This branch handles a provenance that starts and ends in the current line.
-                let provenance_width = provenance_width(ptr_size.bytes_usize() - 1);
+                let provenance_width = provenance_width(pointer_memory_size.bytes_usize() - 1);
                 oversized_ptr(&mut target, provenance_width);
                 ascii.push('╾');
                 write!(w, "╾{0:─^1$}╼", target, provenance_width)?;
-                for _ in 0..ptr_size.bytes() - 2 {
+                for _ in 0..pointer_memory_size.bytes() - 2 {
                     ascii.push('─');
                 }
                 ascii.push('╼');
-                i += ptr_size;
+                i += pointer_memory_size;
             }
         } else if let Some(prov) = alloc.provenance().get(i, &tcx) {
             // Memory with provenance must be defined
             assert!(
-                alloc.init_mask().is_range_initialized(alloc_range(i, Size::from_bytes(1))).is_ok()
+                alloc.init_mask().is_range_initialized(alloc_range(i, Size::from_bytes(1), Size::from_bytes(1))).is_ok()
             );
             ascii.push('━'); // HEAVY HORIZONTAL
             // We have two characters to display this, which is obviously not enough.
@@ -976,7 +977,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
             i += Size::from_bytes(1);
         } else if alloc
             .init_mask()
-            .is_range_initialized(alloc_range(i, Size::from_bytes(1)))
+            .is_range_initialized(alloc_range(i, Size::from_bytes(1), Size::from_bytes(1)))
             .is_ok()
         {
             let j = i.bytes_usize();
@@ -997,7 +998,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
             i += Size::from_bytes(1);
         }
         // Print a new line header if the next line still has some bytes to print.
-        if i == line_start + Size::from_bytes(BYTES_PER_LINE) && i != alloc.size() {
+        if i == line_start + Size::from_bytes(BYTES_PER_LINE) && i != alloc.memory_size() {
             line_start = write_allocation_newline(w, line_start, &ascii, pos_width, prefix)?;
             ascii.clear();
         }

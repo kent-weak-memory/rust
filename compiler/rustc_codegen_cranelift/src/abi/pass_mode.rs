@@ -107,7 +107,7 @@ impl<'tcx> ArgAbiExt<'tcx> for ArgAbi<'tcx, Ty<'tcx>> {
             PassMode::Indirect { attrs, extra_attrs: None, on_stack } => {
                 if on_stack {
                     // Abi requires aligning struct size to pointer size
-                    let size = self.layout.size.align_to(tcx.data_layout.pointer_align.abi);
+                    let size = self.layout.memory_size.align_to(tcx.data_layout.pointer_align.abi);
                     let size = u32::try_from(size.bytes()).unwrap();
                     smallvec![apply_arg_attrs_to_abi_param(
                         AbiParam::special(pointer_ty(tcx), ArgumentPurpose::StructArgument(size),),
@@ -188,7 +188,7 @@ pub(super) fn from_casted_value<'tcx>(
 ) -> CValue<'tcx> {
     let abi_params = cast_target_to_abi_params(cast);
     let abi_param_size: u32 = abi_params.iter().map(|param| param.value_type.bytes()).sum();
-    let layout_size = u32::try_from(layout.size.bytes()).unwrap();
+    let layout_size = u32::try_from(layout.memory_size.bytes()).unwrap();
     let stack_slot = fx.bcx.create_sized_stack_slot(StackSlotData {
         kind: StackSlotKind::ExplicitSlot,
         // FIXME Don't force the size to a multiple of 16 bytes once Cranelift gets a way to

@@ -113,19 +113,19 @@ fn lit_to_mir_constant<'tcx>(
     let LitToConstInput { lit, ty, neg } = lit_input;
     let trunc = |n| {
         let param_ty = ty::ParamEnv::reveal_all().and(ty);
-        let width = tcx
+        let layout = tcx
             .layout_of(param_ty)
             .map_err(|_| {
                 LitToConstError::Reported(tcx.sess.delay_span_bug(
                     DUMMY_SP,
                     format!("couldn't compute width of literal: {:?}", lit_input.lit),
                 ))
-            })?
-            .size;
-        trace!("trunc {} with size {} and shift {}", n, width.bits(), 128 - width.bits());
-        let result = width.truncate(n);
+            })?;
+        let data_size = layout.data_size.unwrap();
+        trace!("trunc {} with size {} and shift {}", n, data_size.bits(), 128 - data_size.bits());
+        let result = data_size.truncate(n);
         trace!("trunc result: {}", result);
-        Ok(ConstValue::Scalar(Scalar::from_uint(result, width)))
+        Ok(ConstValue::Scalar(Scalar::from_uint(result, data_size, layout.memory_size)))
     };
 
     let value = match (lit, &ty.kind()) {
@@ -153,7 +153,8 @@ fn lit_to_mir_constant<'tcx>(
             ConstValue::Slice { data: allocation, start: 0, end: data.len() }
         }
         (ast::LitKind::Byte(n), ty::Uint(ty::UintTy::U8)) => {
-            ConstValue::Scalar(Scalar::from_uint(*n, Size::from_bytes(1)))
+            let width = Size::from_bytes(1);
+            ConstValue::Scalar(Scalar::from_uint(*n, width, width))
         }
         (ast::LitKind::Int(n, _), ty::Uint(_)) | (ast::LitKind::Int(n, _), ty::Int(_)) => {
             trunc(if neg { (*n as i128).overflowing_neg().0 as u128 } else { *n })?

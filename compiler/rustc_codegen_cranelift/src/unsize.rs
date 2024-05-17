@@ -91,7 +91,10 @@ fn unsize_ptr<'tcx>(
                 if src_f.is_zst() {
                     continue;
                 }
-                assert_eq!(src_layout.size, src_f.size);
+                assert_eq!(src_layout.memory_size, src_f.memory_size);
+                if let (Some(a), Some(b)) = (src_layout.data_size, src_f.data_size) {
+                    assert_eq!(a, b);
+                }
 
                 let dst_f = dst_layout.field(fx, i);
                 assert_ne!(src_f.ty, dst_f.ty);
@@ -201,7 +204,7 @@ pub(crate) fn size_and_align_of_dst<'tcx>(
             // The info in this case is the length of the str, so the size is that
             // times the unit size.
             (
-                fx.bcx.ins().imul_imm(info, unit.size.bytes() as i64),
+                fx.bcx.ins().imul_imm(info, unit.memory_size.bytes() as i64),
                 fx.bcx.ins().iconst(fx.pointer_type, unit.align.abi.bytes() as i64),
             )
         }

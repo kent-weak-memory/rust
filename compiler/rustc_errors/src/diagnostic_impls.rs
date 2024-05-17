@@ -274,10 +274,17 @@ impl IntoDiagnostic<'_, !> for TargetDataLayoutErrors<'_> {
                 diag.set_arg("target", target);
                 diag
             }
-            TargetDataLayoutErrors::InconsistentTargetPointerWidth { pointer_size, target } => {
+            TargetDataLayoutErrors::InconsistentTargetPointerWidth {
+                pointer_data_size,
+                pointer_memory_size,
+                target_data_size,
+                target_memory_size,
+            } => {
                 diag = handler.struct_fatal(fluent::errors_target_inconsistent_pointer_width);
-                diag.set_arg("pointer_size", pointer_size);
-                diag.set_arg("target", target);
+                diag.set_arg("pointer_data_size", pointer_data_size);
+                diag.set_arg("pointer_memory_size", pointer_memory_size);
+                diag.set_arg("target_data_size", target_data_size);
+                diag.set_arg("target_memory_size", target_memory_size);
                 diag
             }
             TargetDataLayoutErrors::InvalidBitsSize { err } => {

@@ -229,7 +229,7 @@ pub(crate) mod rustc {
             let param_env_and_type = ParamEnvAnd { param_env, value: ty };
             let TyAndLayout { layout, .. } = ctx.layout_of(param_env_and_type)?;
 
-            let total_size: usize = layout.size().bytes_usize();
+            let total_size: usize = layout.memory_size().bytes_usize();
             let total_align: Align = layout.align().abi;
             let discriminant_align: Align;
             let discriminant_size: usize;
@@ -276,7 +276,7 @@ pub(crate) mod rustc {
                 ty::Int(I64) | ty::Uint(U64) | ty::Float(F64) => Ok(Self::number(8)),
                 ty::Int(I128) | ty::Uint(U128) => Ok(Self::number(16)),
                 ty::Int(Isize) | ty::Uint(Usize) => {
-                    Ok(Self::number(target.pointer_size.bytes_usize()))
+                    Ok(Self::number(target.pointer_data_size.bytes_usize()))
                 }
 
                 ty::Tuple(members) => {
@@ -353,7 +353,7 @@ pub(crate) mod rustc {
                             for field in adt_def.all_fields() {
                                 let variant_ty = field.ty(tcx, substs_ref);
                                 let variant_layout = layout_of(tcx, variant_ty)?;
-                                let padding_needed = ty_layout.size() - variant_layout.size();
+                                let padding_needed = ty_layout.memory_size() - variant_layout.memory_size();
                                 let variant = Self::def(Def::Field(field))
                                     .then(Self::from_ty(variant_ty, tcx)?)
                                     .then(Self::padding(padding_needed));
@@ -452,8 +452,8 @@ pub(crate) mod rustc {
 
             // finally: padding
             let padding_span = trace_span!("adding trailing padding").entered();
-            if layout_summary.total_size > variant_layout.size() {
-                let padding_needed = layout_summary.total_size - variant_layout.size();
+            if layout_summary.total_size > variant_layout.memory_size() {
+                let padding_needed = layout_summary.total_size - variant_layout.memory_size();
                 tree = tree.then(Self::padding(padding_needed));
             };
             drop(padding_span);
@@ -490,7 +490,7 @@ pub(crate) mod rustc {
         let param_env_and_type = ParamEnvAnd { param_env, value: ty };
         let TyAndLayout { layout, .. } = ctx.layout_of(param_env_and_type)?;
         let layout = alloc::Layout::from_size_align(
-            layout.size().bytes_usize(),
+            layout.memory_size().bytes_usize(),
             layout.align().abi.bytes().try_into().unwrap(),
         )
         .unwrap();

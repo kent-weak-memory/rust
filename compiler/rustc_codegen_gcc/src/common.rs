@@ -113,7 +113,7 @@ impl<'gcc, 'tcx> ConstMethods<'tcx> for CodegenCx<'gcc, 'tcx> {
     }
 
     fn const_usize(&self, i: u64) -> RValue<'gcc> {
-        let bit_size = self.data_layout().pointer_size.bits();
+        let bit_size = self.data_layout().pointer_data_size.bits();
         if bit_size < 64 {
             // make sure it doesn't overflow
             assert!(i < (1 << bit_size));
@@ -166,10 +166,11 @@ impl<'gcc, 'tcx> ConstMethods<'tcx> for CodegenCx<'gcc, 'tcx> {
     }
 
     fn scalar_to_backend(&self, cv: Scalar, layout: abi::Scalar, ty: Type<'gcc>) -> RValue<'gcc> {
-        let bitsize = if layout.is_bool() { 1 } else { layout.size(self).bits() };
+        let bitsize = if layout.is_bool() { 1 } else { layout.memory_size(self).bits() };
         match cv {
             Scalar::Int(int) => {
-                let data = int.assert_bits(layout.size(self));
+                assert_eq!(layout.data_size(self).unwrap(), layout.memory_size(self));
+                let data = int.assert_bits(layout.data_size(self).unwrap());
 
                 // FIXME(antoyo): there's some issues with using the u128 code that follows, so hard-code
                 // the paths for floating-point values.
@@ -181,7 +182,7 @@ impl<'gcc, 'tcx> ConstMethods<'tcx> for CodegenCx<'gcc, 'tcx> {
                 }
 
                 let value = self.const_uint_big(self.type_ix(bitsize), data);
-                let bytesize = layout.size(self).bytes();
+                let bytesize = layout.memory_size(self).bytes();
                 if bitsize > 1 && ty.is_integral() && bytesize as u32 == ty.get_size() {
                     // NOTE: since the intrinsic _xabort is called with a bitcast, which
                     // is non-const, but expects a constant, do a normal cast instead of a bitcast.
@@ -194,7 +195,7 @@ impl<'gcc, 'tcx> ConstMethods<'tcx> for CodegenCx<'gcc, 'tcx> {
                     self.const_bitcast(value, ty)
                 }
             }
-            Scalar::Ptr(ptr, _size) => {
+            Scalar::Ptr(ptr, _data_size, _memory_size) => {
                 let (alloc_id, offset) = ptr.into_parts();
                 let base_addr =
                     match self.tcx.global_alloc(alloc_id) {

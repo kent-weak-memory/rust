@@ -12,7 +12,8 @@ use std::arch::asm;
 pub unsafe extern "C" fn f() {
     // Check that f has naked and noinline attributes.
     //
-    // CHECK:       define {{(dso_local )?}}void @f() unnamed_addr [[ATTR:#[0-9]+]]
+    // NONCHERI:       define {{(dso_local )?}}void @f() unnamed_addr [[ATTR:#[0-9]+]]
+    // CHERI:       define {{(dso_local )?}}void @f() unnamed_addr addrspace(200) [[ATTR:#[0-9]+]]
     // CHECK-NEXT:  start:
     // CHECK-NEXT:    call void asm
     asm!("", options(noreturn));

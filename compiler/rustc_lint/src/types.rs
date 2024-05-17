@@ -400,7 +400,7 @@ fn lint_int_literal<'tcx>(
     t: ty::IntTy,
     v: u128,
 ) {
-    let int_type = t.normalize(cx.sess().target.pointer_width);
+    let int_type = t.normalize(cx.sess().target.pointer_data_size);
     let (min, max) = int_ty_range(int_type);
     let max = max as u128;
     let negative = type_limits.negated_expr_id == Some(e.hir_id);
@@ -413,7 +413,7 @@ fn lint_int_literal<'tcx>(
                 cx,
                 e,
                 attr::IntType::SignedInt(ty::ast_int_ty(t)),
-                Integer::from_int_ty(cx, t).size(),
+                Integer::from_int_ty(cx, t).data_size(),
                 repr_str,
                 v,
                 negative,
@@ -448,7 +448,7 @@ fn lint_uint_literal<'tcx>(
     lit: &hir::Lit,
     t: ty::UintTy,
 ) {
-    let uint_type = t.normalize(cx.sess().target.pointer_width);
+    let uint_type = t.normalize(cx.sess().target.pointer_data_size);
     let (min, max) = uint_ty_range(uint_type);
     let lit_val: u128 = match lit.node {
         // _v is u8, within range by definition
@@ -482,7 +482,7 @@ fn lint_uint_literal<'tcx>(
                 cx,
                 e,
                 attr::IntType::UnsignedInt(ty::ast_uint_ty(t)),
-                Integer::from_uint_ty(cx, t).size(),
+                Integer::from_uint_ty(cx, t).data_size(),
                 repr_str,
                 lit_val,
                 false,
@@ -923,7 +923,7 @@ pub(crate) fn repr_nullable_ptr<'tcx>(
         if let Abi::Scalar(field_ty_scalar) = field_ty_abi {
             match field_ty_scalar.valid_range(cx) {
                 WrappingRange { start: 0, end }
-                    if end == field_ty_scalar.size(&cx.tcx).unsigned_int_max() - 1 =>
+                    if end == field_ty_scalar.data_size(&cx.tcx).unsigned_int_max() - 1 =>
                 {
                     return Some(get_nullable_type(cx, field_ty).unwrap());
                 }
@@ -1582,19 +1582,19 @@ impl<'tcx> LateLintPass<'tcx> for VariantSizeDifferences {
                 return
             };
 
-            let tag_size = tag.size(&cx.tcx).bytes();
+            let tag_size = tag.memory_size(&cx.tcx).bytes();
 
             debug!(
                 "enum `{}` is {} bytes large with layout:\n{:#?}",
                 t,
-                layout.size.bytes(),
+                layout.memory_size.bytes(),
                 layout
             );
 
             let (largest, slargest, largest_index) = iter::zip(enum_definition.variants, variants)
                 .map(|(variant, variant_layout)| {
                     // Subtract the size of the enum tag.
-                    let bytes = variant_layout.size.bytes().saturating_sub(tag_size);
+                    let bytes = variant_layout.memory_size.bytes().saturating_sub(tag_size);
 
                     debug!("- variant `{}` is {} bytes large", variant.ident, bytes);
                     bytes

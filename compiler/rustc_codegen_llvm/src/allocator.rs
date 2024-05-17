@@ -21,7 +21,7 @@ pub(crate) unsafe fn codegen(
 ) {
     let llcx = &*module_llvm.llcx;
     let llmod = module_llvm.llmod();
-    let usize = match tcx.sess.target.pointer_width {
+    let usize = match tcx.sess.target.pointer_data_size {
         16 => llvm::LLVMInt16TypeInContext(llcx),
         32 => llvm::LLVMInt32TypeInContext(llcx),
         64 => llvm::LLVMInt64TypeInContext(llcx),

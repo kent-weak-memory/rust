@@ -17,8 +17,10 @@ pub struct Bytes {
 pub fn small_array_alignment(x: &mut [i8; 4], y: [i8; 4]) {
 // CHECK: [[TMP:%.+]] = alloca i32
 // CHECK: %y = alloca [4 x i8]
-// CHECK: store i32 %0, {{i32\*|ptr}} [[TMP]]
-// CHECK: call void @llvm.memcpy.{{.*}}({{i8\*|ptr}} align 1 {{.+}}, {{i8\*|ptr}} align 4 {{.+}}, i{{[0-9]+}} 4, i1 false)
+// NONCHERI: store i32 %0, {{i32\*|ptr}} [[TMP]]
+// CHERI: store i32 %0, {{i32 addrspace\(200\)\*|ptr addrspace\(200\)}} [[TMP]]
+// NONCHERI: call void @llvm.memcpy.{{.*}}({{i8\*|ptr}} align 1 {{.+}}, {{i8\*|ptr}} align 4 {{.+}}, i{{[0-9]+}} 4, i1 false)
+// CHERI: call void @llvm.memcpy.{{.*}}({{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 1 {{.+}}, {{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 4 {{.+}}, i{{[0-9]+}} 4, i1 false)
     *x = y;
 }
 
@@ -29,7 +31,9 @@ pub fn small_array_alignment(x: &mut [i8; 4], y: [i8; 4]) {
 pub fn small_struct_alignment(x: &mut Bytes, y: Bytes) {
 // CHECK: [[TMP:%.+]] = alloca i32
 // CHECK: %y = alloca %Bytes
-// CHECK: store i32 %0, {{i32\*|ptr}} [[TMP]]
-// CHECK: call void @llvm.memcpy.{{.*}}({{i8\*|ptr}} align 1 {{.+}}, {{i8\*|ptr}} align 4 {{.+}}, i{{[0-9]+}} 4, i1 false)
+// NONCHERI: store i32 %0, {{i32\*|ptr}} [[TMP]]
+// CHERI: store i32 %0, {{i32 addrspace\(200\)\*|ptr addrspace\(200\)}} [[TMP]]
+// NONCHERI: call void @llvm.memcpy.{{.*}}({{i8\*|ptr}} align 1 {{.+}}, {{i8\*|ptr}} align 4 {{.+}}, i{{[0-9]+}} 4, i1 false)
+// CHERI: call void @llvm.memcpy.{{.*}}({{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 1 {{.+}}, {{i8 addrspace\(200\)\*|ptr addrspace\(200\)}} align 4 {{.+}}, i{{[0-9]+}} 4, i1 false)
     *x = y;
 }

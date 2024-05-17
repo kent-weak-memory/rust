@@ -356,7 +356,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             // I don't know how return types can seem to be unsized but this happens in the
             // `type/type-unsatisfiable.rs` test.
             .filter(|ret_layout| {
-                ret_layout.is_sized() && ret_layout.size < Size::from_bytes(MAX_ALLOC_LIMIT)
+                ret_layout.is_sized() && ret_layout.memory_size < Size::from_bytes(MAX_ALLOC_LIMIT)
             })
             .unwrap_or_else(|| ecx.layout_of(tcx.types.unit).unwrap());
 
@@ -539,7 +539,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                     return None;
                 }
 
-                let arg_value = const_arg.to_scalar().to_bits(const_arg.layout.size).ok()?;
+                let arg_value = const_arg.to_scalar().to_bits(const_arg.layout.data_size.unwrap()).ok()?;
                 let dest = self.ecx.eval_place(place).ok()?;
 
                 match op {
@@ -547,7 +547,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                         self.ecx.write_immediate(*const_arg, &dest).ok()
                     }
                     BinOp::BitOr
-                        if arg_value == const_arg.layout.size.truncate(u128::MAX)
+                        if arg_value == const_arg.layout.data_size.unwrap().truncate(u128::MAX)
                             || (const_arg.layout.ty.is_bool() && arg_value == 1) =>
                     {
                         self.ecx.write_immediate(*const_arg, &dest).ok()
@@ -715,7 +715,7 @@ impl CanConstProp {
         for (local, val) in cpv.can_const_prop.iter_enumerated_mut() {
             let ty = body.local_decls[local].ty;
             match tcx.layout_of(param_env.and(ty)) {
-                Ok(layout) if layout.size < Size::from_bytes(MAX_ALLOC_LIMIT) => {}
+                Ok(layout) if layout.memory_size < Size::from_bytes(MAX_ALLOC_LIMIT) => {}
                 // Either the layout fails to compute, then we can't use this local anyway
                 // or the local is too large, then we don't want to.
                 _ => {

@@ -66,13 +66,17 @@ pub(super) fn vtable_allocation_provider<'tcx>(
         .layout_of(ty::ParamEnv::reveal_all().and(ty))
         .expect("failed to build vtable representation");
     assert!(layout.is_sized(), "can't create a vtable for an unsized type");
-    let size = layout.size.bytes();
+    let memory_size = layout.memory_size.bytes();
     let align = layout.align.abi.bytes();
 
-    let ptr_size = tcx.data_layout.pointer_size;
+    let ptr_memory_size = tcx.data_layout.pointer_memory_size;
+    let ptr_data_size = tcx.data_layout.pointer_data_size;
     let ptr_align = tcx.data_layout.pointer_align.abi;
 
-    let vtable_size = ptr_size * u64::try_from(vtable_entries.len()).unwrap();
+    // Each entry in the vtable is large enough to hold a pointer.
+    // On targets where pointers are larger than `usize`, integer entries are
+    // filled out with padding.
+    let vtable_size = ptr_memory_size * u64::try_from(vtable_entries.len()).unwrap();
     let mut vtable = Allocation::uninit(vtable_size, ptr_align);
 
     // No need to do any alignment checks on the memory accesses below, because we know the
@@ -88,8 +92,8 @@ pub(super) fn vtable_allocation_provider<'tcx>(
                 let fn_ptr = Pointer::from(fn_alloc_id);
                 Scalar::from_pointer(fn_ptr, &tcx)
             }
-            VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_size),
-            VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_size),
+            VtblEntry::MetadataSize => Scalar::from_uint(memory_size, ptr_data_size, ptr_memory_size),
+            VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_data_size, ptr_memory_size),
             VtblEntry::Vacant => continue,
             VtblEntry::Method(instance) => {
                 // Prepare the fn ptr we write into the vtable.
@@ -107,7 +111,7 @@ pub(super) fn vtable_allocation_provider<'tcx>(
             }
         };
         vtable
-            .write_scalar(&tcx, alloc_range(ptr_size * idx, ptr_size), scalar)
+            .write_scalar(&tcx, alloc_range(ptr_memory_size * idx, Some(ptr_data_size), ptr_memory_size), scalar)
             .expect("failed to build vtable representation");
     }
 

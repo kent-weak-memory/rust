@@ -614,7 +614,7 @@ pub fn linking_symbol_name_for_instance_in_crate<'tcx>(
 
     let args_in_bytes: u64 = args
         .iter()
-        .map(|abi| abi.layout.size.bytes().next_multiple_of(target.pointer_width as u64 / 8))
+        .map(|abi| abi.layout.memory_size.bytes().next_multiple_of(target.pointer_memory_width as u64 / 8))
         .sum();
     format!("{prefix}{undecorated}{suffix}{args_in_bytes}")
 }

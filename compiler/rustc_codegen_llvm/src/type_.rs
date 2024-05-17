@@ -123,7 +123,8 @@ impl<'ll> CodegenCx<'ll, '_> {
     pub(crate) fn type_padding_filler(&self, size: Size, align: Align) -> &'ll Type {
         let unit = Integer::approximate_align(self, align);
         let size = size.bytes();
-        let unit_size = unit.size().bytes();
+        // TODO(seharris): not sure this is correct.
+        let unit_size = unit.memory_size().bytes();
         assert_eq!(size % unit_size, 0);
         self.type_array(self.type_from_integer(unit), size / unit_size)
     }
@@ -195,7 +196,7 @@ impl<'ll, 'tcx> BaseTypeMethods<'tcx> for CodegenCx<'ll, 'tcx> {
             TypeKind::Function,
             "don't call ptr_to on function types, use ptr_to_llvm_type on FnAbi instead or explicitly specify an address space if it makes sense"
         );
-        ty.ptr_to(AddressSpace::DATA)
+        ty.ptr_to(self.data_layout().data_address_space)
     }
 
     fn type_ptr_to_ext(&self, ty: &'ll Type, address_space: AddressSpace) -> &'ll Type {
@@ -247,8 +248,8 @@ impl Type {
         unsafe { llvm::LLVMIntTypeInContext(llcx, num_bits as c_uint) }
     }
 
-    pub fn i8p_llcx(llcx: &llvm::Context) -> &Type {
-        Type::i8_llcx(llcx).ptr_to(AddressSpace::DATA)
+    pub fn i8p_llcx(llcx: &llvm::Context, address_space: AddressSpace) -> &Type {
+        Type::i8_llcx(llcx).ptr_to(address_space)
     }
 
     fn ptr_to(&self, address_space: AddressSpace) -> &Type {

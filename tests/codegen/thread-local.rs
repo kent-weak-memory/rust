@@ -14,8 +14,10 @@ use std::cell::Cell;
 
 thread_local!(static A: Cell<u32> = const { Cell::new(1) });
 
-// CHECK: [[TLS_AUX:@.+]] = external thread_local local_unnamed_addr global i64
-// CHECK: [[TLS:@.+]] = internal thread_local unnamed_addr global
+// NONCHERI: [[TLS_AUX:@.+]] = external thread_local local_unnamed_addr global i64
+// CHERI: [[TLS_AUX:@.+]] = external thread_local local_unnamed_addr addrspace(200) global i64
+// NONCHERI: [[TLS:@.+]] = internal thread_local unnamed_addr global
+// CHERI: [[TLS:@.+]] = internal thread_local unnamed_addr addrspace(200) global
 
 // CHECK-LABEL: @get
 #[no_mangle]

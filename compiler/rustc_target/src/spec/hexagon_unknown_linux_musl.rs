@@ -15,7 +15,8 @@ pub fn target() -> Target {
 
     Target {
         llvm_target: "hexagon-unknown-linux-musl".into(),
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memory_size: 32,
         data_layout: concat!(
             "e-m:e-p:32:32:32-a:0-n16:32-i64:64:64-i32:32",
             ":32-i16:16:16-i1:8:8-f32:32:32-f64:64:64-v32",

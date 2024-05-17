@@ -47,10 +47,13 @@ impl EnumSizeOpt {
         ty: Ty<'tcx>,
         alloc_cache: &mut FxHashMap<Ty<'tcx>, AllocId>,
     ) -> Option<(AdtDef<'tcx>, usize, AllocId)> {
+        // Nothing to do if not an enum.
         let adt_def = match ty.kind() {
             ty::Adt(adt_def, _substs) if adt_def.is_enum() => adt_def,
             _ => return None,
         };
+
+        // Situations where optimisation isn't helpful.
         let layout = tcx.layout_of(param_env.and(ty)).ok()?;
         let variants = match &layout.variants {
             Variants::Single { .. } => return None,
@@ -62,12 +65,14 @@ impl EnumSizeOpt {
             Variants::Multiple { variants, .. } if variants.len() <= 1 => return None,
             Variants::Multiple { variants, .. } => variants,
         };
-        let min = variants.iter().map(|v| v.size).min().unwrap();
-        let max = variants.iter().map(|v| v.size).max().unwrap();
+        let min = variants.iter().map(|v| v.memory_size).min().unwrap();
+        let max = variants.iter().map(|v| v.memory_size).max().unwrap();
         if max.bytes() - min.bytes() < self.discrepancy {
             return None;
         }
 
+        // We want to store a table of variant sizes by discriminant, so
+        // discriminants need to be within a practical range.
         let num_discrs = adt_def.discriminants(tcx).count();
         if variants.iter_enumerated().any(|(var_idx, _)| {
             let discr_for_var = adt_def.discriminant_for_variant(tcx, var_idx).val;
@@ -79,10 +84,11 @@ impl EnumSizeOpt {
             return Some((*adt_def, num_discrs, *alloc_id));
         }
 
+        // Build table that maps from discriminant indices to variant sizes,
+        // each entry is one usize.
         let data_layout = tcx.data_layout();
-        let ptr_sized_int = data_layout.ptr_sized_integer();
-        let target_bytes = ptr_sized_int.size().bytes() as usize;
-        let mut data = vec![0; target_bytes * num_discrs];
+        let usize_bytes = data_layout.pointer_data_size.bytes() as usize;
+        let mut data = vec![0; usize_bytes * num_discrs];
         macro_rules! encode_store {
             ($curr_idx: expr, $endian: expr, $bytes: expr) => {
                 let bytes = match $endian {
@@ -95,23 +101,22 @@ impl EnumSizeOpt {
             };
         }
 
+        // Write variant sizes to table.
         for (var_idx, layout) in variants.iter_enumerated() {
             let curr_idx =
-                target_bytes * adt_def.discriminant_for_variant(tcx, var_idx).val as usize;
-            let sz = layout.size;
-            match ptr_sized_int {
-                rustc_target::abi::Integer::I32 => {
-                    encode_store!(curr_idx, data_layout.endian, sz.bytes() as u32);
-                }
-                rustc_target::abi::Integer::I64 => {
-                    encode_store!(curr_idx, data_layout.endian, sz.bytes());
-                }
+                usize_bytes * adt_def.discriminant_for_variant(tcx, var_idx).val as usize;
+            let sz = layout.memory_size;
+            match usize_bytes {
+                4 => encode_store!(curr_idx, data_layout.endian, sz.bytes() as u32),
+                8 => encode_store!(curr_idx, data_layout.endian, sz.bytes()),
                 _ => unreachable!(),
             };
         }
+
+        // Write table to allocation.
         let alloc = interpret::Allocation::from_bytes(
             data,
-            tcx.data_layout.ptr_sized_integer().align(&tcx.data_layout).abi,
+            tcx.data_layout.ptr_data_sized_integer().align(&tcx.data_layout).abi,
             Mutability::Not,
         );
         let alloc = tcx.create_memory_alloc(tcx.mk_const_alloc(alloc));
@@ -137,6 +142,7 @@ impl EnumSizeOpt {
                     let source_info = st.source_info;
                     let span = source_info.span;
 
+                    // Create local variable to access table of variant sizes.
                     let (adt_def, num_variants, alloc_id) =
                         self.candidate(tcx, param_env, ty, &mut alloc_cache)?;
                     let alloc = tcx.global_alloc(alloc_id).unwrap_memory();
@@ -165,6 +171,7 @@ impl EnumSizeOpt {
                         kind: StatementKind::Assign(Box::new((place, rval))),
                     };
 
+                    // Store discriminant.
                     let discr_place = Place::from(
                         local_decls
                             .push(LocalDecl::new(adt_def.repr().discr_type().to_ty(tcx), span)),
@@ -178,6 +185,7 @@ impl EnumSizeOpt {
                         ))),
                     };
 
+                    // Cast discriminant to usize to index into table of variant sizes.
                     let discr_cast_place =
                         Place::from(local_decls.push(LocalDecl::new(tcx.types.usize, span)));
 
@@ -193,6 +201,7 @@ impl EnumSizeOpt {
                         ))),
                     };
 
+                    // Get size of variant.
                     let size_place =
                         Place::from(local_decls.push(LocalDecl::new(tcx.types.usize, span)));
 
@@ -208,6 +217,7 @@ impl EnumSizeOpt {
                         ))),
                     };
 
+                    // Cast source and destination to byte pointers.
                     let dst = Place::from(
                         local_decls.push(LocalDecl::new(Ty::new_mut_ptr(tcx, ty), span)),
                     );
@@ -256,6 +266,7 @@ impl EnumSizeOpt {
                         ))),
                     };
 
+                    // Copy size of active variant.
                     let deinit_old =
                         Statement { source_info, kind: StatementKind::Deinit(Box::new(dst)) };
 
@@ -270,6 +281,7 @@ impl EnumSizeOpt {
                         )),
                     };
 
+                    // Clean up table of variant sizes.
                     let store_dead = Statement {
                         source_info,
                         kind: StatementKind::StorageDead(size_array_local),

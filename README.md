@@ -1,301 +1,275 @@
-# The Rust Programming Language
+# The Rust Programming Language (experimental Morello port)
 
-[![Rust Community](https://img.shields.io/badge/Rust_Community%20-Join_us-brightgreen?style=plastic&logo=rust)](https://www.rust-lang.org/community)
+This is a fork of [Rust](https://www.rust-lang.org) which adds experimental support for [Morello](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-morello.html).
+Morello is an experimental processor architecture that adds [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) protections to ARM (AArch64).
+This repository contains the compiler, standard library, and documentation.
 
-This is the main source code repository for [Rust]. It contains the compiler,
-standard library, and documentation.
+As of time of writing (2024-01-12), this compiler should be fully functional, but has bugs and contains some dirty hacks we haven't fixed yet.
+Expect things to break.
 
-[Rust]: https://www.rust-lang.org/
+This fork is not built or maintained by the Rust project proper, please don't complain to them if you have issues with it, they will not be able to help.
+We can be contacted via email or GitHub issues but don't really have the capacity to offer much support.
 
-**Note: this README is for _users_ rather than _contributors_.**
-If you wish to _contribute_ to the compiler, you should read
-[CONTRIBUTING.md](CONTRIBUTING.md) instead.
+## Setup
 
-## Quick Start
+This fork is intended to be used as a cross compiler.
+We have not yet tried running the compiler itself on Morello.
 
-Read ["Installation"] from [The Book].
+The fork has been used and tested compiling from x86-64 Linux and M1 Mac OS Ventura.
+Mac OS requires some additional setup.
+Other platforms may or may not work.
 
-["Installation"]: https://doc.rust-lang.org/book/ch01-01-installation.html
-[The Book]: https://doc.rust-lang.org/book/index.html
+Programs can be compiled for CheriBSD running on Morello, and other targets already supported by Rust.
 
-## Installing from Source
+There are two ways to install the compiler:
+* download a pre-built binary (if one is available for your platform)
+* build the compiler from source
 
-The Rust build system uses a Python script called `x.py` to build the compiler,
-which manages the bootstrapping process. It lives at the root of the project.
-It also uses a file named `config.toml` to determine various configuration
-settings for the build. You can see a full list of options in
-`config.example.toml`.
+## Pre-built Binaries
 
-The `x.py` command can be run directly on most Unix systems in the following
-format:
+See <https://github.com/kent-weak-memory/rust/releases> for available builds.
+Releases as of January 2024 should work straight from the directory they are extracted into, and include:
+* the Rust compiler, `rustc`
+* the Rust package manager, `cargo`
+* the Rust standard library for Morello FreeBSD, AArch64 FreeBSD, and the platform the release is for
+* supporting system libraries for Morello and AArch64
+* extra tools for Morello and AArch64
+* a simple example program
 
-```sh
-./x.py <subcommand> [flags]
+Note that releases from before January 2024 had a different structure and content, and will be more awkward to use.
+
+### Compiling Programs
+
+Programs can be built either with the Rust package manager, Cargo, or manually with just the compiler.
+
+*Cargo*
+
+Cargo must be told to use the correct compiler and linker for Morello via a `.cargo/config` configuration file in either your home directory or the top level directory of the project you are trying to build.
+See the example in `example_project`.
+
+The following sets the Rust compiler for all platforms, and the linker for Morello and AArch64, you will need to modify the paths for your installation:
+```
+[build]
+rustc = "/path/to/release/bin/rustc"
+
+[target.aarch64-unknown-freebsd]
+linker = "/path/to/release/bin/clang-freebsd.sh"
+
+[target.aarch64-unknown-freebsd-purecap]
+linker = "/path/to/release/bin/clang-morello.sh"
 ```
 
-This is how the documentation and examples assume you are running `x.py`.
-See the [rustc dev guide][rustcguidebuild] if this does not work on your
-platform.
-
-More information about `x.py` can be found by running it with the `--help` flag
-or reading the [rustc dev guide][rustcguidebuild].
-
-[gettingstarted]: https://rustc-dev-guide.rust-lang.org/getting-started.html
-[rustcguidebuild]: https://rustc-dev-guide.rust-lang.org/building/how-to-build-and-run.html#what-is-xpy
-
-### Dependencies
-
-Make sure you have installed the dependencies:
-
-* `python` 3 or 2.7
-* `git`
-* A C compiler (when building for the host, `cc` is enough; cross-compiling may
-  need additional compilers)
-* `curl` (not needed on Windows)
-* `pkg-config` if you are compiling on Linux and targeting Linux
-* `libiconv` (already included with glibc on Debian-based distros)
-
-To build Cargo, you'll also need OpenSSL (`libssl-dev` or `openssl-devel` on
-most Unix distros).
-
-If building LLVM from source, you'll need additional tools:
-
-* `g++`, `clang++`, or MSVC with versions listed on
-  [LLVM's documentation](https://llvm.org/docs/GettingStarted.html#host-c-toolchain-both-compiler-and-standard-library)
-* `ninja`, or GNU `make` 3.81 or later (Ninja is recommended, especially on
-  Windows)
-* `cmake` 3.13.4 or later
-* `libstdc++-static` may be required on some Linux distributions such as Fedora
-  and Ubuntu
-
-On tier 1 or tier 2 with host tools platforms, you can also choose to download
-LLVM by setting `llvm.download-ci-llvm = true`.
-Otherwise, you'll need LLVM installed and `llvm-config` in your path.
-See [the rustc-dev-guide for more info][sysllvm].
-
-[sysllvm]: https://rustc-dev-guide.rust-lang.org/building/new-target.html#using-pre-built-llvm
-
-
-### Building on a Unix-like system
-
-#### Build steps
-
-1. Clone the [source] with `git`:
-
-   ```sh
-   git clone https://github.com/rust-lang/rust.git
-   cd rust
-   ```
-
-[source]: https://github.com/rust-lang/rust
-
-2. Configure the build settings:
-
-   ```sh
-   ./configure
-   ```
-
-   If you plan to use `x.py install` to create an installation, it is
-   recommended that you set the `prefix` value in the `[install]` section to a
-   directory: `./configure --set install.prefix=<path>`
-
-3. Build and install:
-
-   ```sh
-   ./x.py build && ./x.py install
-   ```
-
-   When complete, `./x.py install` will place several programs into
-   `$PREFIX/bin`: `rustc`, the Rust compiler, and `rustdoc`, the
-   API-documentation tool. By default, it will also include [Cargo], Rust's
-   package manager. You can disable this behavior by passing
-   `--set build.extended=false` to `./configure`.
-
-[Cargo]: https://github.com/rust-lang/cargo
-
-#### Configure and Make
-
-This project provides a configure script and makefile (the latter of which just
-invokes `x.py`). `./configure` is the recommended way to programatically
-generate a `config.toml`. `make` is not recommended (we suggest using `x.py`
-directly), but it is supported and we try not to break it unnecessarily.
-
-```sh
-./configure
-make && sudo make install
+The following commands, run from the root directory of your project, will build it for Morello, AArch64, and the local machine's architecture respectively:
+```
+/path/to/release/bin/cargo build --target aarch64-unknown-freebsd-purecap
+/path/to/release/bin/cargo build --target aarch64-unknown-freebsd
+/path/to/release/bin/cargo build
 ```
 
-`configure` generates a `config.toml` which can also be used with normal `x.py`
-invocations.
+The resulting executable will appear at `target/aarch64-unknown-freebsd-purecap/debug/program-name` for Morello, and similarly named directories for other targets.
 
-### Building on Windows
+*Manual*
 
-On Windows, we suggest using [winget] to install dependencies by running the
-following in a terminal:
-
-```powershell
-winget install -e Python.Python.3
-winget install -e Kitware.CMake
-winget install -e Git.Git
+To build for Morello Purecap:
+```
+/path/to/release/bin/rustc --out-dir /tmp/build -g --target aarch64-unknown-freebsd-purecap -C linker=/path/to/release/bin/clang-morello.sh program.rs
 ```
 
-Then edit your system's `PATH` variable and add: `C:\Program Files\CMake\bin`.
-See
-[this guide on editing the system `PATH`](https://www.java.com/en/download/help/path.html)
-from the Java documentation.
+The resulting binary will appear at `/tmp/build/program`
 
-[winget]: https://github.com/microsoft/winget-cli
-
-There are two prominent ABIs in use on Windows: the native (MSVC) ABI used by
-Visual Studio and the GNU ABI used by the GCC toolchain. Which version of Rust
-you need depends largely on what C/C++ libraries you want to interoperate with.
-Use the MSVC build of Rust to interop with software produced by Visual Studio
-and the GNU build to interop with GNU software built using the MinGW/MSYS2
-toolchain.
-
-#### MinGW
-
-[MSYS2][msys2] can be used to easily build Rust on Windows:
-
-[msys2]: https://www.msys2.org/
-
-1. Download the latest [MSYS2 installer][msys2] and go through the installer.
-
-2. Run `mingw32_shell.bat` or `mingw64_shell.bat` from the MSYS2 installation
-   directory (e.g. `C:\msys64`), depending on whether you want 32-bit or 64-bit
-   Rust. (As of the latest version of MSYS2 you have to run `msys2_shell.cmd
-   -mingw32` or `msys2_shell.cmd -mingw64` from the command line instead.)
-
-3. From this terminal, install the required tools:
-
-   ```sh
-   # Update package mirrors (may be needed if you have a fresh install of MSYS2)
-   pacman -Sy pacman-mirrors
-
-   # Install build tools needed for Rust. If you're building a 32-bit compiler,
-   # then replace "x86_64" below with "i686". If you've already got Git, Python,
-   # or CMake installed and in PATH you can remove them from this list.
-   # Note that it is important that you do **not** use the 'python2', 'cmake',
-   # and 'ninja' packages from the 'msys2' subsystem.
-   # The build has historically been known to fail with these packages.
-   pacman -S git \
-               make \
-               diffutils \
-               tar \
-               mingw-w64-x86_64-python \
-               mingw-w64-x86_64-cmake \
-               mingw-w64-x86_64-gcc \
-               mingw-w64-x86_64-ninja
-   ```
-
-4. Navigate to Rust's source code (or clone it), then build it:
-
-   ```sh
-   python x.py setup user && python x.py build && python x.py install
-   ```
-
-#### MSVC
-
-MSVC builds of Rust additionally require an installation of Visual Studio 2017
-(or later) so `rustc` can use its linker. The simplest way is to get
-[Visual Studio], check the "C++ build tools" and "Windows 10 SDK" workload.
-
-[Visual Studio]: https://visualstudio.microsoft.com/downloads/
-
-(If you're installing CMake yourself, be careful that "C++ CMake tools for
-Windows" doesn't get included under "Individual components".)
-
-With these dependencies installed, you can build the compiler in a `cmd.exe`
-shell with:
-
-```sh
-python x.py setup user
-python x.py build
+To build for AArch64:
+```
+/path/to/release/bin/rustc --out-dir /tmp/build -g --target aarch64-unknown-freebsd -C linker=/path/to/release/bin/clang-freebsd.sh program.rs
 ```
 
-Right now, building Rust only works with some known versions of Visual Studio.
-If you have a more recent version installed and the build system doesn't
-understand, you may need to force rustbuild to use an older version.
-This can be done by manually calling the appropriate vcvars file before running
-the bootstrap.
-
-```batch
-CALL "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat"
-python x.py build
+To build for the architecture of the local machine:
+```
+/path/to/release/bin/rustc --out-dir /tmp/build -g program.rs
 ```
 
-#### Specifying an ABI
+## Building from Source
 
-Each specific ABI can also be used from either environment (for example, using
-the GNU ABI in PowerShell) by using an explicit build triple. The available
-Windows build triples are:
-- GNU ABI (using GCC)
-    - `i686-pc-windows-gnu`
-    - `x86_64-pc-windows-gnu`
-- The MSVC ABI
-    - `i686-pc-windows-msvc`
-    - `x86_64-pc-windows-msvc`
+At a high level the steps to build from source are:
+* compile Morello LLVM
+* compile CheriBSD
+* compile Rust compiler and libraries
+* compile additional Rust tools
 
-The build triple can be specified by either specifying `--build=<triple>` when
-invoking `x.py` commands, or by creating a `config.toml` file (as described in
-[Building on a Unix-like system](#building-on-a-unix-like-system)), and passing
-`--set build.build=<triple>` to `./configure`.
+### Cheribuild
 
-## Building Documentation
+Cheribuild is required to compile Morello LLVM and CHERI BSD.
 
-If you'd like to build the documentation, it's almost the same:
+Clone it from `https://github.com/CTSRD-CHERI/cheribuild` and follow their setup instructions for your platform.
 
-```sh
-./x.py doc
+### CHERI BSD (and Morello LLVM)
+
+Building libraries and programs requires a build of Morello LLVM as a compiler backend, and a build of CHERI BSD to compile against.
+Cheribuild will automatically compile Morello LLVM as a dependency for building CHERI BSD, so we can do both in one go:
+```
+cd /path/to/cheribuild
+./cheribuild.py -d cheribsd-morello-purecap
 ```
 
-The generated documentation will appear under `doc` in the `build` directory for
-the ABI used. That is, if the ABI was `x86_64-pc-windows-msvc`, the directory
-will be `build\x86_64-pc-windows-msvc\doc`.
+Note that this process will download large amounts of source code from the internet.
 
-## Notes
+### Clone Compiler Repository
 
-Since the Rust compiler is written in Rust, it must be built by a precompiled
-"snapshot" version of itself (made in an earlier stage of development).
-As such, source builds require an Internet connection to fetch snapshots, and an
-OS that can execute the available snapshot binaries.
+If you have not done so already, clone this repository so it is available for later steps.
+Be aware that the complete repository is very large.
+Using a shallow clone can save time and storage if you don't need the entire commit history:
+```
+git clone --depth=1 https://github.com/kent-weak-memory/rust.git
+```
 
-See https://doc.rust-lang.org/nightly/rustc/platform-support.html for a list of
-supported platforms.
-Only "host tools" platforms have a pre-compiled snapshot binary available; to
-compile for a platform without host tools you must cross-compile.
+### Patch and Rebuild Morello LLVM
 
-You may find that other platforms work, but these are our officially supported
-build environments that are most likely to work.
+Our compiler requires minor changes to Morello LLVM to function properly.
 
-## Getting Help
+Checkout a known working version of Morello LLVM and apply patches:
+```
+cd /path/to/cheribuild-working-directory/morello-llvm-project
+git fetch --unshallow
+git checkout f35a94e96b1c3cc017ca9581ecfeb405ed86508d
+git apply /path/to/rust-repository/llvm.patch
+```
 
-See https://www.rust-lang.org/community for a list of chat platforms and forums.
+Rebuild Morello LLVM:
+```
+cd /path/to/cheribuild
+./cheribuild.py --skip-update morello-llvm
+```
 
-## Contributing
+### Compiler configuration
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Rust requires a `config.toml` which provides details of how to build the compiler.
+In addition, our fork also requires paths to tools to be set in `cheri-config.sh`.
+
+Modify `cheri-config.sh` to point at your Cheribuild output directory.
+By default this will be `~/cheri/` on UNIX-like systems.
+
+Create a `config.toml`, with contents along the lines of the example below.
+Some values will need to be replaced with the correct ones for your environment:
+
+* `/path/to/cheribuild-working-directory` replace with the absolute path to your Cheribuild working directory
+* `/path/to/rust-repository` replace with the absolute path to your clone of this compiler repository
+* `aarch64-apple-darwin` replace with the architecture for the system you want to run the compiler on (`aarch64-apple-darwin` for M1 Mac OS, `x86_64-unknown-linux-gnu` for x86-64 Linux)
+
+```toml
+profile = "codegen"
+changelog-seen = 2
+
+[build]
+target = ["aarch64-apple-darwin", "aarch64-unknown-freebsd-purecap", "aarch64-unknown-freebsd"]
+
+[target.aarch64-apple-darwin]
+llvm-config = "/path/to/cheribuild-working-directory/output/morello-sdk/bin/llvm-config"
+
+# This section tells the compiler to use custom scripts for linking AArch64 programs.
+[target.aarch64-unknown-freebsd]
+cc = "/path/to/rust-repository/clang-freebsd.sh"
+cxx = "/path/to/rust-repository/clang++-freebsd.sh"
+linker = "/path/to/rust-repository/clang-freebsd.sh"
+ar = "/path/to/cheribuild-working-directory/output/morello-sdk/bin/ar"
+ranlib = "/path/to/cheribuild-working-directory/output/morello-sdk/bin/ranlib"
+
+# This section tells the compiler to use custom scripts for linking Purecap programs.
+[target.aarch64-unknown-freebsd-purecap]
+cc = "/path/to/rust-repository/clang-morello.sh"
+cxx = "/path/to/rust-repository/clang++-morello.sh"
+ar = "/path/to/cheribuild-working-directory/output/morello-sdk/bin/ar"
+ranlib = "/path/to/cheribuild-working-directory/output/morello-sdk/bin/ranlib"
+linker = "/path/to/rust-repository/clang-morello.sh"
+```
+
+### Compile Rust
+
+Building programs requires a build of the compiler, a build of the Rust standard libraries for the architecture of the machine that will run the compiler (for build scripts), and a build of the standard libraries for the target machine.
+
+Build the compiler and standard libraries:
+```
+cd /path/to/rust-repository
+python3 x.py build
+```
+
+Note that this process will download large amounts of source code from the internet.
+
+You may also want to build the package manager Cargo:
+```
+python3 x.py build tools/cargo
+```
+
+### Compiling Programs
+
+Programs can be built either with the Rust package manager, Cargo, or manually with just the compiler.
+
+*Cargo*
+
+Assuming you have already built Cargo, it can be run from `/path/to/rust-repository/build/aarch64-apple-darwin/stage1-tools-bin/cargo` (replacing `aarch64-apple-darwin` if your machine has a different architecture).
+Cargo must be told to use the correct compiler and linker for Morello via a `.cargo/config` configuration file in either your home directory or the top level directory of the project you are trying to build.
+
+The following sets the Rust compiler for all platforms, and the linker for Morello and AArch64, you will need to modify the paths for your installation and architecture:
+```
+[build]
+rustc = "/path/to/rust-repository/build/aarch64-apple-darwin/stage1/bin/rustc"
+
+[target.aarch64-unknown-freebsd]
+linker = "/path/to/rust-repository/clang-freebsd.sh"
+
+[target.aarch64-unknown-freebsd-purecap]
+linker = "/path/to/rust-repository/clang-morello.sh"
+```
+
+The following commands, run from the root directory of your project, will build it for Morello, AArch64, and the local machine's architecture respectively:
+```
+/path/to/rust-repository/build/aarch64-apple-darwin/stage1-tools-bin/cargo build --target aarch64-unknown-freebsd-purecap
+/path/to/rust-repository/build/aarch64-apple-darwin/stage1-tools-bin/cargo build --target aarch64-unknown-freebsd
+/path/to/rust-repository/build/aarch64-apple-darwin/stage1-tools-bin/cargo build
+```
+
+The resulting executable will appear at `target/aarch64-unknown-freebsd-purecap/debug/program-name` for Morello, and similarly named directories for other targets.
+
+*Manual*
+
+The compiler itself can be found in `/path/to/rust-repository/build/aarch64-apple-darwin/stage1/bin/rustc`
+
+It will default to building for the machine it is running on, so building for the current machine looks like this:
+```
+/path/to/rust-repository/build/aarch64-apple-darwin/stage1/bin/rustc --out-dir /tmp/build -g program.rs
+```
+The resulting binary will appear at `/tmp/build/program`
+
+To build for Morello Purecap, specify the architecture and linker:
+```
+/path/to/rust-repository/build/aarch64-apple-darwin/stage1/bin/rustc --out-dir /tmp/build -g --target aarch64-unknown-freebsd-purecap -C linker=/path/to/rust-repository/clang-morello.sh program.rs
+```
+
+To build for AArch64:
+```
+/path/to/rust-repository/build/aarch64-apple-darwin/stage1/bin/rustc --out-dir /tmp/build -g --target aarch64-unknown-freebsd -C linker=/path/to/rust-repository/clang-freebsd.sh program.rs
+```
+
+### Mac OS Ventura
+
+There are a couple of problems on Mac OS.
+
+*libarchive*
+
+Firstly, there's a packaging issue with upstream libarchive, and the brew install doesn't work perfectly.
+To fix this remove `Requires.private: iconv` from `/opt/homebrew/opt/libarchive/lib/pkgconfig/libarchive.pc`.
+You might need to do `chmod +w` first.
+There are issues tracking this [here](https://github.com/Homebrew/homebrew-core/issues/120526), and [here](https://github.com/CTSRD-CHERI/cheribuild/issues/340).
+
+*failed to `installworld`*
+
+There's some weird interaction between a new feature in Mac OS 13 (Ventura) and the Cheribuild script.
+You need to disable SIP by following the Apple instructions [here](https://developer.apple.com/documentation/security/disabling_and_enabling_system_integrity_protection).
+There is an issue tracking this [here](https://github.com/CTSRD-CHERI/cheribuild/issues/339).
 
 ## License
 
-Rust is primarily distributed under the terms of both the MIT license and the
-Apache License (Version 2.0), with portions covered by various BSD-like
-licenses.
+Rust is primarily distributed under the terms of both the MIT license
+and the Apache License (Version 2.0), with portions covered by various
+BSD-like licenses.
 
 See [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT), and
 [COPYRIGHT](COPYRIGHT) for details.
-
-## Trademark
-
-[The Rust Foundation][rust-foundation] owns and protects the Rust and Cargo
-trademarks and logos (the "Rust Trademarks").
-
-If you want to use these names or brands, please read the
-[media guide][media-guide].
-
-Third-party logos may be subject to third-party copyrights and trademarks. See
-[Licenses][policies-licenses] for details.
-
-[rust-foundation]: https://foundation.rust-lang.org/
-[media-guide]: https://foundation.rust-lang.org/policies/logo-policy-and-media-guide/
-[policies-licenses]: https://www.rust-lang.org/policies/licenses

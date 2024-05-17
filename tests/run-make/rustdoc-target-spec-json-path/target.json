@@ -34,5 +34,6 @@
     "thread"
   ],
   "target-family": "unix",
-  "target-pointer-width": "64"
+  "target-pointer-data-size": "64"
+  "target-pointer-memory-size": "64"
 }

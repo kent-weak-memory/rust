@@ -115,7 +115,7 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
                 .layout_of(self.param_env.with_reveal_all_normalized(self.tcx).and(ty))
                 .ok()
                 .unwrap()
-                .size
+                .data_size.unwrap()
                 .unsigned_int_max()
         };
         match (end, cmp) {

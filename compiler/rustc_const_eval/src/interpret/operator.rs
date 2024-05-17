@@ -153,7 +153,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         // Shift ops can have an RHS with a different numeric type.
         if matches!(bin_op, Shl | ShlUnchecked | Shr | ShrUnchecked) {
-            let size = u128::from(left_layout.size.bits());
+            let size = u128::from(left_layout.data_size.unwrap().bits());
             // Even if `r` is signed, we treat it as if it was unsigned (i.e., we use its
             // zero-extended form). This matches the codegen backend:
             // <https://github.com/rust-lang/rust/blob/c274e4969f058b1c644243181ece9f829efa7594/compiler/rustc_codegen_ssa/src/base.rs#L315-L317>.
@@ -201,7 +201,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 );
             }
 
-            return Ok((Scalar::from_uint(truncated, left_layout.size), overflow, left_layout.ty));
+            let value = Scalar::from_uint(truncated, left_layout.data_size.unwrap(), left_layout.memory_size);
+            return Ok((value, overflow, left_layout.ty));
         }
 
         // For the remaining ops, the types must be the same on both sides
@@ -217,7 +218,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             )
         }
 
-        let size = left_layout.size;
+        let data_size = left_layout.data_size.unwrap();
+        let memory_size = left_layout.memory_size;
 
         // Operations that need special treatment for signed integers
         if left_layout.abi.is_signed() {
@@ -250,7 +252,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // We need a special check for overflowing Rem and Div since they are *UB*
                 // on overflow, which can happen with "int_min $OP -1".
                 if matches!(bin_op, Rem | Div) {
-                    if l == size.signed_int_min() && r == -1 {
+                    if l == data_size.signed_int_min() && r == -1 {
                         if bin_op == Rem {
                             throw_ub!(RemainderOverflow)
                         } else {
@@ -268,7 +270,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 if overflow && let Some(intrinsic_name) = throw_ub_on_overflow {
                     throw_ub_custom!(fluent::const_eval_overflow, name = intrinsic_name);
                 }
-                return Ok((Scalar::from_uint(truncated, size), overflow, left_layout.ty));
+                return Ok((Scalar::from_uint(truncated, data_size, memory_size), overflow, left_layout.ty));
             }
         }
 
@@ -281,9 +283,9 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             Gt => (Scalar::from_bool(l > r), self.tcx.types.bool),
             Ge => (Scalar::from_bool(l >= r), self.tcx.types.bool),
 
-            BitOr => (Scalar::from_uint(l | r, size), left_layout.ty),
-            BitAnd => (Scalar::from_uint(l & r, size), left_layout.ty),
-            BitXor => (Scalar::from_uint(l ^ r, size), left_layout.ty),
+            BitOr => (Scalar::from_uint(l | r, data_size, memory_size), left_layout.ty),
+            BitAnd => (Scalar::from_uint(l & r, data_size, memory_size), left_layout.ty),
+            BitXor => (Scalar::from_uint(l ^ r, data_size, memory_size), left_layout.ty),
 
             Add | AddUnchecked | Sub | SubUnchecked | Mul | MulUnchecked | Rem | Div => {
                 assert!(!left_layout.abi.is_signed());
@@ -305,7 +307,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 if overflow && let Some(intrinsic_name) = throw_ub_on_overflow {
                     throw_ub_custom!(fluent::const_eval_overflow, name = intrinsic_name);
                 }
-                return Ok((Scalar::from_uint(truncated, size), overflow, left_layout.ty));
+                return Ok((Scalar::from_uint(truncated, data_size, memory_size), overflow, left_layout.ty));
             }
 
             _ => span_bug!(
@@ -399,8 +401,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     right.layout.ty
                 );
 
-                let l = left.to_scalar().to_bits(left.layout.size)?;
-                let r = right.to_scalar().to_bits(right.layout.size)?;
+                let l = left.to_scalar().to_bits(left.layout.data_size.unwrap())?;
+                let r = right.to_scalar().to_bits(right.layout.data_size.unwrap())?;
                 self.binary_int_op(bin_op, l, left.layout, r, right.layout)
             }
             _ if left.layout.ty.is_any_ptr() => {
@@ -468,7 +470,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             }
             _ => {
                 assert!(layout.ty.is_integral());
-                let val = val.to_bits(layout.size)?;
+                let val = val.to_bits(layout.data_size.unwrap())?;
                 let (res, overflow) = match un_op {
                     Not => (self.truncate(!val, layout), false), // bitwise negation, then truncate
                     Neg => {
@@ -483,7 +485,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                         (truncated, overflow || self.sign_extend(truncated, layout) != res)
                     }
                 };
-                Ok((Scalar::from_uint(res, layout.size), overflow, layout.ty))
+                Ok((Scalar::from_uint(res, layout.data_size.unwrap(), layout.memory_size), overflow, layout.ty))
             }
         }
     }

@@ -10,7 +10,8 @@ pub fn target() -> Target {
 
     Target {
         llvm_target: llvm_target.into(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memory_size: 64,
         data_layout: "e-m:o-i64:64-i128:128-n32:64-S128".into(),
         arch: arch.target_arch(),
         options: TargetOptions {

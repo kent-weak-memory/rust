@@ -5,7 +5,8 @@ pub fn target() -> Target {
     let base = opts("watchos", Arch::Arm64_32);
     Target {
         llvm_target: "arm64_32-apple-watchos".into(),
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memory_size: 32,
         data_layout: "e-m:o-p:32:32-i64:64-i128:128-n32:64-S128".into(),
         arch: "aarch64".into(),
         options: TargetOptions {

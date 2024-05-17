@@ -54,7 +54,8 @@ fn dump_layout_of(tcx: TyCtxt<'_>, item_def_id: LocalDefId, attr: &Attribute) {
                     sym::size => {
                         tcx.sess.emit_err(Size {
                             span: tcx.def_span(item_def_id.to_def_id()),
-                            size: format!("{:?}", ty_layout.size),
+                            data_size: format!("{:?}", ty_layout.data_size),
+                            memory_size: format!("{:?}", ty_layout.memory_size),
                         });
                     }
 

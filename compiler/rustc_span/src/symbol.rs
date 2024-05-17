@@ -1500,6 +1500,7 @@ symbols! {
         target_has_atomic_equal_alignment,
         target_has_atomic_load_store,
         target_os,
+        // TODO(seharris): this name is now misleading.
         target_pointer_width,
         target_thread_local,
         target_vendor,

@@ -639,6 +639,11 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         expr_span: Span,
         source_info: SourceInfo,
     ) -> BasicBlock {
+        // TODO(seharris): use compiler flag.
+        if self.tcx.sess.opts.cg.drop_bounds_checks {
+            return block;
+        }
+
         let usize_ty = self.tcx.types.usize;
         let bool_ty = self.tcx.types.bool;
         // bounds check:

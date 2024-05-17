@@ -25,7 +25,8 @@ pub fn is_zero_slice_long(data: &[u8; 456]) -> bool {
 // CHECK-LABEL: @is_zero_slice_short
 #[no_mangle]
 pub fn is_zero_slice_short(data: &[u8; 4]) -> bool {
-    // CHECK: %[[LOAD:.+]] = load i32, {{i32\*|ptr}} %{{.+}}, align 1
+    // NONCHERI: %[[LOAD:.+]] = load i32, {{i32\*|ptr}} %{{.+}}, align 1
+    // CHERI: %[[LOAD:.+]] = load i32, {{i32 addrspace\(200)\*|ptr addrspace\(200)}} %{{.+}}, align 1
     // CHECK-NEXT: %[[EQ:.+]] = icmp eq i32 %[[LOAD]], 0
     // CHECK-NEXT: ret i1 %[[EQ]]
     &data[..] == [0; 4]
@@ -34,7 +35,8 @@ pub fn is_zero_slice_short(data: &[u8; 4]) -> bool {
 // CHECK-LABEL: @is_zero_array
 #[no_mangle]
 pub fn is_zero_array(data: &[u8; 4]) -> bool {
-    // CHECK: %[[LOAD:.+]] = load i32, {{i32\*|ptr}} %{{.+}}, align 1
+    // NONCHERI: %[[LOAD:.+]] = load i32, {{i32\*|ptr}} %{{.+}}, align 1
+    // CHERI: %[[LOAD:.+]] = load i32, {{i32 addrspace\(200)\*|ptr addrspace\(200)}} %{{.+}}, align 1
     // CHECK-NEXT: %[[EQ:.+]] = icmp eq i32 %[[LOAD]], 0
     // CHECK-NEXT: ret i1 %[[EQ]]
     *data == [0; 4]
@@ -50,7 +52,8 @@ pub fn is_zero_array(data: &[u8; 4]) -> bool {
 fn eq_slice_of_nested_u8(x: &[[u8; 3]], y: &[[u8; 3]]) -> bool {
     // CHECK: icmp eq [[USIZE]] %1, %3
     // CHECK: %[[BYTES:.+]] = mul nsw [[USIZE]] %1, 3
-    // CHECK: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i8\*|ptr}}
+    // NONCHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i8\*|ptr}}
+    // CHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i8 addrspace\(200\)\*|ptr addrspace\(200\)}}
     // CHECK-SAME: , [[USIZE]]{{( noundef)?}} %[[BYTES]])
     x == y
 }
@@ -62,7 +65,8 @@ fn eq_slice_of_nested_u8(x: &[[u8; 3]], y: &[[u8; 3]]) -> bool {
 fn eq_slice_of_i32(x: &[i32], y: &[i32]) -> bool {
     // CHECK: icmp eq [[USIZE]] %1, %3
     // CHECK: %[[BYTES:.+]] = shl nsw [[USIZE]] %1, 2
-    // CHECK: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i32\*|ptr}}
+    // NONCHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i32\*|ptr}}
+    // CHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i32 addrspace\(200\)\*|ptr addrspace\(200\)}}
     // CHECK-SAME: , [[USIZE]]{{( noundef)?}} %[[BYTES]])
     x == y
 }
@@ -74,7 +78,8 @@ fn eq_slice_of_i32(x: &[i32], y: &[i32]) -> bool {
 fn eq_slice_of_nonzero(x: &[NonZeroU32], y: &[NonZeroU32]) -> bool {
     // CHECK: icmp eq [[USIZE]] %1, %3
     // CHECK: %[[BYTES:.+]] = shl nsw [[USIZE]] %1, 2
-    // CHECK: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i32\*|ptr}}
+    // NONCHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i32\*|ptr}}
+    // CHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i32 addrspace\(200\)\*|ptr addrspace\(200\)}}
     // CHECK-SAME: , [[USIZE]]{{( noundef)?}} %[[BYTES]])
     x == y
 }
@@ -86,7 +91,8 @@ fn eq_slice_of_nonzero(x: &[NonZeroU32], y: &[NonZeroU32]) -> bool {
 fn eq_slice_of_option_of_nonzero(x: &[Option<NonZeroI16>], y: &[Option<NonZeroI16>]) -> bool {
     // CHECK: icmp eq [[USIZE]] %1, %3
     // CHECK: %[[BYTES:.+]] = shl nsw [[USIZE]] %1, 1
-    // CHECK: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i16\*|ptr}}
+    // NONCHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i16\*|ptr}}
+    // CHERI: tail call{{( noundef)?}} i32 @{{bcmp|memcmp}}({{i16 addrspace\(200\)\*|ptr addrspace\(200\)}}
     // CHECK-SAME: , [[USIZE]]{{( noundef)?}} %[[BYTES]])
     x == y
 }

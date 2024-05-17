@@ -9,7 +9,8 @@ pub fn target() -> Target {
     base.crt_static_default = false;
     Target {
         llvm_target: "mips-unknown-linux-musl".into(),
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memory_size: 32,
         data_layout: "E-m:m-p:32:32-i8:8:32-i16:16:32-i64:64-n32-S64".into(),
         arch: "mips".into(),
         options: TargetOptions { endian: Endian::Big, mcount: "_mcount".into(), ..base },

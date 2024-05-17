@@ -382,13 +382,13 @@ pub fn eval_to_allocation_raw_provider<'tcx>(
 
                 let alloc = ecx.tcx.global_alloc(alloc_id).unwrap_memory().inner();
                 let mut bytes = String::new();
-                if alloc.size() != abi::Size::ZERO {
+                if alloc.memory_size() != abi::Size::ZERO {
                     bytes = "\n".into();
                     // FIXME(translation) there might be pieces that are translatable.
                     write_allocation_bytes(*ecx.tcx, alloc, &mut bytes, "    ").unwrap();
                 }
                 let raw_bytes = errors::RawBytesNote {
-                    size: alloc.size().bytes(),
+                    size: alloc.memory_size().bytes(),
                     align: alloc.align.bytes(),
                     bytes,
                 };

@@ -69,7 +69,7 @@ fn uncached_llvm_type<'a, 'tcx>(
 
     match layout.fields {
         FieldsShape::Primitive | FieldsShape::Union(_) => {
-            let fill = cx.type_padding_filler(layout.size, layout.align.abi);
+            let fill = cx.type_padding_filler(layout.memory_size, layout.align.abi);
             let packed = false;
             match name {
                 None => cx.type_struct(&[fill], packed),
@@ -134,26 +134,26 @@ fn struct_llfields<'a, 'tcx>(
         }
         field_remapping[i] = result.len() as u32;
         result.push(field.llvm_type(cx));
-        offset = target_offset + field.size;
+        offset = target_offset + field.memory_size;
         prev_effective_align = effective_field_align;
     }
     let padding_used = result.len() > field_count;
     if layout.is_sized() && field_count > 0 {
-        if offset > layout.size {
-            bug!("layout: {:#?} stride: {:?} offset: {:?}", layout, layout.size, offset);
+        if offset > layout.memory_size {
+            bug!("layout: {:#?} stride: {:?} offset: {:?}", layout, layout.memory_size, offset);
         }
-        let padding = layout.size - offset;
+        let padding = layout.memory_size - offset;
         if padding != Size::ZERO {
             let padding_align = prev_effective_align;
-            assert_eq!(offset.align_to(padding_align) + padding, layout.size);
+            assert_eq!(offset.align_to(padding_align) + padding, layout.memory_size);
             debug!(
                 "struct_llfields: pad_bytes: {:?} offset: {:?} stride: {:?}",
-                padding, offset, layout.size
+                padding, offset, layout.memory_size
             );
             result.push(cx.type_padding_filler(padding, padding_align));
         }
     } else {
-        debug!("struct_llfields: offset: {:?} stride: {:?}", offset, layout.size);
+        debug!("struct_llfields: offset: {:?} stride: {:?}", offset, layout.memory_size);
     }
     let field_remapping = padding_used.then_some(field_remapping);
     (result, packed, field_remapping)
@@ -164,13 +164,13 @@ impl<'a, 'tcx> CodegenCx<'a, 'tcx> {
         self.layout_of(ty).align.abi
     }
 
-    pub fn size_of(&self, ty: Ty<'tcx>) -> Size {
-        self.layout_of(ty).size
+    pub fn memory_size_of(&self, ty: Ty<'tcx>) -> Size {
+        self.layout_of(ty).memory_size
     }
 
     pub fn size_and_align_of(&self, ty: Ty<'tcx>) -> (Size, Align) {
         let layout = self.layout_of(ty);
-        (layout.size, layout.align.abi)
+        (layout.memory_size, layout.align.abi)
     }
 }
 
@@ -364,7 +364,11 @@ impl<'tcx> LayoutLlvmExt<'tcx> for TyAndLayout<'tcx> {
             return cx.type_i1();
         }
 
-        let offset = if index == 0 { Size::ZERO } else { a.size(cx).align_to(b.align(cx).abi) };
+        let offset = if index == 0 {
+            Size::ZERO
+        } else {
+            a.memory_size(cx).align_to(b.align(cx).abi)
+        };
         self.scalar_llvm_type_at(cx, scalar, offset)
     }
 
@@ -424,8 +428,8 @@ impl<'tcx> LayoutLlvmExt<'tcx> for TyAndLayout<'tcx> {
         // FIXME: this is a fairly arbitrary choice, but 128 bits on WASM
         // (matching the 128-bit SIMD types proposal) and 256 bits on x64
         // (like AVX2 registers) seems at least like a tolerable starting point.
-        let threshold = cx.data_layout().pointer_size * 4;
-        if self.layout.size() > threshold {
+        let threshold = cx.data_layout().pointer_data_size * 4;
+        if self.layout.memory_size() > threshold {
             return None;
         }
 

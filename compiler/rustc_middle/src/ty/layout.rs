@@ -57,7 +57,7 @@ impl IntegerExt for Integer {
             ty::IntTy::I32 => I32,
             ty::IntTy::I64 => I64,
             ty::IntTy::I128 => I128,
-            ty::IntTy::Isize => cx.data_layout().ptr_sized_integer(),
+            ty::IntTy::Isize => cx.data_layout().ptr_data_sized_integer(),
         }
     }
     fn from_uint_ty<C: HasDataLayout>(cx: &C, ity: ty::UintTy) -> Integer {
@@ -67,7 +67,7 @@ impl IntegerExt for Integer {
             ty::UintTy::U32 => I32,
             ty::UintTy::U64 => I64,
             ty::UintTy::U128 => I128,
-            ty::UintTy::Usize => cx.data_layout().ptr_sized_integer(),
+            ty::UintTy::Usize => cx.data_layout().ptr_data_sized_integer(),
         }
     }
 
@@ -146,7 +146,7 @@ impl PrimitiveExt for Primitive {
             // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
             Pointer(_) => {
                 let signed = false;
-                tcx.data_layout().ptr_sized_integer().to_ty(tcx, signed)
+                tcx.data_layout().ptr_data_sized_integer().to_ty(tcx, signed)
             }
             F32 | F64 => bug!("floats do not have an int type"),
         }
@@ -316,7 +316,7 @@ impl<'tcx> SizeSkeleton<'tcx> {
         // First try computing a static layout.
         let err = match tcx.layout_of(param_env.and(ty)) {
             Ok(layout) => {
-                return Ok(SizeSkeleton::Known(layout.size));
+                return Ok(SizeSkeleton::Known(layout.memory_size));
             }
             Err(err @ LayoutError::Unknown(_)) => err,
             // We can't extract SizeSkeleton info from other layout errors
@@ -975,14 +975,18 @@ where
         let pointee_info = match *this.ty.kind() {
             ty::RawPtr(mt) if offset.bytes() == 0 => {
                 tcx.layout_of(param_env.and(mt.ty)).ok().map(|layout| PointeeInfo {
-                    size: layout.size,
+                    size: layout.memory_size,
                     align: layout.align.abi,
                     safe: None,
                 })
             }
             ty::FnPtr(fn_sig) if offset.bytes() == 0 => {
                 tcx.layout_of(param_env.and(Ty::new_fn_ptr(tcx, fn_sig))).ok().map(|layout| {
-                    PointeeInfo { size: layout.size, align: layout.align.abi, safe: None }
+                    PointeeInfo {
+                        size: layout.memory_size,
+                        align: layout.align.abi,
+                        safe: None,
+                    }
                 })
             }
             ty::Ref(_, ty, mt) if offset.bytes() == 0 => {
@@ -1000,7 +1004,7 @@ where
                 };
 
                 tcx.layout_of(param_env.and(ty)).ok().map(|layout| PointeeInfo {
-                    size: layout.size,
+                    size: layout.memory_size,
                     align: layout.align.abi,
                     safe: Some(kind),
                 })
@@ -1039,15 +1043,16 @@ where
                 let mut result = None;
 
                 if let Some(variant) = data_variant {
+                    let address_space = cx.data_layout().data_address_space;
                     // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
                     // (requires passing in the expected address space from the caller)
-                    let ptr_end = offset + Pointer(AddressSpace::DATA).size(cx);
+                    let ptr_end = offset + Pointer(address_space).memory_size(cx);
                     for i in 0..variant.fields.count() {
                         let field_start = variant.fields.offset(i);
                         if field_start <= offset {
                             let field = variant.field(cx, i);
                             result = field.to_result().ok().and_then(|field| {
-                                if ptr_end <= field_start + field.size {
+                                if ptr_end <= field_start + field.memory_size {
                                     // We found the right field, look inside it.
                                     let field_info =
                                         field.pointee_info_at(cx, offset - field_start);

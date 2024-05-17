@@ -134,12 +134,12 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
         assert_eq!(alloc_align, layout.align.abi);
         let ty = bx.type_ptr_to(bx.cx().backend_type(layout));
 
-        let read_scalar = |start, size, s: abi::Scalar, ty| {
+        let read_scalar = |start, data_size, memory_size, s: abi::Scalar, ty| {
             let val = alloc
                 .0
                 .read_scalar(
                     bx,
-                    alloc_range(start, size),
+                    alloc_range(start, data_size, memory_size),
                     /*read_provenance*/ matches!(s.primitive(), abi::Pointer(_)),
                 )
                 .unwrap();
@@ -154,27 +154,27 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
         // like a `Scalar` (or `ScalarPair`).
         match layout.abi {
             Abi::Scalar(s @ abi::Scalar::Initialized { .. }) => {
-                let size = s.size(bx);
-                assert_eq!(size, layout.size, "abi::Scalar size does not match layout size");
-                let val = read_scalar(Size::ZERO, size, s, ty);
+                assert_eq!(s.memory_size(bx), layout.memory_size, "abi::Scalar size does not match layout size");
+                let val = read_scalar(Size::ZERO, s.data_size(bx), s.memory_size(bx), s, ty);
                 OperandRef { val: OperandValue::Immediate(val), layout }
             }
             Abi::ScalarPair(
                 a @ abi::Scalar::Initialized { .. },
                 b @ abi::Scalar::Initialized { .. },
             ) => {
-                let (a_size, b_size) = (a.size(bx), b.size(bx));
-                let b_offset = a_size.align_to(b.align(bx).abi);
+                let b_offset = a.memory_size(bx).align_to(b.align(bx).abi);
                 assert!(b_offset.bytes() > 0);
                 let a_val = read_scalar(
                     Size::ZERO,
-                    a_size,
+                    a.data_size(bx),
+                    a.memory_size(bx),
                     a,
                     bx.scalar_pair_element_backend_type(layout, 0, true),
                 );
                 let b_val = read_scalar(
                     b_offset,
-                    b_size,
+                    b.data_size(bx),
+                    b.memory_size(bx),
                     b,
                     bx.scalar_pair_element_backend_type(layout, 1, true),
                 );
@@ -280,7 +280,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
 
             // Newtype of a scalar, scalar pair or vector.
             (OperandValue::Immediate(_) | OperandValue::Pair(..), _)
-                if field.size == self.layout.size =>
+                if field.memory_size == self.layout.memory_size =>
             {
                 assert_eq!(offset.bytes(), 0);
                 self.val
@@ -289,11 +289,11 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
             // Extract a scalar component from a pair.
             (OperandValue::Pair(a_llval, b_llval), Abi::ScalarPair(a, b)) => {
                 if offset.bytes() == 0 {
-                    assert_eq!(field.size, a.size(bx.cx()));
+                    assert_eq!(field.memory_size, a.memory_size(bx.cx()));
                     OperandValue::Immediate(a_llval)
                 } else {
-                    assert_eq!(offset, a.size(bx.cx()).align_to(b.align(bx.cx()).abi));
-                    assert_eq!(field.size, b.size(bx.cx()));
+                    assert_eq!(offset, a.memory_size(bx.cx()).align_to(b.align(bx.cx()).abi));
+                    assert_eq!(field.memory_size, b.memory_size(bx.cx()));
                     OperandValue::Immediate(b_llval)
                 }
             }
@@ -453,7 +453,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandValue<V> {
                     bug!("store_with_flags: invalid ScalarPair layout: {:#?}", dest.layout);
                 };
                 let ty = bx.backend_type(dest.layout);
-                let b_offset = a_scalar.size(bx).align_to(b_scalar.align(bx).abi);
+                let b_offset = a_scalar.memory_size(bx).align_to(b_scalar.align(bx).abi);
 
                 let llptr = bx.struct_gep(ty, dest.llval, 0);
                 let val = bx.from_immediate(a);

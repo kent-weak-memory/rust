@@ -617,7 +617,8 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 let lhs_bits = Operand::const_from_scalar(
                     self.tcx,
                     unsigned_ty,
-                    Scalar::from_uint(lhs_size.bits(), rhs_size),
+                    // TODO(seharris): this is likely the wrong memory size.
+                    Scalar::from_uint(lhs_size.bits(), rhs_size, rhs_size),
                     span,
                 );
 
@@ -821,7 +822,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     // Helper to get a `-1` value of the appropriate type
     fn neg_1_literal(&mut self, span: Span, ty: Ty<'tcx>) -> Operand<'tcx> {
         let param_ty = ty::ParamEnv::empty().and(ty);
-        let size = self.tcx.layout_of(param_ty).unwrap().size;
+        let size = self.tcx.layout_of(param_ty).unwrap().data_size.unwrap();
         let literal = ConstantKind::from_bits(self.tcx, size.unsigned_int_max(), param_ty);
 
         self.literal_operand(span, literal)
@@ -831,7 +832,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     fn minval_literal(&mut self, span: Span, ty: Ty<'tcx>) -> Operand<'tcx> {
         assert!(ty.is_signed());
         let param_ty = ty::ParamEnv::empty().and(ty);
-        let bits = self.tcx.layout_of(param_ty).unwrap().size.bits();
+        let bits = self.tcx.layout_of(param_ty).unwrap().data_size.unwrap().bits();
         let n = 1 << (bits - 1);
         let literal = ConstantKind::from_bits(self.tcx, n, param_ty);
 

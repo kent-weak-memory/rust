@@ -40,37 +40,37 @@ where
     match arg_layout.abi {
         Abi::Scalar(scalar) => match scalar.primitive() {
             abi::Int(..) | abi::Pointer(_) => {
-                if arg_layout.size.bits() > xlen {
+                if arg_layout.memory_size.bits() > xlen {
                     return Err(CannotUseFpConv);
                 }
                 match (*field1_kind, *field2_kind) {
                     (RegPassKind::Unknown, _) => {
                         *field1_kind = RegPassKind::Integer(Reg {
                             kind: RegKind::Integer,
-                            size: arg_layout.size,
+                            size: arg_layout.memory_size,
                         });
                     }
                     (RegPassKind::Float(_), RegPassKind::Unknown) => {
                         *field2_kind = RegPassKind::Integer(Reg {
                             kind: RegKind::Integer,
-                            size: arg_layout.size,
+                            size: arg_layout.memory_size,
                         });
                     }
                     _ => return Err(CannotUseFpConv),
                 }
             }
             abi::F32 | abi::F64 => {
-                if arg_layout.size.bits() > flen {
+                if arg_layout.memory_size.bits() > flen {
                     return Err(CannotUseFpConv);
                 }
                 match (*field1_kind, *field2_kind) {
                     (RegPassKind::Unknown, _) => {
                         *field1_kind =
-                            RegPassKind::Float(Reg { kind: RegKind::Float, size: arg_layout.size });
+                            RegPassKind::Float(Reg { kind: RegKind::Float, size: arg_layout.memory_size });
                     }
                     (_, RegPassKind::Unknown) => {
                         *field2_kind =
-                            RegPassKind::Float(Reg { kind: RegKind::Float, size: arg_layout.size });
+                            RegPassKind::Float(Reg { kind: RegKind::Float, size: arg_layout.memory_size });
                     }
                     _ => return Err(CannotUseFpConv),
                 }
@@ -156,7 +156,7 @@ where
         return false;
     }
 
-    let total = arg.layout.size;
+    let total = arg.layout.memory_size;
 
     // "Scalars wider than 2✕XLEN are passed by reference and are replaced in
     // the argument list with the address."
@@ -225,7 +225,7 @@ fn classify_arg<'a, Ty, C>(
         }
     }
 
-    let total = arg.layout.size;
+    let total = arg.layout.memory_size;
     let align = arg.layout.align.abi.bits();
 
     // "Scalars wider than 2✕XLEN are passed by reference and are replaced in
@@ -311,7 +311,8 @@ where
     Ty: TyAbiInterface<'a, C> + Copy,
     C: HasDataLayout + HasTargetSpec,
 {
-    let xlen = cx.data_layout().pointer_size.bits();
+    // TODO(seharris): this needs checking by someone who understands what this code does in useful depth.
+    let xlen = cx.data_layout().pointer_memory_size.bits();
     let flen = match &cx.target_spec().llvm_abiname[..] {
         "ilp32f" | "lp64f" => 32,
         "ilp32d" | "lp64d" => 64,

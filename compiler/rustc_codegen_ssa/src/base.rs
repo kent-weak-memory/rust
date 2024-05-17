@@ -240,7 +240,7 @@ pub fn unsize_ptr<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
 
                 assert_eq!(src_layout.fields.offset(i).bytes(), 0);
                 assert_eq!(dst_layout.fields.offset(i).bytes(), 0);
-                assert_eq!(src_layout.size, src_f.size);
+                assert_eq!(src_layout.memory_size, src_f.memory_size);
 
                 let dst_f = dst_layout.field(bx.cx(), i);
                 assert_ne!(src_f.ty, dst_f.ty);
@@ -389,7 +389,7 @@ pub fn memcpy_ty<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
     layout: TyAndLayout<'tcx>,
     flags: MemFlags,
 ) {
-    let size = layout.size.bytes();
+    let size = layout.memory_size.bytes();
     if size == 0 {
         return;
     }

@@ -26,7 +26,7 @@ fn copy_intrinsic<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
     count: Bx::Value,
 ) {
     let layout = bx.layout_of(ty);
-    let size = layout.size;
+    let size = layout.memory_size;
     let align = layout.align.abi;
     let size = bx.mul(bx.const_usize(size.bytes()), count);
     let flags = if volatile { MemFlags::VOLATILE } else { MemFlags::empty() };
@@ -48,7 +48,7 @@ fn memset_intrinsic<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
     count: Bx::Value,
 ) {
     let layout = bx.layout_of(ty);
-    let size = layout.size;
+    let size = layout.memory_size;
     let align = layout.align.abi;
     let size = bx.mul(bx.const_usize(size.bytes()), count);
     let flags = if volatile { MemFlags::VOLATILE } else { MemFlags::empty() };
@@ -94,7 +94,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     let (llsize, _) = glue::size_and_align_of_dst(bx, tp_ty, Some(meta));
                     llsize
                 } else {
-                    bx.const_usize(bx.layout_of(tp_ty).size.bytes())
+                    bx.const_usize(bx.layout_of(tp_ty).memory_size.bytes())
                 }
             }
             sym::min_align_of_val => {
@@ -315,7 +315,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                             let mut dst = args[0].immediate();
                             let mut cmp = args[1].immediate();
                             let mut src = args[2].immediate();
-                            if ty.is_unsafe_ptr() {
+                            if ty.is_unsafe_ptr() && bx.target_spec().atomic_pointers_via_integers {
                                 // Some platforms do not support atomic operations on pointers,
                                 // so we cast to integer first.
                                 let ptr_llty = bx.type_ptr_to(bx.type_isize());
@@ -343,9 +343,9 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                         let ty = substs.type_at(0);
                         if int_type_width_signed(ty, bx.tcx()).is_some() || ty.is_unsafe_ptr() {
                             let layout = bx.layout_of(ty);
-                            let size = layout.size;
+                            let size = layout.memory_size;
                             let mut source = args[0].immediate();
-                            if ty.is_unsafe_ptr() {
+                            if ty.is_unsafe_ptr() && bx.target_spec().atomic_pointers_via_integers {
                                 // Some platforms do not support atomic operations on pointers,
                                 // so we cast to integer first...
                                 let llty = bx.type_isize();
@@ -365,10 +365,10 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     "store" => {
                         let ty = substs.type_at(0);
                         if int_type_width_signed(ty, bx.tcx()).is_some() || ty.is_unsafe_ptr() {
-                            let size = bx.layout_of(ty).size;
+                            let size = bx.layout_of(ty).memory_size;
                             let mut val = args[1].immediate();
                             let mut ptr = args[0].immediate();
-                            if ty.is_unsafe_ptr() {
+                            if ty.is_unsafe_ptr() && bx.target_spec().atomic_pointers_via_integers {
                                 // Some platforms do not support atomic operations on pointers,
                                 // so we cast to integer first.
                                 let ptr_llty = bx.type_ptr_to(bx.type_isize());
@@ -413,7 +413,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                         if int_type_width_signed(ty, bx.tcx()).is_some() || ty.is_unsafe_ptr() {
                             let mut ptr = args[0].immediate();
                             let mut val = args[1].immediate();
-                            if ty.is_unsafe_ptr() {
+                            if ty.is_unsafe_ptr() && bx.target_spec().atomic_pointers_via_integers {
                                 // Some platforms do not support atomic operations on pointers,
                                 // so we cast to integer first.
                                 let ptr_llty = bx.type_ptr_to(bx.type_isize());
@@ -442,7 +442,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
 
             sym::ptr_offset_from | sym::ptr_offset_from_unsigned => {
                 let ty = substs.type_at(0);
-                let pointee_size = bx.layout_of(ty).size;
+                let pointee_size = bx.layout_of(ty).memory_size;
 
                 let a = args[0].immediate();
                 let b = args[1].immediate();
@@ -492,10 +492,10 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
 fn int_type_width_signed(ty: Ty<'_>, tcx: TyCtxt<'_>) -> Option<(u64, bool)> {
     match ty.kind() {
         ty::Int(t) => {
-            Some((t.bit_width().unwrap_or(u64::from(tcx.sess.target.pointer_width)), true))
+            Some((t.bit_width().unwrap_or(u64::from(tcx.sess.target.pointer_data_size)), true))
         }
         ty::Uint(t) => {
-            Some((t.bit_width().unwrap_or(u64::from(tcx.sess.target.pointer_width)), false))
+            Some((t.bit_width().unwrap_or(u64::from(tcx.sess.target.pointer_data_size)), false))
         }
         _ => None,
     }

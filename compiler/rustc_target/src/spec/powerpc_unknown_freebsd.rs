@@ -13,7 +13,8 @@ pub fn target() -> Target {
 
     Target {
         llvm_target: "powerpc-unknown-freebsd13.0".into(),
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memory_size: 32,
         data_layout: "E-m:e-p:32:32-i64:64-n32".into(),
         arch: "powerpc".into(),
         options: TargetOptions {

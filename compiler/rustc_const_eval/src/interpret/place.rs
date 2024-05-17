@@ -359,8 +359,7 @@ where
     {
         assert!(place.layout.is_sized());
         assert!(!place.meta.has_meta());
-        let size = place.layout.size;
-        self.get_ptr_alloc(place.ptr, size, place.align)
+        self.get_ptr_alloc(place.ptr, place.layout.data_size, place.layout.memory_size, place.align)
     }
 
     #[inline]
@@ -371,15 +370,14 @@ where
     {
         assert!(place.layout.is_sized());
         assert!(!place.meta.has_meta());
-        let size = place.layout.size;
-        self.get_ptr_alloc_mut(place.ptr, size, place.align)
+        self.get_ptr_alloc_mut(place.ptr, place.layout.data_size, place.layout.memory_size, place.align)
     }
 
     /// Check if this mplace is dereferenceable and sufficiently aligned.
     pub fn check_mplace(&self, mplace: MPlaceTy<'tcx, M::Provenance>) -> InterpResult<'tcx> {
         let (size, align) = self
             .size_and_align_of_mplace(&mplace)?
-            .unwrap_or((mplace.layout.size, mplace.layout.align.abi));
+            .unwrap_or((mplace.layout.memory_size, mplace.layout.align.abi));
         assert!(mplace.align <= align, "dynamic alignment less strict than static one?");
         let align = if M::enforce_alignment(self).should_check() { align } else { Align::ONE };
         self.check_ptr_access_align(mplace.ptr, size, align, CheckInAllocMsg::DerefTest)?;
@@ -398,7 +396,7 @@ where
         let (len, e_ty) = mplace.layout.ty.simd_size_and_type(*self.tcx);
         let array = Ty::new_array(self.tcx.tcx, e_ty, len);
         let layout = self.layout_of(array)?;
-        assert_eq!(layout.size, mplace.layout.size);
+        assert_eq!(layout.memory_size, mplace.layout.memory_size);
         Ok((MPlaceTy { layout, ..*mplace }, len))
     }
 
@@ -553,9 +551,11 @@ where
                         "write_immediate_to_mplace: invalid Scalar layout: {layout:#?}",
                     )
                 };
-                let size = s.size(&tcx);
-                assert_eq!(size, layout.size, "abi::Scalar size does not match layout size");
-                alloc.write_scalar(alloc_range(Size::ZERO, size), scalar)
+                let data_size = s.data_size(&tcx);
+                let memory_size = s.memory_size(&tcx);
+                assert_eq!(data_size, layout.data_size.unwrap(), "abi::Scalar size does not match layout size");
+                assert_eq!(memory_size, layout.memory_size, "abi::Scalar size does not match layout size");
+                alloc.write_scalar(alloc_range(Size::ZERO, Some(data_size), memory_size), scalar)
             }
             Immediate::ScalarPair(a_val, b_val) => {
                 // We checked `ptr_align` above, so all fields will have the alignment they need.
@@ -567,16 +567,17 @@ where
                         layout
                     )
                 };
-                let (a_size, b_size) = (a.size(&tcx), b.size(&tcx));
-                let b_offset = a_size.align_to(b.align(&tcx).abi);
+                let (a_data_size, b_data_size) = (a.data_size(&tcx), b.data_size(&tcx));
+                let (a_memory_size, b_memory_size) = (a.memory_size(&tcx), b.memory_size(&tcx));
+                let b_offset = a_memory_size.align_to(b.align(&tcx).abi);
                 assert!(b_offset.bytes() > 0); // in `operand_field` we use the offset to tell apart the fields
 
                 // It is tempting to verify `b_offset` against `layout.fields.offset(1)`,
                 // but that does not work: We could be a newtype around a pair, then the
                 // fields do not match the `ScalarPair` components.
 
-                alloc.write_scalar(alloc_range(Size::ZERO, a_size), a_val)?;
-                alloc.write_scalar(alloc_range(b_offset, b_size), b_val)
+                alloc.write_scalar(alloc_range(Size::ZERO, Some(a_data_size), a_memory_size), a_val)?;
+                alloc.write_scalar(alloc_range(b_offset, Some(b_data_size), b_memory_size), b_val)
             }
             Immediate::Uninit => alloc.write_uninit(),
         }
@@ -665,7 +666,8 @@ where
                 if dest.layout.is_unsized() {
                     throw_inval!(SizeOfUnsizedType(dest.layout.ty));
                 }
-                assert_eq!(src.layout.size, dest.layout.size);
+                assert_eq!(src.layout.data_size, dest.layout.data_size);
+                assert_eq!(src.layout.memory_size, dest.layout.memory_size);
                 // Yay, we got a value that we can write directly.
                 return if layout_compat {
                     self.write_immediate_no_validate(*src_val, dest)
@@ -697,7 +699,7 @@ where
             assert_eq!(src_size, dest_size, "Cannot copy differently-sized data");
         } else {
             // As a cheap approximation, we compare the fixed parts of the size.
-            assert_eq!(src.layout.size, dest.layout.size);
+            assert_eq!(src.layout.memory_size, dest.layout.memory_size);
         }
 
         // Setting `nonoverlapping` here only has an effect when we don't hit the fast-path above,
@@ -766,7 +768,7 @@ where
         kind: MemoryKind<M::MemoryKind>,
     ) -> InterpResult<'tcx, MPlaceTy<'tcx, M::Provenance>> {
         assert!(layout.is_sized());
-        let ptr = self.allocate_ptr(layout.size, layout.align.abi, kind)?;
+        let ptr = self.allocate_ptr(layout.memory_size, layout.align.abi, kind)?;
         Ok(MPlaceTy::from_aligned_ptr(ptr.into(), layout))
     }
 

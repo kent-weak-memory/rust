@@ -140,9 +140,9 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             CastKind::Transmute => {
                 assert!(src.layout.is_sized());
                 assert!(dest.layout.is_sized());
-                if src.layout.size != dest.layout.size {
-                    let src_bytes = src.layout.size.bytes();
-                    let dest_bytes = dest.layout.size.bytes();
+                if src.layout.memory_size != dest.layout.memory_size {
+                    let src_bytes = src.layout.memory_size.bytes();
+                    let dest_bytes = dest.layout.memory_size.bytes();
                     let src_ty = format!("{}", src.layout.ty);
                     let dest_ty = format!("{}", dest.layout.ty);
                     throw_ub_custom!(
@@ -204,13 +204,13 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         assert!(cast_ty.is_unsafe_ptr());
         // Handle casting any ptr to raw ptr (might be a fat ptr).
         let dest_layout = self.layout_of(cast_ty)?;
-        if dest_layout.size == src.layout.size {
+        if dest_layout.memory_size == src.layout.memory_size {
             // Thin or fat pointer that just hast the ptr kind of target type changed.
             return Ok(**src);
         } else {
             // Casting the metadata away from a fat ptr.
-            assert_eq!(src.layout.size, 2 * self.pointer_size());
-            assert_eq!(dest_layout.size, self.pointer_size());
+            assert_eq!(src.layout.memory_size, 2 * self.pointer_memory_size());
+            assert_eq!(dest_layout.memory_size, self.pointer_memory_size());
             assert!(src.layout.ty.is_unsafe_ptr());
             return match **src {
                 Immediate::ScalarPair(data, _) => Ok(data.into()),
@@ -272,7 +272,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // Let's make sure v is sign-extended *if* it has a signed type.
         let signed = src_layout.abi.is_signed(); // Also asserts that abi is `Scalar`.
 
-        let v = scalar.to_bits(src_layout.size)?;
+        let v = scalar.to_bits(src_layout.data_size.unwrap())?;
         let v = if signed { self.sign_extend(v, src_layout) } else { v };
         trace!("cast_from_scalar: {}, {} -> {}", v, src_layout.ty, cast_ty);
 
@@ -284,7 +284,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     _ => bug!(),
                 };
                 let v = size.truncate(v);
-                Scalar::from_uint(v, size)
+                Scalar::from_uint(v, size, size)
             }
 
             Float(FloatTy::F32) if signed => Scalar::from_f32(Single::from_i128(v as i128).value),
@@ -316,7 +316,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // (https://doc.rust-lang.org/nightly/nightly-rustc/rustc_apfloat/trait.Float.html#method.to_i128_r).
                 let v = f.to_u128(size.bits_usize()).value;
                 // This should already fit the bit width
-                Scalar::from_uint(v, size)
+                Scalar::from_uint(v, size, size)
             }
             // float -> int
             Int(t) => {
@@ -324,7 +324,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // `to_i128` is a saturating cast, which is what we need
                 // (https://doc.rust-lang.org/nightly/nightly-rustc/rustc_apfloat/trait.Float.html#method.to_i128_r).
                 let v = f.to_i128(size.bits_usize()).value;
-                Scalar::from_int(v, size)
+                Scalar::from_int(v, size, size)
             }
             // float -> f32
             Float(FloatTy::F32) => Scalar::from_f32(f.convert(&mut false).value),

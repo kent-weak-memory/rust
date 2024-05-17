@@ -590,12 +590,12 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                             name: var.name,
                             source_info: var.source_info,
                             dbg_var,
-                            fragment: if fragment_layout.size == var_layout.size {
+                            fragment: if fragment_layout.memory_size == var_layout.memory_size {
                                 // Fragment covers entire variable, so as far as
                                 // DWARF is concerned, it's not really a fragment.
                                 None
                             } else {
-                                Some(fragment_start..fragment_start + fragment_layout.size)
+                                Some(fragment_start..fragment_start + fragment_layout.memory_size)
                             },
                             projection: place.projection,
                             references: var.references,

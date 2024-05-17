@@ -20,8 +20,8 @@ pub trait LayoutCalculator {
         let dl = dl.borrow();
         let b_align = b.align(dl);
         let align = a.align(dl).max(b_align).max(dl.aggregate_align);
-        let b_offset = a.size(dl).align_to(b_align.abi);
-        let size = (b_offset + b.size(dl)).align_to(align.abi);
+        let b_offset = a.memory_size(dl).align_to(b_align.abi);
+        let size = (b_offset + b.memory_size(dl)).align_to(align.abi);
 
         // HACK(nox): We iter on `b` and then `a` because `max_by_key`
         // returns the last maximum.
@@ -63,8 +63,8 @@ pub trait LayoutCalculator {
             if !matches!(kind, StructKind::MaybeUnsized) {
                 if let Some(niche) = layout.largest_niche {
                     let head_space = niche.offset.bytes();
-                    let niche_length = niche.value.size(dl).bytes();
-                    let tail_space = layout.size.bytes() - head_space - niche_length;
+                    let niche_length = niche.value.memory_size(dl).bytes();
+                    let tail_space = layout.memory_size.bytes() - head_space - niche_length;
 
                     // This may end up doing redundant work if the niche is already in the last field
                     // (e.g. a trailing bool) and there is tail padding. But it's non-trivial to get
@@ -76,11 +76,11 @@ pub trait LayoutCalculator {
                             .largest_niche
                             .expect("alt layout should have a niche like the regular one");
                         let alt_head_space = niche.offset.bytes();
-                        let alt_niche_len = niche.value.size(dl).bytes();
+                        let alt_niche_len = niche.value.memory_size(dl).bytes();
                         let alt_tail_space =
-                            alt_layout.size.bytes() - alt_head_space - alt_niche_len;
+                            alt_layout.memory_size.bytes() - alt_head_space - alt_niche_len;
 
-                        debug_assert_eq!(layout.size.bytes(), alt_layout.size.bytes());
+                        debug_assert_eq!(layout.memory_size.bytes(), alt_layout.memory_size.bytes());
 
                         let prefer_alt_layout =
                             alt_head_space > head_space && alt_head_space > tail_space;
@@ -89,7 +89,7 @@ pub trait LayoutCalculator {
                             "sz: {}, default_niche_at: {}+{}, default_tail_space: {}, alt_niche_at/head_space: {}+{}, alt_tail: {}, num_fields: {}, better: {}\n\
                             layout: {}\n\
                             alt_layout: {}\n",
-                            layout.size.bytes(),
+                            layout.memory_size.bytes(),
                             head_space,
                             niche_length,
                             tail_space,
@@ -121,7 +121,18 @@ pub trait LayoutCalculator {
             abi: Abi::Uninhabited,
             largest_niche: None,
             align: dl.i8_align,
-            size: Size::ZERO,
+            data_size: Some(Size::ZERO),
+            memory_size: Size::ZERO,
+        }
+    }
+
+    fn data_size_for_abi(&self, abi: &Abi, memory_size: Size) -> Option<Size> {
+        match abi {
+            Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) => Some(dl.pointer_data_size()),
+            Abi::Scalar({Scalar {..}) => Some(memory_size),
+            Abi::Aggregate{sized: true} if memory_size.bytes() == 0 => Some(memory_size),
+            Abi::Uninhabited if memory_size.bytes() == 0 => Some(memory_size),
+            _ => None,
         }
     }
 
@@ -141,7 +152,7 @@ pub trait LayoutCalculator {
         let dl = dl.borrow();
 
         let scalar_unit = |value: Primitive| {
-            let size = value.size(dl);
+            let size = value.data_size(dl);
             assert!(size.bits() <= 128);
             Scalar::Initialized { value, valid_range: WrappingRange::full(size) }
         };
@@ -225,7 +236,7 @@ pub trait LayoutCalculator {
                     // Because of that we only check that the start and end
                     // of the range is representable with this scalar type.
 
-                    let max_value = scalar.size(dl).unsigned_int_max();
+                    let max_value = scalar.data_size(dl).unsigned_int_max();
                     if let Bound::Included(start) = start {
                         // FIXME(eddyb) this might be incorrect - it doesn't
                         // account for wrap-around (end < start) ranges.
@@ -303,7 +314,7 @@ pub trait LayoutCalculator {
 
             let largest_variant_index = variant_layouts
                 .iter_enumerated()
-                .max_by_key(|(_i, layout)| layout.size.bytes())
+                .max_by_key(|(_i, layout)| layout.memory_size.bytes())
                 .map(|(i, _layout)| i)?;
 
             let all_indices = variants.indices();
@@ -323,8 +334,8 @@ pub trait LayoutCalculator {
                 .and_then(|(j, niche)| Some((j, niche, niche.reserve(dl, count)?)))?;
             let niche_offset =
                 niche.offset + variant_layouts[largest_variant_index].fields.offset(field_index);
-            let niche_size = niche.value.size(dl);
-            let size = variant_layouts[largest_variant_index].size.align_to(align.abi);
+            let niche_size = niche.value.memory_size(dl);
+            let memory_size = variant_layouts[largest_variant_index].memory_size.align_to(align.abi);
 
             let all_variants_fit = variant_layouts.iter_enumerated_mut().all(|(i, layout)| {
                 if i == largest_variant_index {
@@ -333,7 +344,7 @@ pub trait LayoutCalculator {
 
                 layout.largest_niche = None;
 
-                if layout.size <= niche_offset {
+                if layout.memory_size <= niche_offset {
                     // This variant will fit before the niche.
                     return true;
                 }
@@ -342,7 +353,7 @@ pub trait LayoutCalculator {
                 let this_align = layout.align.abi;
                 let this_offset = (niche_offset + niche_size).align_to(this_align);
 
-                if this_offset + layout.size > size {
+                if this_offset + layout.memory_size > memory_size {
                     return false;
                 }
 
@@ -364,7 +375,8 @@ pub trait LayoutCalculator {
                 if !layout.abi.is_uninhabited() {
                     layout.abi = Abi::Aggregate { sized: true };
                 }
-                layout.size += this_offset;
+                layout.data_size = None;
+                layout.memory_size += this_offset;
 
                 true
             });
@@ -377,8 +389,8 @@ pub trait LayoutCalculator {
 
             let others_zst = variant_layouts
                 .iter_enumerated()
-                .all(|(i, layout)| i == largest_variant_index || layout.size == Size::ZERO);
-            let same_size = size == variant_layouts[largest_variant_index].size;
+                .all(|(i, layout)| i == largest_variant_index || layout.memory_size == Size::ZERO);
+            let same_size = memory_size == variant_layouts[largest_variant_index].memory_size;
             let same_align = align == variant_layouts[largest_variant_index].align;
 
             let abi = if variant_layouts.iter().all(|v| v.abi.is_uninhabited()) {
@@ -420,7 +432,8 @@ pub trait LayoutCalculator {
                 },
                 abi,
                 largest_niche,
-                size,
+                data_size: self.data_size_for_abi(abi, memory_size),
+                memory_size,
                 align,
             };
 
@@ -456,7 +469,7 @@ pub trait LayoutCalculator {
         let (min_ity, signed) = discr_range_of_repr(min, max); //Integer::repr_discr(tcx, ty, &repr, min, max);
 
         let mut align = dl.aggregate_align;
-        let mut size = Size::ZERO;
+        let mut memory_size = Size::ZERO;
 
         // We're interested in the smallest alignment, so start large.
         let mut start_align = Align::from_bytes(256).unwrap();
@@ -484,7 +497,7 @@ pub trait LayoutCalculator {
                     dl,
                     field_layouts,
                     repr,
-                    StructKind::Prefixed(min_ity.size(), prefix_align),
+                    StructKind::Prefixed(min_ity.memory_size(), prefix_align),
                 )?;
                 st.variants = Variants::Single { index: i };
                 // Find the first field we can't move later
@@ -496,16 +509,16 @@ pub trait LayoutCalculator {
                         break;
                     }
                 }
-                size = cmp::max(size, st.size);
+                memory_size = cmp::max(memory_size, st.memory_size);
                 align = align.max(st.align);
                 Some(st)
             })
             .collect::<Option<IndexVec<VariantIdx, _>>>()?;
 
         // Align the maximum variant size to the largest alignment.
-        size = size.align_to(align.abi);
+        memory_size = memory_size.align_to(align.abi);
 
-        if size.bytes() >= dl.obj_size_bound() {
+        if memory_size.bytes() >= dl.obj_size_bound() {
             return None;
         }
 
@@ -562,8 +575,8 @@ pub trait LayoutCalculator {
                             }
                         }
                         // We might be making the struct larger.
-                        if variant.size <= old_ity_size {
-                            variant.size = new_ity_size;
+                        if variant.memory_size <= old_ity_size {
+                            variant.memory_size = new_ity_size;
                         }
                     }
                     _ => panic!(),
@@ -583,7 +596,7 @@ pub trait LayoutCalculator {
 
         if layout_variants.iter().all(|v| v.abi.is_uninhabited()) {
             abi = Abi::Uninhabited;
-        } else if tag.size(dl) == size {
+        } else if tag.memory_size(dl) == memory_size {
             // Make sure we only use scalar layout when the enum is entirely its
             // own tag (i.e. it has no padding nor any non-ZST variant fields).
             abi = Abi::Scalar(tag);
@@ -649,7 +662,7 @@ pub trait LayoutCalculator {
                 if pair_offsets[FieldIdx::from_u32(0)] == Size::ZERO
                     && pair_offsets[FieldIdx::from_u32(1)] == *offset
                     && align == pair.align
-                    && size == pair.size
+                    && memory_size == pair.memory_size
                 {
                     // We can use `ScalarPair` only when it matches our
                     // already computed layout (including `#[repr(C)]`).
@@ -668,7 +681,7 @@ pub trait LayoutCalculator {
                 if variant.fields.count() > 0 && matches!(variant.abi, Abi::Aggregate { .. }) {
                     variant.abi = abi;
                     // Also need to bump up the size and alignment, so that the entire value fits in here.
-                    variant.size = cmp::max(variant.size, size);
+                    variant.memory_size = cmp::max(variant.memory_size, memory_size);
                     variant.align.abi = cmp::max(variant.align.abi, align.abi);
                 }
             }
@@ -690,7 +703,8 @@ pub trait LayoutCalculator {
             largest_niche,
             abi,
             align,
-            size,
+            data_size: self.data_size_for_abi(abi, memory_size),
+            memory_size,
         };
 
         let tagged_layout = TmpLayout { layout: tagged_layout, variants: layout_variants };
@@ -703,7 +717,7 @@ pub trait LayoutCalculator {
                 use cmp::Ordering::*;
                 let niche_size =
                     |tmp_l: &TmpLayout| tmp_l.layout.largest_niche.map_or(0, |n| n.available(dl));
-                match (tl.layout.size.cmp(&nl.layout.size), niche_size(&tl).cmp(&niche_size(&nl))) {
+                match (tl.layout.memory_size.cmp(&nl.layout.memory_size), niche_size(&tl).cmp(&niche_size(&nl))) {
                     (Greater, _) => nl,
                     (Equal, Less) => nl,
                     _ => tl,
@@ -745,13 +759,13 @@ pub trait LayoutCalculator {
             Ok(None)
         };
 
-        let mut size = Size::ZERO;
+        let mut memory_size = Size::ZERO;
         let only_variant = &variants[FIRST_VARIANT];
         for field in only_variant {
             assert!(field.0.is_sized());
 
             align = align.max(field.align());
-            size = cmp::max(size, field.size());
+            memory_size = cmp::max(memory_size, field.memory_size());
 
             if field.0.is_zst() {
                 // Nothing more to do for ZST fields
@@ -802,13 +816,15 @@ pub trait LayoutCalculator {
             }
         };
 
+        let memory_size = size.align_to(align.abi);
         Some(LayoutS {
             variants: Variants::Single { index: FIRST_VARIANT },
             fields: FieldsShape::Union(NonZeroUsize::new(only_variant.len())?),
             abi,
             largest_niche: None,
             align,
-            size: size.align_to(align.abi),
+            data_size: self.data_size_for_abi(abi, memory_size),
+            memory_size,
         })
     }
 }
@@ -874,10 +890,10 @@ fn univariant(
                     // The calculation assumes that size is an integer multiple of align, except for ZSTs.
                     //
                     let align = layout.align().abi.bytes();
-                    let size = layout.size().bytes();
+                    let memory_size = layout.memory_size().bytes();
                     let niche_size = layout.largest_niche().map(|n| n.available(dl)).unwrap_or(0);
                     // group [u8; 4] with align-4 or [u8; 6] with align-2 fields
-                    let size_as_align = align.max(size).trailing_zeros();
+                    let size_as_align = align.max(memory_size).trailing_zeros();
                     let size_as_align = if largest_niche_size > 0 {
                         match niche_bias {
                             // Given `A(u8, [u8; 16])` and `B(bool, [u8; 16])` we want to bump the array
@@ -911,7 +927,7 @@ fn univariant(
                     // of packing can't be achieved by sorting.
                     optimizing.sort_by_key(|&x| {
                         let f = fields[x];
-                        let field_size = f.size().bytes();
+                        let field_size = f.memory_size().bytes();
                         let niche_size = f.largest_niche().map_or(0, |n| n.available(dl));
                         let niche_size_key = match niche_bias {
                             // large niche first
@@ -922,7 +938,7 @@ fn univariant(
                         let inner_niche_offset_key = match niche_bias {
                             NicheBias::Start => f.largest_niche().map_or(0, |n| n.offset.bytes()),
                             NicheBias::End => f.largest_niche().map_or(0, |n| {
-                                !(field_size - n.value.size(dl).bytes() - n.offset.bytes())
+                                !(field_size - n.value.memory_size(dl).bytes() - n.offset.bytes())
                             }),
                         };
 
@@ -1016,7 +1032,7 @@ fn univariant(
             }
         }
 
-        offset = offset.checked_add(field.size(), dl)?;
+        offset = offset.checked_add(field.memory_size(), dl)?;
     }
     if let Some(repr_align) = repr.align {
         align = align.max(AbiAndPrefAlign::new(repr_align));
@@ -1035,10 +1051,10 @@ fn univariant(
         debug_assert!(inverse_memory_index.iter().copied().eq(fields.indices()));
         inverse_memory_index.into_iter().map(FieldIdx::as_u32).collect()
     };
-    let size = min_size.align_to(align.abi);
+    let memory_size = min_size.align_to(align.abi);
     let mut abi = Abi::Aggregate { sized };
     // Unpack newtype ABIs and find scalar pairs.
-    if sized && size.bytes() > 0 {
+    if sized && memory_size.bytes() > 0 {
         // All other fields must be ZSTs.
         let mut non_zst_fields = fields.iter_enumerated().filter(|&(_, f)| !f.0.is_zst());
 
@@ -1046,7 +1062,7 @@ fn univariant(
             // We have exactly one non-ZST field.
             (Some((i, field)), None, None) => {
                 // Field fills the struct and it has a scalar or scalar pair ABI.
-                if offsets[i].bytes() == 0 && align.abi == field.align().abi && size == field.size()
+                if offsets[i].bytes() == 0 && align.abi == field.align().abi && memory_size == field.memory_size()
                 {
                     match field.abi() {
                         // For plain scalars, or vectors of them, we can't unpack
@@ -1085,7 +1101,7 @@ fn univariant(
                         if offsets[i] == pair_offsets[FieldIdx::from_usize(0)]
                             && offsets[j] == pair_offsets[FieldIdx::from_usize(1)]
                             && align == pair.align
-                            && size == pair.size
+                            && memory_size == pair.memory_size
                         {
                             // We can use `ScalarPair` only when it matches our
                             // already computed layout (including `#[repr(C)]`).
@@ -1108,7 +1124,8 @@ fn univariant(
         abi,
         largest_niche,
         align,
-        size,
+        data_size: self.data_size_for_abi(abi, memory_size),
+        memory_size,
     })
 }
 
@@ -1121,14 +1138,14 @@ fn format_field_niches(
     for i in layout.fields.index_by_increasing_offset() {
         let offset = layout.fields.offset(i);
         let f = fields[i.into()];
-        write!(s, "[o{}a{}s{}", offset.bytes(), f.align().abi.bytes(), f.size().bytes()).unwrap();
+        write!(s, "[o{}a{}s{}", offset.bytes(), f.align().abi.bytes(), f.memory_size().bytes()).unwrap();
         if let Some(n) = f.largest_niche() {
             write!(
                 s,
                 " n{}b{}s{}",
                 n.offset.bytes(),
                 n.available(dl).ilog2(),
-                n.value.size(dl).bytes()
+                n.value.memory_size(dl).bytes()
             )
             .unwrap();
         }

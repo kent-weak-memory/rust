@@ -12,6 +12,7 @@
 #![allow(unused)]
 
 use super::DwarfReader;
+use core::ffi::c_void;
 use core::mem;
 use core::ptr;
 
@@ -45,9 +46,10 @@ pub struct EHContext<'a> {
 
 pub enum EHAction {
     None,
-    Cleanup(usize),
-    Catch(usize),
-    Filter(usize),
+    // TODO(seharris): is this really the right way to handle this?
+    Cleanup(*const c_void),
+    Catch(*const c_void),
+    Filter(*const c_void),
     Terminate,
 }
 
@@ -85,7 +87,40 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             let cs_start = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
             let cs_len = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
             let cs_lpad = read_encoded_pointer(&mut reader, context, call_site_encoding)?;
+            // Set when landing pad is encoded as a pointer instead of an
+            // offset from `lpad_base`.
+            // This pointer should be used instead of `cs_lpad` when available.
+            let mut sealed_lpad: Option<*const c_void> = None;
+
+            // Handle special encoding of landing pads on Morello.
+            // Landing pads are encoded as straight pointer values, either
+            // among the LSDA data, or at a given offset.
+            //
+            // Based on changes in
+            // `morello-llvm-project/libcxxabi/src/cxa_personality.cpp`
+            // from Morello LLVM release 1.5 (2022-10-5).
+            #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+            {
+                // Ideally get `align_of(*const c_void)` or equivalent, I'm not
+                // aware of a good way to do this at the moment.
+                // This is the alignment of capabilities on Morello.
+                let pointer_align = 16;
+
+                // Landing pad value describes the encoding of the pointer.
+                // Read actual pointer and override landing pad data with it.
+                if cs_lpad == 0xc {
+                    sealed_lpad = Some(reader.read_aligned(pointer_align));
+                } else if cs_lpad == 0xd {
+                    let offset = reader.read::<u64>();
+                    sealed_lpad = Some(*(reader.ptr.add(offset as usize) as *const *const c_void));
+                } else if cs_lpad != 0 {
+                    // Invalid encoding.
+                    return Err(());
+                }
+            }
+
             let cs_action_entry = reader.read_uleb128();
+
             // Callsite table is sorted by cs_start, so if we've passed the ip, we
             // may stop searching.
             if ip < func_start + cs_start {
@@ -94,8 +129,10 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             if ip < func_start + cs_start + cs_len {
                 if cs_lpad == 0 {
                     return Ok(EHAction::None);
+                } else if let Some(lpad) = sealed_lpad {
+                    return Ok(interpret_cs_action(action_table as *mut u8, cs_action_entry, lpad));
                 } else {
-                    let lpad = lpad_base + cs_lpad;
+                    let lpad = (lpad_base + cs_lpad) as *const c_void;
                     return Ok(interpret_cs_action(action_table as *mut u8, cs_action_entry, lpad));
                 }
             }
@@ -119,7 +156,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             if idx == 0 {
                 // Can never have null landing pad for sjlj -- that would have
                 // been indicated by a -1 call site index.
-                let lpad = (cs_lpad + 1) as usize;
+                let lpad = (cs_lpad + 1) as usize as *const c_void;
                 return Ok(interpret_cs_action(action_table as *mut u8, cs_action_entry, lpad));
             }
         }
@@ -129,7 +166,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
 unsafe fn interpret_cs_action(
     action_table: *mut u8,
     cs_action_entry: u64,
-    lpad: usize,
+    lpad: *const c_void,
 ) -> EHAction {
     if cs_action_entry == 0 {
         // If cs_action_entry is 0 then this is a cleanup (Drop::drop). We run these

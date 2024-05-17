@@ -51,7 +51,7 @@ fn codegen_field<'tcx>(
 }
 
 fn scalar_pair_calculate_b_offset(tcx: TyCtxt<'_>, a_scalar: Scalar, b_scalar: Scalar) -> Offset32 {
-    let b_offset = a_scalar.size(&tcx).align_to(b_scalar.align(&tcx).abi);
+    let b_offset = a_scalar.memory_size(&tcx).align_to(b_scalar.align(&tcx).abi);
     Offset32::new(b_offset.bytes().try_into().unwrap())
 }
 
@@ -250,7 +250,7 @@ impl<'tcx> CValue<'tcx> {
         match self.0 {
             CValueInner::ByVal(_) | CValueInner::ByValPair(_, _) => unreachable!(),
             CValueInner::ByRef(ptr, None) => {
-                let field_offset = lane_layout.size * lane_idx;
+                let field_offset = lane_layout.memory_size * lane_idx;
                 let field_ptr = ptr.offset_i64(fx, i64::try_from(field_offset.bytes()).unwrap());
                 CValue::by_ref(field_ptr, lane_layout)
             }
@@ -271,7 +271,7 @@ impl<'tcx> CValue<'tcx> {
         match self.0 {
             CValueInner::ByVal(_) | CValueInner::ByValPair(_, _) => unreachable!(),
             CValueInner::ByRef(ptr, None) => {
-                let field_offset = fx.bcx.ins().imul_imm(lane_idx, lane_layout.size.bytes() as i64);
+                let field_offset = fx.bcx.ins().imul_imm(lane_idx, lane_layout.memory_size.bytes() as i64);
                 let field_ptr = ptr.offset_value(fx, field_offset);
                 CValue::by_ref(field_ptr, lane_layout)
             }
@@ -285,7 +285,7 @@ impl<'tcx> CValue<'tcx> {
         layout: TyAndLayout<'tcx>,
         const_val: ty::ScalarInt,
     ) -> CValue<'tcx> {
-        assert_eq!(const_val.size(), layout.size, "{:#?}: {:?}", const_val, layout);
+        assert_eq!(const_val.memory_size(), layout.memory_size, "{:#?}: {:?}", const_val, layout);
         use cranelift_codegen::ir::immediates::{Ieee32, Ieee64};
 
         let clif_ty = fx.clif_type(layout.ty).unwrap();
@@ -300,13 +300,13 @@ impl<'tcx> CValue<'tcx> {
 
         let val = match layout.ty.kind() {
             ty::Uint(UintTy::U128) | ty::Int(IntTy::I128) => {
-                let const_val = const_val.to_bits(layout.size).unwrap();
+                let const_val = const_val.to_bits(layout.memory_size).unwrap();
                 let lsb = fx.bcx.ins().iconst(types::I64, const_val as u64 as i64);
                 let msb = fx.bcx.ins().iconst(types::I64, (const_val >> 64) as u64 as i64);
                 fx.bcx.ins().iconcat(lsb, msb)
             }
             ty::Bool | ty::Char | ty::Uint(_) | ty::Int(_) | ty::Ref(..) | ty::RawPtr(..) => {
-                fx.bcx.ins().iconst(clif_ty, const_val.to_bits(layout.size).unwrap() as i64)
+                fx.bcx.ins().iconst(clif_ty, const_val.to_bits(layout.data_size.unwrap()).unwrap() as i64)
             }
             ty::Float(FloatTy::F32) => {
                 fx.bcx.ins().f32const(Ieee32::with_bits(u32::try_from(const_val).unwrap()))
@@ -355,14 +355,14 @@ impl<'tcx> CPlace<'tcx> {
         layout: TyAndLayout<'tcx>,
     ) -> CPlace<'tcx> {
         assert!(layout.is_sized());
-        if layout.size.bytes() == 0 {
+        if layout.memory_size.bytes() == 0 {
             return CPlace {
                 inner: CPlaceInner::Addr(Pointer::dangling(layout.align.pref), None),
                 layout,
             };
         }
 
-        if layout.size.bytes() >= u64::from(u32::MAX - 16) {
+        if layout.memory_size.bytes() >= u64::from(u32::MAX - 16) {
             fx.tcx
                 .sess
                 .fatal(format!("values of type {} are too big to store on the stack", layout.ty));
@@ -372,7 +372,7 @@ impl<'tcx> CPlace<'tcx> {
             kind: StackSlotKind::ExplicitSlot,
             // FIXME Don't force the size to a multiple of 16 bytes once Cranelift gets a way to
             // specify stack slot alignment.
-            size: (u32::try_from(layout.size.bytes()).unwrap() + 15) / 16 * 16,
+            size: (u32::try_from(layout.memory_size.bytes()).unwrap() + 15) / 16 * 16,
         });
         CPlace { inner: CPlaceInner::Addr(Pointer::stack_slot(stack_slot), None), layout }
     }
@@ -559,7 +559,7 @@ impl<'tcx> CPlace<'tcx> {
             fx.bcx.def_var(var, data);
         }
 
-        assert_eq!(self.layout().size, from.layout().size);
+        assert_eq!(self.layout().memory_size, from.layout().memory_size);
 
         if fx.clif_comments.enabled() {
             use cranelift_codegen::cursor::{Cursor, CursorPosition};
@@ -601,7 +601,7 @@ impl<'tcx> CPlace<'tcx> {
             }
             CPlaceInner::Addr(_, Some(_)) => bug!("Can't write value to unsized place {:?}", self),
             CPlaceInner::Addr(to_ptr, None) => {
-                if dst_layout.size == Size::ZERO || dst_layout.abi == Abi::Uninhabited {
+                if dst_layout.memory_size == Size::ZERO || dst_layout.abi == Abi::Uninhabited {
                     return;
                 }
 
@@ -634,7 +634,7 @@ impl<'tcx> CPlace<'tcx> {
                         let from_addr = from_ptr.get_addr(fx);
                         let to_addr = to_ptr.get_addr(fx);
                         let src_layout = from.1;
-                        let size = dst_layout.size.bytes();
+                        let size = dst_layout.memory_size.bytes();
                         let src_align = src_layout.align.abi.bytes() as u8;
                         let dst_align = dst_layout.align.abi.bytes() as u8;
                         fx.bcx.emit_small_memory_copy(
@@ -719,7 +719,7 @@ impl<'tcx> CPlace<'tcx> {
             CPlaceInner::Var(_, _) => unreachable!(),
             CPlaceInner::VarPair(_, _, _) => unreachable!(),
             CPlaceInner::Addr(ptr, None) => {
-                let field_offset = lane_layout.size * lane_idx;
+                let field_offset = lane_layout.memory_size * lane_idx;
                 let field_ptr = ptr.offset_i64(fx, i64::try_from(field_offset.bytes()).unwrap());
                 CPlace::for_ptr(field_ptr, lane_layout)
             }
@@ -746,7 +746,7 @@ impl<'tcx> CPlace<'tcx> {
             _ => bug!("place_index({:?})", self.layout().ty),
         };
 
-        let offset = fx.bcx.ins().imul_imm(index, elem_layout.size.bytes() as i64);
+        let offset = fx.bcx.ins().imul_imm(index, elem_layout.memory_size.bytes() as i64);
 
         CPlace::for_ptr(ptr.offset_value(fx, offset), elem_layout)
     }

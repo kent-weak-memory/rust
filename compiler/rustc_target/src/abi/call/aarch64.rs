@@ -28,7 +28,7 @@ where
     C: HasDataLayout,
 {
     arg.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()).and_then(|unit| {
-        let size = arg.layout.size;
+        let size = arg.layout.memory_size;
 
         // Ensure we have at most four uniquely addressable members.
         if size > unit.size.checked_mul(4, cx).unwrap() {
@@ -61,7 +61,7 @@ where
         ret.cast_to(uniform);
         return;
     }
-    let size = ret.layout.size;
+    let size = ret.layout.memory_size;
     let bits = size.bits();
     if bits <= 128 {
         ret.cast_to(Uniform { unit: Reg::i64(), total: size });
@@ -86,7 +86,7 @@ where
         arg.cast_to(uniform);
         return;
     }
-    let size = arg.layout.size;
+    let size = arg.layout.memory_size;
     let bits = size.bits();
     if bits <= 128 {
         arg.cast_to(Uniform { unit: Reg::i64(), total: size });

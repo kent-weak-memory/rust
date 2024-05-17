@@ -19,7 +19,8 @@ pub fn target() -> Target {
 
     Target {
         llvm_target: "s390x-unknown-linux-musl".into(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memory_size: 64,
         data_layout: "E-m:e-i1:8:16-i8:8:16-i64:64-f128:64-v128:64-a:8:16-n32:64".into(),
         arch: "s390x".into(),
         options: base,

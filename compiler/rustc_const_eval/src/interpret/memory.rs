@@ -347,17 +347,17 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         }
 
         // Let the machine take some extra action
-        let size = alloc.size();
+        let memory_size = alloc.memory_size();
         M::before_memory_deallocation(
             *self.tcx,
             &mut self.machine,
             &mut alloc.extra,
             (alloc_id, prov),
-            alloc_range(Size::ZERO, size),
+            alloc_range(Size::ZERO, alloc.data_size(), memory_size),
         )?;
 
         // Don't forget to remember size and align of this now-dead allocation
-        let old = self.memory.dead_alloc_map.insert(alloc_id, (size, alloc.align));
+        let old = self.memory.dead_alloc_map.insert(alloc_id, (memory_size, alloc.align));
         if old.is_some() {
             bug!("Nothing can be deallocated twice");
         }
@@ -602,23 +602,24 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     pub fn get_ptr_alloc<'a>(
         &'a self,
         ptr: Pointer<Option<M::Provenance>>,
-        size: Size,
+        data_Size: Option<Size>,
+        memory_size: Size,
         align: Align,
     ) -> InterpResult<'tcx, Option<AllocRef<'a, 'tcx, M::Provenance, M::AllocExtra, M::Bytes>>>
     {
         let ptr_and_alloc = self.check_and_deref_ptr(
             ptr,
-            size,
+            memory_size,
             align,
             M::enforce_alignment(self),
             CheckInAllocMsg::MemoryAccessTest,
             |alloc_id, offset, prov| {
                 let alloc = self.get_alloc_raw(alloc_id)?;
-                Ok((alloc.size(), alloc.align, (alloc_id, offset, prov, alloc)))
+                Ok((alloc.memory_size(), alloc.align, (alloc_id, offset, prov, alloc)))
             },
         )?;
         if let Some((alloc_id, offset, prov, alloc)) = ptr_and_alloc {
-            let range = alloc_range(offset, size);
+            let range = alloc_range(offset, data_size, memory_size);
             M::before_memory_read(*self.tcx, &self.machine, &alloc.extra, (alloc_id, prov), range)?;
             Ok(Some(AllocRef { alloc, range, tcx: *self.tcx, alloc_id }))
         } else {
@@ -675,17 +676,18 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     pub fn get_ptr_alloc_mut<'a>(
         &'a mut self,
         ptr: Pointer<Option<M::Provenance>>,
-        size: Size,
+        data_size: Option<Size>,
+        memory_size: Size,
         align: Align,
     ) -> InterpResult<'tcx, Option<AllocRefMut<'a, 'tcx, M::Provenance, M::AllocExtra, M::Bytes>>>
     {
-        let parts = self.get_ptr_access(ptr, size, align)?;
+        let parts = self.get_ptr_access(ptr, memory_size, align)?;
         if let Some((alloc_id, offset, prov)) = parts {
             let tcx = *self.tcx;
             // FIXME: can we somehow avoid looking up the allocation twice here?
             // We cannot call `get_raw_mut` inside `check_and_deref_ptr` as that would duplicate `&mut self`.
             let (alloc, machine) = self.get_alloc_raw_mut(alloc_id)?;
-            let range = alloc_range(offset, size);
+            let range = alloc_range(offset, data_size, memory_size);
             M::before_memory_write(tcx, machine, &mut alloc.extra, (alloc_id, prov), range)?;
             Ok(Some(AllocRefMut { alloc, range, tcx, alloc_id }))
         } else {
@@ -734,7 +736,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     .expect("statics should not have generic parameters");
                 let layout = self.tcx.layout_of(ParamEnv::empty().and(ty)).unwrap();
                 assert!(layout.is_sized());
-                (layout.size, layout.align.abi, AllocKind::LiveData)
+                (layout.memory_size, layout.align.abi, AllocKind::LiveData)
             }
             Some(GlobalAlloc::Memory(alloc)) => {
                 // Need to duplicate the logic here, because the global allocations have
@@ -967,7 +969,8 @@ impl<'tcx, 'a, Prov: Provenance, Extra, Bytes: AllocBytes>
 
     /// `offset` is relative to this allocation reference, not the base of the allocation.
     pub fn write_ptr_sized(&mut self, offset: Size, val: Scalar<Prov>) -> InterpResult<'tcx> {
-        self.write_scalar(alloc_range(offset, self.tcx.data_layout().pointer_size), val)
+        let data_layout = self.tcx.data_layout();
+        self.write_scalar(alloc_range(offset, Some(data_layout.pointer_data_size), data_layout.pointer_memory_size), val)
     }
 
     /// Mark the entire referenced range as uninitialized
@@ -1002,8 +1005,9 @@ impl<'tcx, 'a, Prov: Provenance, Extra, Bytes: AllocBytes> AllocRef<'a, 'tcx, Pr
 
     /// `offset` is relative to this allocation reference, not the base of the allocation.
     pub fn read_pointer(&self, offset: Size) -> InterpResult<'tcx, Scalar<Prov>> {
+        let data_layout = self.tcx.data_layout();
         self.read_scalar(
-            alloc_range(offset, self.tcx.data_layout().pointer_size),
+            alloc_range(offset, Some(data_layout.pointer_data_size), data_layout.pointer_memory_size),
             /*read_provenance*/ true,
         )
     }
@@ -1030,9 +1034,10 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     pub fn read_bytes_ptr_strip_provenance(
         &self,
         ptr: Pointer<Option<M::Provenance>>,
-        size: Size,
+        data_size: Option<Size>,
+        memory_size: Size,
     ) -> InterpResult<'tcx, &[u8]> {
-        let Some(alloc_ref) = self.get_ptr_alloc(ptr, size, Align::ONE)? else {
+        let Some(alloc_ref) = self.get_ptr_alloc(ptr, data_size, memory_size, Align::ONE)? else {
             // zero-sized access
             return Ok(&[]);
         };
@@ -1058,7 +1063,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         assert_eq!(lower, len, "can only write iterators with a precise length");
 
         let size = Size::from_bytes(len);
-        let Some(alloc_ref) = self.get_ptr_alloc_mut(ptr, size, Align::ONE)? else {
+        let Some(alloc_ref) = self.get_ptr_alloc_mut(ptr, Some(size), size, Align::ONE)? else {
             // zero-sized access
             assert_matches!(
                 src.next(),
@@ -1120,7 +1125,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             return Ok(());
         };
         let src_alloc = self.get_alloc_raw(src_alloc_id)?;
-        let src_range = alloc_range(src_offset, size);
+        let src_range = alloc_range(src_offset, None, size);
         M::before_memory_read(
             *tcx,
             &self.machine,
@@ -1150,7 +1155,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         // Destination alloc preparations and access hooks.
         let (dest_alloc, extra) = self.get_alloc_raw_mut(dest_alloc_id)?;
-        let dest_range = alloc_range(dest_offset, size * num_copies);
+        let dest_range = alloc_range(dest_offset, None, size * num_copies);
         M::before_memory_write(
             *tcx,
             extra,
@@ -1214,7 +1219,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // now fill in all the "init" data
         dest_alloc.init_mask_apply_copy(
             init,
-            alloc_range(dest_offset, size), // just a single copy (i.e., not full `dest_range`)
+            alloc_range(dest_offset, None, size), // just a single copy (i.e., not full `dest_range`)
             num_copies,
         );
         // copy the provenance to the destination

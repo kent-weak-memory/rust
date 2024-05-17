@@ -102,7 +102,7 @@ impl<Prov: Provenance> std::fmt::Display for ImmTy<'_, Prov> {
         ) -> Result<FmtPrinter<'a, 'tcx>, std::fmt::Error> {
             match s {
                 Scalar::Int(int) => cx.pretty_print_const_scalar_int(int, ty, true),
-                Scalar::Ptr(ptr, _sz) => {
+                Scalar::Ptr(ptr, _data_size, _memory_size) => {
                     // Just print the ptr value. `pretty_print_const_scalar_ptr` would also try to
                     // print what is points to, which would fail since it has no access to the local
                     // memory.
@@ -217,21 +217,21 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
 
     #[inline]
     pub fn try_from_uint(i: impl Into<u128>, layout: TyAndLayout<'tcx>) -> Option<Self> {
-        Some(Self::from_scalar(Scalar::try_from_uint(i, layout.size)?, layout))
+        Some(Self::from_scalar(Scalar::try_from_uint(i, layout.data_size.unwrap(), layout.memory_size)?, layout))
     }
     #[inline]
     pub fn from_uint(i: impl Into<u128>, layout: TyAndLayout<'tcx>) -> Self {
-        Self::from_scalar(Scalar::from_uint(i, layout.size), layout)
+        Self::from_scalar(Scalar::from_uint(i, layout.data_size.unwrap(), layout.memory_size), layout)
     }
 
     #[inline]
     pub fn try_from_int(i: impl Into<i128>, layout: TyAndLayout<'tcx>) -> Option<Self> {
-        Some(Self::from_scalar(Scalar::try_from_int(i, layout.size)?, layout))
+        Some(Self::from_scalar(Scalar::try_from_int(i, layout.data_size.unwrap(), layout.memory_size)?, layout))
     }
 
     #[inline]
     pub fn from_int(i: impl Into<i128>, layout: TyAndLayout<'tcx>) -> Self {
-        Self::from_scalar(Scalar::from_int(i, layout.size), layout)
+        Self::from_scalar(Scalar::from_int(i, layout.data_size.unwrap(), layout.memory_size), layout)
     }
 
     #[inline]
@@ -267,7 +267,7 @@ impl<'tcx, Prov: Provenance> OpTy<'tcx, Prov> {
     /// a ScalarPair are entirely determined by the layout, not the data.
     pub fn transmute(&self, layout: TyAndLayout<'tcx>) -> Self {
         assert_eq!(
-            self.layout.size, layout.size,
+            self.layout.memory_size, layout.memory_size,
             "transmuting with a size change, that doesn't seem right"
         );
         OpTy { layout, ..*self }
@@ -338,10 +338,10 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // like a `Scalar` (or `ScalarPair`).
         Ok(match mplace.layout.abi {
             Abi::Scalar(abi::Scalar::Initialized { value: s, .. }) => {
-                let size = s.size(self);
-                assert_eq!(size, mplace.layout.size, "abi::Scalar size does not match layout size");
+                let memory_size = s.memory_size(self);
+                assert_eq!(memory_size, mplace.layout.memory_size, "abi::Scalar size does not match layout size");
                 let scalar = alloc.read_scalar(
-                    alloc_range(Size::ZERO, size),
+                    alloc_range(Size::ZERO, s.data_size(self), size),
                     /*read_provenance*/ matches!(s, abi::Pointer(_)),
                 )?;
                 Some(ImmTy { imm: scalar.into(), layout: mplace.layout })
@@ -353,15 +353,15 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // We checked `ptr_align` above, so all fields will have the alignment they need.
                 // We would anyway check against `ptr_align.restrict_for_offset(b_offset)`,
                 // which `ptr.offset(b_offset)` cannot possibly fail to satisfy.
-                let (a_size, b_size) = (a.size(self), b.size(self));
-                let b_offset = a_size.align_to(b.align(self).abi);
+                let (a_memory_size, b_memory_size) = (a.memory_size(self), b.memory_size(self));
+                let b_offset = a_memory_size.align_to(b.align(self).abi);
                 assert!(b_offset.bytes() > 0); // in `operand_field` we use the offset to tell apart the fields
                 let a_val = alloc.read_scalar(
-                    alloc_range(Size::ZERO, a_size),
+                    alloc_range(Size::ZERO, a.data_size(self), a_memory_size),
                     /*read_provenance*/ matches!(a, abi::Pointer(_)),
                 )?;
                 let b_val = alloc.read_scalar(
-                    alloc_range(b_offset, b_size),
+                    alloc_range(b_offset, b.data_size(self), b_memory_size),
                     /*read_provenance*/ matches!(b, abi::Pointer(_)),
                 )?;
                 Some(ImmTy { imm: Immediate::ScalarPair(a_val, b_val), layout: mplace.layout })
@@ -448,8 +448,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
     /// Turn the wide MPlace into a string (must already be dereferenced!)
     pub fn read_str(&self, mplace: &MPlaceTy<'tcx, M::Provenance>) -> InterpResult<'tcx, &str> {
-        let len = mplace.len(self)?;
-        let bytes = self.read_bytes_ptr_strip_provenance(mplace.ptr, Size::from_bytes(len))?;
+        let len = size::from_bytes(mplace.len(self)?);
+        let bytes = self.read_bytes_ptr_strip_provenance(mplace.ptr, Some(len), len)?;
         let str = std::str::from_utf8(bytes).map_err(|err| err_ub!(InvalidStr(err)))?;
         Ok(str)
     }
@@ -642,7 +642,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // Other cases need layout.
         let adjust_scalar = |scalar| -> InterpResult<'tcx, _> {
             Ok(match scalar {
-                Scalar::Ptr(ptr, size) => Scalar::Ptr(self.global_base_pointer(ptr)?, size),
+                Scalar::Ptr(ptr, data_size, memory_size) => Scalar::Ptr(self.global_base_pointer(ptr)?, data_size, memory_size),
                 Scalar::Int(int) => Scalar::Int(int),
             })
         };

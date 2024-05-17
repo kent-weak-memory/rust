@@ -240,8 +240,10 @@ pub struct UninitBytesAccess {
 /// Information about a size mismatch.
 #[derive(Debug)]
 pub struct ScalarSizeMismatch {
-    pub target_size: u64,
-    pub data_size: u64,
+    pub target_data_size: u64,
+    pub target_memory_size: u64,
+    pub data_data_size: u64,
+    pub data_memory_size: u64,
 }
 
 macro_rules! impl_into_diagnostic_arg_through_debug {

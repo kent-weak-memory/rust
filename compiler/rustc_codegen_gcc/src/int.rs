@@ -233,8 +233,8 @@ impl<'a, 'gcc, 'tcx> Builder<'a, 'gcc, 'tcx> {
 
         let new_kind =
             match typ.kind() {
-                Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_width)),
-                Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_width)),
+                Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_data_size)),
+                Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_data_size)),
                 t @ (Uint(_) | Int(_)) => t.clone(),
                 _ => panic!("tried to get overflow intrinsic for op applied to non-int type"),
             };

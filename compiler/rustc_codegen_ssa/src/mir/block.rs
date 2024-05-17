@@ -218,7 +218,7 @@ impl<'a, 'tcx> TerminatorCodegenHelper<'tcx> {
                 bx.switch_to_block(fx.llbb(target));
                 fx.set_debug_loc(bx, self.terminator.source_info);
                 for tmp in copied_constant_arguments {
-                    bx.lifetime_end(tmp.llval, tmp.layout.size);
+                    bx.lifetime_end(tmp.llval, tmp.layout.memory_size);
                 }
                 fx.store_return(bx, ret_dest, &fn_abi.ret, invokeret);
             }
@@ -235,7 +235,7 @@ impl<'a, 'tcx> TerminatorCodegenHelper<'tcx> {
 
             if let Some((ret_dest, target)) = destination {
                 for tmp in copied_constant_arguments {
-                    bx.lifetime_end(tmp.llval, tmp.layout.size);
+                    bx.lifetime_end(tmp.llval, tmp.layout.memory_size);
                 }
                 fx.store_return(bx, ret_dest, &fn_abi.ret, llret);
                 self.funclet_br(fx, bx, target, mergeable_succ)
@@ -590,6 +590,14 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
         // Don't codegen the panic block if success if known.
         if const_cond == Some(expected) {
             return helper.funclet_br(self, bx, target, mergeable_succ);
+        }
+
+        // Following Zhang et. al, ASE 2022:
+        let gcx = bx.tcx();
+        if gcx.sess.opts.cg.drop_bounds_checks {
+            // Modify to disable the run-time checks
+            helper.funclet_br(self, &mut bx, target);
+            return;
         }
 
         // Pass the condition through llvm.expect for branch hinting.
@@ -1018,7 +1026,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 (&mir::Operand::Copy(_), Ref(_, None, _))
                 | (&mir::Operand::Constant(_), Ref(_, None, _)) => {
                     let tmp = PlaceRef::alloca(bx, op.layout);
-                    bx.lifetime_start(tmp.llval, tmp.layout.size);
+                    bx.lifetime_start(tmp.llval, tmp.layout.memory_size);
                     op.val.store(bx, tmp);
                     op.val = Ref(tmp.llval, None, tmp.align);
                     copied_constant_arguments.push(tmp);

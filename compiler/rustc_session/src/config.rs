@@ -1169,7 +1169,7 @@ fn default_configuration(sess: &Session) -> CrateConfig {
     // NOTE: This should be kept in sync with `CrateCheckConfig::fill_well_known` below.
     let end = &sess.target.endian;
     let arch = &sess.target.arch;
-    let wordsz = sess.target.pointer_width.to_string();
+    let address_size = sess.target.pointer_data_size.to_string();
     let os = &sess.target.os;
     let env = &sess.target.env;
     let abi = &sess.target.abi;
@@ -1195,7 +1195,8 @@ fn default_configuration(sess: &Session) -> CrateConfig {
     }
     ret.insert((sym::target_arch, Some(Symbol::intern(arch))));
     ret.insert((sym::target_endian, Some(Symbol::intern(end.as_str()))));
-    ret.insert((sym::target_pointer_width, Some(Symbol::intern(&wordsz))));
+    // TODO(seharris): assuming this is used for `cfg!()`, the name target_pointer_width is iffy.
+    ret.insert((sym::target_pointer_width, Some(Symbol::intern(&address_size))));
     ret.insert((sym::target_env, Some(Symbol::intern(env))));
     ret.insert((sym::target_abi, Some(Symbol::intern(abi))));
     ret.insert((sym::target_vendor, Some(Symbol::intern(vendor))));
@@ -1223,7 +1224,7 @@ fn default_configuration(sess: &Session) -> CrateConfig {
             };
             let s = i.to_string();
             insert_atomic(&s, align);
-            if s == wordsz {
+            if s == address_size {
                 insert_atomic("ptr", layout.pointer_align.abi);
             }
         }
@@ -1528,10 +1529,10 @@ pub(super) fn build_target_config(
         handler.early_warn(warning)
     }
 
-    if !matches!(target.pointer_width, 16 | 32 | 64) {
+    if !matches!(target.pointer_data_size, 16 | 32 | 64) {
         handler.early_error(format!(
-            "target specification was invalid: unrecognized target-pointer-width {}",
-            target.pointer_width
+            "target specification was invalid: unrecognized target-pointer-data-size {}",
+            target.pointer_data_size
         ))
     }
 

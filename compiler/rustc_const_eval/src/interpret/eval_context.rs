@@ -469,12 +469,12 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     #[inline(always)]
     pub fn sign_extend(&self, value: u128, ty: TyAndLayout<'_>) -> u128 {
         assert!(ty.abi.is_signed());
-        ty.size.sign_extend(value)
+        ty.data_size.unwrap().sign_extend(value)
     }
 
     #[inline(always)]
     pub fn truncate(&self, value: u128, ty: TyAndLayout<'_>) -> u128 {
-        ty.size.truncate(value)
+        ty.data_size.unwrap().truncate(value)
     }
 
     #[inline]
@@ -579,7 +579,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         layout: &TyAndLayout<'tcx>,
     ) -> InterpResult<'tcx, Option<(Size, Align)>> {
         if layout.is_sized() {
-            return Ok(Some((layout.size, layout.align.abi)));
+            return Ok(Some((layout.memory_size, layout.align.abi)));
         }
         match layout.ty.kind() {
             ty::Adt(..) | ty::Tuple(..) => {
@@ -652,7 +652,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let elem = layout.field(self, 0);
 
                 // Make sure the slice is not too big.
-                let size = elem.size.bytes().saturating_mul(len); // we rely on `max_size_of_val` being smaller than `u64::MAX`.
+                let size = elem.memory_size.bytes().saturating_mul(len); // we rely on `max_size_of_val` being smaller than `u64::MAX`.
                 let size = Size::from_bytes(size);
                 if size > self.max_size_of_val() {
                     throw_ub!(InvalidMeta(InvalidMetaKind::SliceTooBig));
@@ -1041,16 +1041,16 @@ impl<'a, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> std::fmt::Debug
                     }
                     LocalValue::Live(Operand::Immediate(Immediate::Scalar(val))) => {
                         write!(fmt, " {:?}", val)?;
-                        if let Scalar::Ptr(ptr, _size) = val {
+                        if let Scalar::Ptr(ptr, _data_size, _memory_size) = val {
                             allocs.push(ptr.provenance.get_alloc_id());
                         }
                     }
                     LocalValue::Live(Operand::Immediate(Immediate::ScalarPair(val1, val2))) => {
                         write!(fmt, " ({:?}, {:?})", val1, val2)?;
-                        if let Scalar::Ptr(ptr, _size) = val1 {
+                        if let Scalar::Ptr(ptr, _data_size, _memory_size) = val1 {
                             allocs.push(ptr.provenance.get_alloc_id());
                         }
-                        if let Scalar::Ptr(ptr, _size) = val2 {
+                        if let Scalar::Ptr(ptr, _data_size, _memory_size) = val2 {
                             allocs.push(ptr.provenance.get_alloc_id());
                         }
                     }

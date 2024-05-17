@@ -43,7 +43,7 @@ pub trait BaseTypeMethods<'tcx>: Backend<'tcx> {
 
 pub trait DerivedTypeMethods<'tcx>: BaseTypeMethods<'tcx> + MiscMethods<'tcx> {
     fn type_i8p(&self) -> Self::Type {
-        self.type_i8p_ext(AddressSpace::DATA)
+        self.type_i8p_ext(self.data_layout().data_address_space)
     }
 
     fn type_i8p_ext(&self, address_space: AddressSpace) -> Self::Type {

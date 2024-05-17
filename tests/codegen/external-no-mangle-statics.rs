@@ -6,72 +6,88 @@
 // `#[no_mangle]`d static variables always have external linkage, i.e., no `internal` in their
 // definitions
 
-// CHECK: @A = {{(dso_local )?}}local_unnamed_addr constant
+// NONCHERI: @A = {{(dso_local )?}}local_unnamed_addr constant
+// CHERI: @A = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
 #[no_mangle]
 static A: u8 = 0;
 
-// CHECK: @B = {{(dso_local )?}}local_unnamed_addr global
+// NONCHERI: @B = {{(dso_local )?}}local_unnamed_addr global
+// CHERI: @B = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
 #[no_mangle]
 static mut B: u8 = 0;
 
-// CHECK: @C = {{(dso_local )?}}local_unnamed_addr constant
+// NONCHERI: @C = {{(dso_local )?}}local_unnamed_addr constant
+// CHERI: @C = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
 #[no_mangle]
 pub static C: u8 = 0;
 
-// CHECK: @D = {{(dso_local )?}}local_unnamed_addr global
+// NONCHERI: @D = {{(dso_local )?}}local_unnamed_addr global
+// CHERI: @D = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
 #[no_mangle]
 pub static mut D: u8 = 0;
 
 mod private {
-    // CHECK: @E = {{(dso_local )?}}local_unnamed_addr constant
+    // NONCHERI: @E = {{(dso_local )?}}local_unnamed_addr constant
+    // CHERI: @E = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
     #[no_mangle]
     static E: u8 = 0;
 
-    // CHECK: @F = {{(dso_local )?}}local_unnamed_addr global
+    // NONCHERI: @F = {{(dso_local )?}}local_unnamed_addr global
+    // CHERI: @F = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
     #[no_mangle]
     static mut F: u8 = 0;
 
-    // CHECK: @G = {{(dso_local )?}}local_unnamed_addr constant
+    // NONCHERI: @G = {{(dso_local )?}}local_unnamed_addr constant
+    // CHERI: @G = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
     #[no_mangle]
     pub static G: u8 = 0;
 
-    // CHECK: @H = {{(dso_local )?}}local_unnamed_addr global
+    // NONCHERI: @H = {{(dso_local )?}}local_unnamed_addr global
+    // CHERI: @H = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
     #[no_mangle]
     pub static mut H: u8 = 0;
 }
 
 const HIDDEN: () = {
-    // CHECK: @I = {{(dso_local )?}}local_unnamed_addr constant
+    // NONCHERI: @I = {{(dso_local )?}}local_unnamed_addr constant
+    // CHERI: @I = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
     #[no_mangle]
     static I: u8 = 0;
 
-    // CHECK: @J = {{(dso_local )?}}local_unnamed_addr global
+    // NONCHERI: @J = {{(dso_local )?}}local_unnamed_addr global
+    // CHERI: @J = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
     #[no_mangle]
     static mut J: u8 = 0;
 
-    // CHECK: @K = {{(dso_local )?}}local_unnamed_addr constant
+    // NONCHERI: @K = {{(dso_local )?}}local_unnamed_addr constant
+    // CHERI: @K = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
     #[no_mangle]
     pub static K: u8 = 0;
 
-    // CHECK: @L = {{(dso_local )?}}local_unnamed_addr global
+    // NONCHERI: @L = {{(dso_local )?}}local_unnamed_addr global
+    // CHERI: @L = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
     #[no_mangle]
     pub static mut L: u8 = 0;
 };
 
 fn x() {
-    // CHECK: @M = {{(dso_local )?}}local_unnamed_addr constant
+    // NONCHERI: @M = {{(dso_local )?}}local_unnamed_addr constant
+    // CHERI: @M = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
     #[no_mangle]
     static M: fn() = x;
 
-    // CHECK: @N = {{(dso_local )?}}local_unnamed_addr global
+    // NONCHERI: @N = {{(dso_local )?}}local_unnamed_addr global
+    // CHERI: @N = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
     #[no_mangle]
     static mut N: u8 = 0;
 
-    // CHECK: @O = {{(dso_local )?}}local_unnamed_addr constant
+    // NONCHERI: @O = {{(dso_local )?}}local_unnamed_addr constant
+    // CHERI: @O = {{(dso_local )?}}local_unnamed_addr addrspace(200) constant
     #[no_mangle]
     pub static O: u8 = 0;
 
-    // CHECK: @P = {{(dso_local )?}}local_unnamed_addr global
+    // NONCHERI: @P = {{(dso_local )?}}local_unnamed_addr global
+    // CHERI: @P = {{(dso_local )?}}local_unnamed_addr addrspace(200) global
     #[no_mangle]
     pub static mut P: u8 = 0;
 }

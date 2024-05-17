@@ -17,25 +17,29 @@ pub struct i64x4(i64, i64, i64, i64);
 #[derive(Copy, Clone)]
 pub union UnionI64x4{ a:(), b: i64x4 }
 
-// CHECK: define {{(dso_local )?}}void @test_UnionI64x4({{<4 x i64>\*|ptr}} {{.*}} %_1)
+// NONCHERI: define {{(dso_local )?}}void @test_UnionI64x4({{<4 x i64>\*|ptr}} {{.*}} %_1)
+// CHERI: define {{(dso_local )?}}void @test_UnionI64x4({{<4 x i64> addrspace\(200\)\*|ptr addrspace\(200\)}} {{.*}} %_1)
 #[no_mangle]
 pub fn test_UnionI64x4(_: UnionI64x4) { loop {} }
 
 pub union UnionI64x4_{ a: i64x4, b: (), c:i64x4, d: Unhab, e: ((),()), f: UnionI64x4 }
 
-// CHECK: define {{(dso_local )?}}void @test_UnionI64x4_({{<4 x i64>\*|ptr}} {{.*}} %_1)
+// NONCHERI: define {{(dso_local )?}}void @test_UnionI64x4_({{<4 x i64>\*|ptr}} {{.*}} %_1)
+// CHERI: define {{(dso_local )?}}void @test_UnionI64x4_({{<4 x i64> addrspace\(200\)\*|ptr addrspace\(200\)}} {{.*}} %_1)
 #[no_mangle]
 pub fn test_UnionI64x4_(_: UnionI64x4_) { loop {} }
 
 pub union UnionI64x4I64{ a: i64x4, b: i64 }
 
-// CHECK: define {{(dso_local )?}}void @test_UnionI64x4I64({{%UnionI64x4I64\*|ptr}} {{.*}} %_1)
+// NONCHERI: define {{(dso_local )?}}void @test_UnionI64x4I64({{%UnionI64x4I64\*|ptr}} {{.*}} %_1)
+// CHERI: define {{(dso_local )?}}void @test_UnionI64x4I64({{%UnionI64x4I64 addrspace\(200\)\*|ptr addrspace\(200\)}} {{.*}} %_1)
 #[no_mangle]
 pub fn test_UnionI64x4I64(_: UnionI64x4I64) { loop {} }
 
 pub union UnionI64x4Tuple{ a: i64x4, b: (i64, i64, i64, i64) }
 
-// CHECK: define {{(dso_local )?}}void @test_UnionI64x4Tuple({{%UnionI64x4Tuple\*|ptr}} {{.*}} %_1)
+// NONCHERI: define {{(dso_local )?}}void @test_UnionI64x4Tuple({{%UnionI64x4Tuple\*|ptr}} {{.*}} %_1)
+// CHERI: define {{(dso_local )?}}void @test_UnionI64x4Tuple({{%UnionI64x4Tuple addrspace\(200\)\*|ptr addrspace\(200\)}} {{.*}} %_1)
 #[no_mangle]
 pub fn test_UnionI64x4Tuple(_: UnionI64x4Tuple) { loop {} }
 

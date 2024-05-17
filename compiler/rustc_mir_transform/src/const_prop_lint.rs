@@ -189,7 +189,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             // I don't know how return types can seem to be unsized but this happens in the
             // `type/type-unsatisfiable.rs` test.
             .filter(|ret_layout| {
-                ret_layout.is_sized() && ret_layout.size < Size::from_bytes(MAX_ALLOC_LIMIT)
+                ret_layout.is_sized() && ret_layout.memory_size < Size::from_bytes(MAX_ALLOC_LIMIT)
             })
             .unwrap_or_else(|| ecx.layout_of(tcx.types.unit).unwrap());
 
@@ -360,10 +360,12 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             // We need the type of the LHS. We cannot use `place_layout` as that is the type
             // of the result, which for checked binops is not the same!
             let left_ty = left.ty(self.local_decls(), self.tcx);
-            let left_size = self.ecx.layout_of(left_ty).ok()?.size;
-            let right_size = r.layout.size;
-            let r_bits = r.to_scalar().to_bits(right_size).ok();
-            if r_bits.is_some_and(|b| b >= left_size.bits() as u128) {
+            let left_layout = self.ecx.layout_of(left_ty).ok()?;
+            let left_data_size = left_layout.data_size.unwrap();
+            let left_memory_size = left_layout.memory_size;
+            let right_data_size = r.layout.data_size.unwrap();
+            let r_bits = r.to_scalar().to_bits(right_data_size).ok();
+            if r_bits.is_some_and(|b| b >= left_data_size.bits() as u128) {
                 debug!("check_binary_op: reporting assert for {:?}", location);
                 let source_info = self.body().source_info(location);
                 let panic = AssertKind::Overflow(
@@ -372,7 +374,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                         Some(l) => l.to_const_int(),
                         // Invent a dummy value, the diagnostic ignores it anyway
                         None => ConstInt::new(
-                            ScalarInt::try_from_uint(1_u8, left_size).unwrap(),
+                            ScalarInt::try_from_uint(1_u8, left_data_size, left_memory_size).unwrap(),
                             left_ty.is_signed(),
                             left_ty.is_ptr_sized_integral(),
                         ),
@@ -666,7 +668,7 @@ impl<'tcx> Visitor<'tcx> for ConstPropagator<'_, 'tcx> {
                 if let Some(ref value) = self.eval_operand(&discr, location)
                   && let Some(value_const) = self.use_ecx(location, |this| this.ecx.read_scalar(&value))
                   && let Ok(constant) = value_const.try_to_int()
-                  && let Ok(constant) = constant.to_bits(constant.size())
+                  && let Ok(constant) = constant.to_bits(constant.data_size().unwrap())
                 {
                     // We managed to evaluate the discriminant, so we know we only need to visit
                     // one target.

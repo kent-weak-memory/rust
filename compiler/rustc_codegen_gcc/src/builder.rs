@@ -817,7 +817,7 @@ impl<'a, 'gcc, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'gcc, 'tcx> {
                 OperandValue::Immediate(self.to_immediate(load, place.layout))
             }
             else if let abi::Abi::ScalarPair(ref a, ref b) = place.layout.abi {
-                let b_offset = a.size(self).align_to(b.align(self).abi);
+                let b_offset = a.memory_size(self).align_to(b.align(self).abi);
                 let pair_type = place.layout.gcc_type(self);
 
                 let mut load = |i, scalar: &abi::Scalar, align| {
@@ -862,7 +862,7 @@ impl<'a, 'gcc, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'gcc, 'tcx> {
         self.cond_br(keep_going, body_bb, next_bb);
 
         self.switch_to_block(body_bb);
-        let align = dest.align.restrict_for_offset(dest.layout.field(self.cx(), 0).size);
+        let align = dest.align.restrict_for_offset(dest.layout.field(self.cx(), 0).memory_size);
         cg_elem.val.store(self, PlaceRef::new_sized_aligned(current_val, cg_elem.layout, align));
 
         let next = self.inbounds_gep(self.backend_type(cg_elem.layout), current.to_rvalue(), &[self.const_usize(1)]);

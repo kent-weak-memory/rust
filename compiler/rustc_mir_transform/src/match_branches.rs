@@ -135,11 +135,13 @@ impl<'tcx> MirPass<'tcx> for MatchBranchSimplification {
                             (*f).clone()
                         } else {
                             // Different value between blocks. Make value conditional on switch condition.
-                            let size = tcx.layout_of(param_env.and(discr_ty)).unwrap().size;
+                            let layout = tcx.layout_of(param_env.and(discr_ty)).unwrap();
+                            let data_size = layout.data_size.unwrap();
+                            let memory_size = layout.memory_size;
                             let const_cmp = Operand::const_from_scalar(
                                 tcx,
                                 discr_ty,
-                                rustc_const_eval::interpret::Scalar::from_uint(val, size),
+                                rustc_const_eval::interpret::Scalar::from_uint(val, data_size, memory_size),
                                 rustc_span::DUMMY_SP,
                             );
                             let op = if f_b { BinOp::Eq } else { BinOp::Ne };

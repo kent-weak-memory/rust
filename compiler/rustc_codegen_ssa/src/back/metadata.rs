@@ -186,7 +186,7 @@ pub(crate) fn create_object_file(sess: &Session) -> Option<write::Object<'static
     let architecture = match &sess.target.arch[..] {
         "arm" => Architecture::Arm,
         "aarch64" => {
-            if sess.target.pointer_width == 32 {
+            if sess.target.pointer_data_size == 32 {
                 Architecture::Aarch64_Ilp32
             } else {
                 Architecture::Aarch64
@@ -197,7 +197,7 @@ pub(crate) fn create_object_file(sess: &Session) -> Option<write::Object<'static
         "mips" => Architecture::Mips,
         "mips64" => Architecture::Mips64,
         "x86_64" => {
-            if sess.target.pointer_width == 32 {
+            if sess.target.pointer_data_size == 32 {
                 Architecture::X86_64_X32
             } else {
                 Architecture::X86_64
@@ -233,6 +233,12 @@ pub(crate) fn create_object_file(sess: &Session) -> Option<write::Object<'static
         }
     }
     let e_flags = match architecture {
+        Architecture::Aarch64 if sess.target.options.features.contains("+morello") => {
+            // Copied from the ARM supplement for Morello.
+            // TODO: the magic number should be moved somewhere else.
+            const EF_AARCH64_CHERI_PURECAP : u32 = 0x00010000;
+            EF_AARCH64_CHERI_PURECAP
+        }
         Architecture::Mips => {
             let arch = match sess.target.options.cpu.as_ref() {
                 "mips1" => elf::EF_MIPS_ARCH_1,

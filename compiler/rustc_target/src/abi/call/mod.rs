@@ -348,14 +348,14 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                     abi::Int(..) | abi::Pointer(_) => RegKind::Integer,
                     abi::F32 | abi::F64 => RegKind::Float,
                 };
-                Ok(HomogeneousAggregate::Homogeneous(Reg { kind, size: self.size }))
+                Ok(HomogeneousAggregate::Homogeneous(Reg { kind, size: self.memory_size }))
             }
 
             Abi::Vector { .. } => {
                 assert!(!self.is_zst());
                 Ok(HomogeneousAggregate::Homogeneous(Reg {
                     kind: RegKind::Vector,
-                    size: self.size,
+                    size: self.memory_size,
                 }))
             }
 
@@ -378,7 +378,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                                 } else {
                                     HomogeneousAggregate::NoData
                                 };
-                                return Ok((result, layout.size));
+                                return Ok((result, layout.memory_size));
                             }
                             FieldsShape::Union(_) => true,
                             FieldsShape::Arbitrary { .. } => false,
@@ -397,7 +397,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                             result = result.merge(field.homogeneous_aggregate(cx)?)?;
 
                             // Keep track of the offset (without padding).
-                            let size = field.size;
+                            let size = field.memory_size;
                             if is_union {
                                 total = total.max(size);
                             } else {
@@ -437,7 +437,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                 }
 
                 // There needs to be no padding.
-                if total != self.size {
+                if total != self.memory_size {
                     Err(Heterogeneous)
                 } else {
                     match result {
@@ -474,7 +474,7 @@ impl<'a, Ty> ArgAbi<'a, Ty> {
             Abi::Scalar(scalar) => PassMode::Direct(scalar_attrs(&layout, scalar, Size::ZERO)),
             Abi::ScalarPair(a, b) => PassMode::Pair(
                 scalar_attrs(&layout, a, Size::ZERO),
-                scalar_attrs(&layout, b, a.size(cx).align_to(b.align(cx).abi)),
+                scalar_attrs(&layout, b, a.memory_size(cx).align_to(b.align(cx).abi)),
             ),
             Abi::Vector { .. } => PassMode::Direct(ArgAttributes::new()),
             Abi::Aggregate { .. } => PassMode::Direct(ArgAttributes::new()),
@@ -493,7 +493,7 @@ impl<'a, Ty> ArgAbi<'a, Ty> {
             .set(ArgAttribute::NoCapture)
             .set(ArgAttribute::NonNull)
             .set(ArgAttribute::NoUndef);
-        attrs.pointee_size = layout.size;
+        attrs.pointee_size = layout.memory_size;
         // FIXME(eddyb) We should be doing this, but at least on
         // i686-pc-windows-msvc, it results in wrong stack offsets.
         // attrs.pointee_align = Some(layout.align.abi);

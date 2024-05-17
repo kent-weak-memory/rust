@@ -15,7 +15,8 @@ pub fn target() -> Target {
         // MACOSX_DEPLOYMENT_TARGET. To enable cross-language LTO to work
         // correctly, we do too.
         llvm_target: macos_llvm_target(arch).into(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memory_size: 64,
         data_layout: "e-m:o-i64:64-i128:128-n32:64-S128".into(),
         arch: arch.target_arch(),
         options: TargetOptions {

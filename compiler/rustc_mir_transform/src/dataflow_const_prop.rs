@@ -371,7 +371,7 @@ impl<'a, 'tcx> ConstAnalysis<'a, 'tcx> {
         }
         let discr = enum_ty.discriminant_for_variant(self.tcx, variant_index)?;
         let discr_layout = self.tcx.layout_of(self.param_env.and(discr.ty)).ok()?;
-        let discr_value = Scalar::try_from_uint(discr.val, discr_layout.size)?;
+        let discr_value = Scalar::try_from_uint(discr.val, discr_layout.data_size.unwrap(), discr_layout.memory_size)?;
         Some(ScalarTy(discr_value, discr.ty))
     }
 

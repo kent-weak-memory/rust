@@ -42,7 +42,7 @@ where
         }
     }
 
-    let size = ret.layout.size;
+    let size = ret.layout.memory_size;
     let bits = size.bits();
     if bits <= 32 {
         ret.cast_to(Uniform { unit: Reg::i32(), total: size });
@@ -69,7 +69,7 @@ where
     }
 
     let align = arg.layout.align.abi.bytes();
-    let total = arg.layout.size;
+    let total = arg.layout.memory_size;
     arg.cast_to(Uniform { unit: if align <= 4 { Reg::i32() } else { Reg::i64() }, total });
 }
 
