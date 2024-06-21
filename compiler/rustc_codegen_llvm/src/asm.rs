@@ -887,7 +887,7 @@ fn llvm_asm_scalar_type<'ll>(cx: &CodegenCx<'ll, '_>, scalar: Scalar) -> &'ll Ty
         Primitive::F32 => cx.type_f32(),
         Primitive::F64 => cx.type_f64(),
         // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
-        Primitive::Pointer(_) => cx.type_from_integer(dl.ptr_sized_integer()),
+        Primitive::Pointer(_) => cx.type_from_integer(dl.ptr_memory_sized_integer()),
         _ => unreachable!(),
     }
 }

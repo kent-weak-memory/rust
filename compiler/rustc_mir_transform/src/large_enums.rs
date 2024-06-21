@@ -90,7 +90,7 @@ impl EnumSizeOpt {
         let usize_bytes = data_layout.pointer_data_size.bytes() as usize;
         let mut data = vec![0; usize_bytes * num_discrs];
         macro_rules! encode_store {
-            ($curr_idx: expr, $endian: expr, $bytes: expr) => {
+            ($curr_idx: expr, $endian: expr, $bytes: expr) => { {
                 let bytes = match $endian {
                     rustc_target::abi::Endian::Little => $bytes.to_le_bytes(),
                     rustc_target::abi::Endian::Big => $bytes.to_be_bytes(),
@@ -98,7 +98,7 @@ impl EnumSizeOpt {
                 for (i, b) in bytes.into_iter().enumerate() {
                     data[$curr_idx + i] = b;
                 }
-            };
+            } };
         }
 
         // Write variant sizes to table.
@@ -110,7 +110,7 @@ impl EnumSizeOpt {
                 4 => encode_store!(curr_idx, data_layout.endian, sz.bytes() as u32),
                 8 => encode_store!(curr_idx, data_layout.endian, sz.bytes()),
                 _ => unreachable!(),
-            };
+            }
         }
 
         // Write table to allocation.

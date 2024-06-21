@@ -194,7 +194,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: CompileTimeMachine<'mir, 'tcx, const_eval::Memory
 
                 // If there is no provenance in this allocation, it does not contain references
                 // that point to another allocation, and we can avoid the interning walk.
-                if let Some(alloc) = self.ecx.get_ptr_alloc(mplace.ptr, size, align)? {
+                if let Some(alloc) = self.ecx.get_ptr_alloc(mplace.ptr, None, size, align)? {
                     if !alloc.has_provenance() {
                         return Ok(false);
                     }

@@ -221,9 +221,12 @@ impl ScalarInt {
     }
 
     #[inline]
-    pub fn null(size: Size) -> Self {
-        let size = NonZeroU8::new(size.bytes() as u8).unwrap();
-        Self { data: 0, data_size: size, memory_size: size }
+    pub fn null(data_size: Size, memory_size: Size) -> Self {
+        Self {
+            data: 0,
+            data_size: NonZeroU8::new(data_size.bytes() as u8).unwrap(),
+            memory_size: NonZeroU8::new(memory_size.bytes() as u8).unwrap(),
+        }
     }
 
     #[inline]
@@ -232,9 +235,9 @@ impl ScalarInt {
     }
 
     #[inline]
-    pub fn try_from_uint(i: impl Into<u128>, data_size: size, memory_size: Size) -> Option<Self> {
+    pub fn try_from_uint(i: impl Into<u128>, data_size: Size, memory_size: Size) -> Option<Self> {
         let data = i.into();
-        if size.truncate(data) == data {
+        if data_size.truncate(data) == data {
             Some(Self {
                 data,
                 data_size: NonZeroU8::new(data_size.bytes() as u8).unwrap(),
@@ -249,8 +252,8 @@ impl ScalarInt {
     pub fn try_from_int(i: impl Into<i128>, data_size: Size, memory_size: Size) -> Option<Self> {
         let i = i.into();
         // `into` performed sign extension, we have to truncate
-        let truncated = size.truncate(i as u128);
-        if size.sign_extend(truncated) as i128 == i {
+        let truncated = data_size.truncate(i as u128);
+        if data_size.sign_extend(truncated) as i128 == i {
             Some(Self {
                 data: truncated,
                 data_size: NonZeroU8::new(data_size.bytes() as u8).unwrap(),
@@ -263,7 +266,7 @@ impl ScalarInt {
 
     #[inline]
     pub fn assert_bits(self, target_size: Size) -> u128 {
-        self.to_bits(target_size).unwrap_or_else(|data_size, memory_size| {
+        self.to_bits(target_size).unwrap_or_else(|(data_size, memory_size)| {
             bug!("expected int of size {}, but got size {} ({} in memory)", target_size.bytes(), data_size.bytes(), memory_size.bytes())
         })
     }
@@ -502,7 +505,7 @@ impl From<Double> for ScalarInt {
 impl TryFrom<ScalarInt> for Double {
     type Error = (Size, Size);
     #[inline]
-    fn try_from(int: ScalarInt) -> Result<Self, Size> {
+    fn try_from(int: ScalarInt) -> Result<Self, (Size, Size)> {
         int.to_bits(Size::from_bytes(8)).map(Self::from_bits)
     }
 }

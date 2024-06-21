@@ -16,7 +16,7 @@ use rustc_middle::mir::interpret::{ConstAllocation, GlobalAlloc, Scalar};
 use rustc_middle::ty::layout::LayoutOf;
 use rustc_middle::ty::TyCtxt;
 use rustc_session::cstore::{DllCallingConvention, DllImport, PeImportNameType};
-use rustc_target::abi::{self, AddressSpace, HasDataLayout, Pointer};
+use rustc_target::abi::{self, HasDataLayout, Pointer};
 use rustc_target::spec::Target;
 
 use libc::{c_char, c_uint};

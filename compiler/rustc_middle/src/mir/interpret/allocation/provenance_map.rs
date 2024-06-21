@@ -86,7 +86,11 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
 
     /// Get the provenance of a single byte.
     pub fn get(&self, offset: Size, cx: &impl HasDataLayout) -> Option<Prov> {
-        let prov = self.range_get_ptrs(alloc_range(offset, Size::from_bytes(1), Size::from_bytes(1)), cx);
+        let prov = self.range_get_ptrs(alloc_range(
+            offset,
+            Some(Size::from_bytes(1)),
+            Size::from_bytes(1),
+        ), cx);
         debug_assert!(prov.len() <= 1);
         if let Some(entry) = prov.first() {
             // If it overlaps with this byte, it is on this byte.
@@ -209,7 +213,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
     ) -> AllocResult<ProvenanceCopy<Prov>> {
         let shift_offset = move |idx, offset| {
             // compute offset for current repetition
-            let dest_offset = dest + src.size * idx; // `Size` operations
+            let dest_offset = dest + src.memory_size * idx; // `Size` operations
             // shift offsets from source allocation to destination allocation
             (offset - src.start) + dest_offset // `Size` operations
         };
@@ -220,8 +224,8 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
         // (Different from `range_get_ptrs` which asks if they overlap the range.)
         // Only makes sense if we are copying at least one pointer worth of bytes.
         let mut dest_ptrs_box = None;
-        if src.size >= ptr_memory_size {
-            let adjusted_end = Size::from_bytes(src.end().bytes() - (ptr_memory_size.bytes() - 1));
+        if src.memory_size >= ptr_memory_size {
+            let adjusted_end = Size::from_bytes(src.end_memory().bytes() - (ptr_memory_size.bytes() - 1));
             let ptrs = self.ptrs.range(src.start..adjusted_end);
             // If `count` is large, this is rather wasteful -- we are allocating a big array here, which
             // is mostly filled with redundant information since it's just N copies of the same `Prov`s
@@ -243,7 +247,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
         // that overlaps with the begin/end of the range.
         let mut dest_bytes_box = None;
         let begin_overlap = self.range_get_ptrs(alloc_range(src.start, None, Size::ZERO), cx).first();
-        let end_overlap = self.range_get_ptrs(alloc_range(src.end(), None, Size::ZERO), cx).first();
+        let end_overlap = self.range_get_ptrs(alloc_range(src.end_memory(), None, Size::ZERO), cx).first();
         if !Prov::OFFSET_IS_ADDR {
             // There can't be any bytewise provenance, and we cannot split up the begin/end overlap.
             if let Some(entry) = begin_overlap {
@@ -259,7 +263,7 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
             if let Some(entry) = begin_overlap {
                 trace!("start overlapping entry: {entry:?}");
                 // For really small copies, make sure we don't run off the end of the `src` range.
-                let entry_end = cmp::min(entry.0 + ptr_memory_size, src.end());
+                let entry_end = cmp::min(entry.0 + ptr_memory_size, src.end_memory());
                 for offset in src.start..entry_end {
                     bytes.push((offset, entry.1));
                 }
@@ -268,14 +272,14 @@ impl<Prov: Provenance> ProvenanceMap<Prov> {
             }
             // Then the main part, bytewise provenance from `self.bytes`.
             if let Some(all_bytes) = self.bytes.as_ref() {
-                bytes.extend(all_bytes.range(src.start..src.end()));
+                bytes.extend(all_bytes.range(src.start..src.end_memory()));
             }
             // And finally possibly parts of a pointer at the end.
             if let Some(entry) = end_overlap {
                 trace!("end overlapping entry: {entry:?}");
                 // For really small copies, make sure we don't start before `src` does.
                 let entry_start = cmp::max(entry.0, src.start);
-                for offset in entry_start..src.end() {
+                for offset in entry_start..src.end_memory() {
                     if bytes.last().map_or(true, |bytes_entry| bytes_entry.0 < offset) {
                         // The last entry, if it exists, has a lower offset than us.
                         bytes.push((offset, entry.1));

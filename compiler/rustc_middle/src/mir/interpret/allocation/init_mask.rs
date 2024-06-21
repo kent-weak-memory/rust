@@ -49,7 +49,7 @@ impl InitMask {
     pub fn is_range_initialized(&self, range: AllocRange) -> Result<(), AllocRange> {
         let end = range.end_data_or_memory();
         if end > self.len {
-            return Err(alloc_range(self.len, None, end-self.end)); // `Size` subtraction (overflow-checked)
+            return Err(alloc_range(self.len, None, end-self.len)); // `Size` subtraction (overflow-checked)
         }
 
         match self.blocks {

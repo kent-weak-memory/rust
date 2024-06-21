@@ -285,14 +285,13 @@ impl TargetDataLayout {
         for spec in input.split('-') {
             let spec_parts = spec.split(':').collect::<Vec<_>>();
 
-TODO(seharris): this needs modifying.
             match &*spec_parts {
                 ["e"] => dl.endian = Endian::Little,
                 ["E"] => dl.endian = Endian::Big,
                 [p] if p.starts_with('P') => {
                     dl.instruction_address_space = parse_address_space(&p[1..], "P")?
                 }
-                [o] if p.starts_with('A') => {
+                [p] if p.starts_with('A') => {
                     dl.data_address_space = parse_address_space(&p[1..], "A")?
                 }
                 ["a", ref a @ ..] => dl.aggregate_align = align(a, "a")?,
@@ -858,7 +857,7 @@ impl Integer {
         let dl = cx.data_layout();
 
         match ity {
-            IntegerType::Pointer(_) => dl.ptr_sized_integer(),
+            IntegerType::Pointer(_) => dl.ptr_data_sized_integer(),
             IntegerType::Fixed(x, _) => x,
         }
     }
@@ -916,7 +915,7 @@ impl Integer {
         let dl = cx.data_layout();
 
         [I8, I16, I32, I64, I128].into_iter().find(|&candidate| {
-            wanted == candidate.align(dl).abi && wanted.bytes() == candidate.memory_size().bytes()
+            wanted == candidate.align(dl).abi && wanted.bytes() == candidate.size().bytes()
         })
     }
 
@@ -926,7 +925,7 @@ impl Integer {
 
         // FIXME(eddyb) maybe include I128 in the future, when it works everywhere.
         for candidate in [I64, I32, I16] {
-            if wanted >= candidate.align(dl).abi && wanted.bytes() >= candidate.memory_size().bytes() {
+            if wanted >= candidate.align(dl).abi && wanted.bytes() >= candidate.size().bytes() {
                 return candidate;
             }
         }
@@ -1327,8 +1326,7 @@ pub struct AddressSpace(pub u32);
 
 impl AddressSpace {
     /// The default address space, corresponding to data space.
-    // TODO(seharris): work out whether to delete this:
-    // pub const DATA: Self = AddressSpace(0);
+    pub const DATA: Self = AddressSpace(0);
 }
 
 /// Describes how values of the type are passed by target ABIs,
@@ -1643,9 +1641,10 @@ impl fmt::Debug for LayoutS {
         // This is how `Layout` used to print before it become
         // `Interned<LayoutS>`. We print it like this to avoid having to update
         // expected output in a lot of tests.
-        let LayoutS { size, align, abi, fields, largest_niche, variants } = self;
+        let LayoutS { data_size, memory_size, align, abi, fields, largest_niche, variants } = self;
         f.debug_struct("Layout")
-            .field("size", size)
+            .field("data_size", data_size)
+            .field("memory_size", memory_size)
             .field("align", align)
             .field("abi", abi)
             .field("fields", fields)

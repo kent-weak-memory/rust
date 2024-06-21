@@ -207,7 +207,7 @@ pub fn asm_const_to_str<'tcx>(
     let ConstValue::Scalar(scalar) = const_value else {
         span_bug!(sp, "expected Scalar for promoted asm const, but got {:#?}", const_value)
     };
-    let value = scalar.assert_bits(ty_and_layout.data_size.unwrap());
+    let value = scalar.assert_bits(ty_and_layout.data_size.unwrap(), ty_and_layout.memory_size);
     match ty_and_layout.ty.kind() {
         ty::Uint(_) => value.to_string(),
         ty::Int(int_ty) => match int_ty.normalize(tcx.sess.target.pointer_data_size) {

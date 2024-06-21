@@ -754,7 +754,8 @@ where
                     abi: Abi::Uninhabited,
                     largest_niche: None,
                     align: tcx.data_layout.i8_align,
-                    size: Size::ZERO,
+                    data_size: Some(Size::ZERO),
+                    memory_size: Size::ZERO,
                 })
             }
 

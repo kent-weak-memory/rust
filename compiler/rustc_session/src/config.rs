@@ -1489,7 +1489,7 @@ impl CrateCheckConfig {
                     values_target_env.insert(Symbol::intern(&target.options.env));
                     values_target_abi.insert(Symbol::intern(&target.options.abi));
                     values_target_vendor.insert(Symbol::intern(&target.options.vendor));
-                    values_target_pointer_width.insert(sym::integer(target.pointer_width));
+                    values_target_pointer_width.insert(sym::integer(target.pointer_data_size));
                 }
             }
         }

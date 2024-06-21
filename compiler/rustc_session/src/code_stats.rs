@@ -108,7 +108,7 @@ impl CodeStats {
         // Except for Generators, whose variants are already sorted according to
         // their yield points in `variant_info_for_generator`.
         if kind != DataTypeKind::Generator {
-            variants.sort_by_key(|info| cmp::Reverse(info.memory_size));
+            variants.sort_by_key(|info| cmp::Reverse(info.size));
         }
         let info = TypeSizeInfo {
             kind,
@@ -187,7 +187,7 @@ impl CodeStats {
                 // the loop below goes wrong; hence the `f.memory_size` in the
                 // sort key.
                 let mut fields = fields.clone();
-                fields.sort_by_key(|f| (f.offset, f.memory_size));
+                fields.sort_by_key(|f| (f.offset, f.size));
 
                 for field in fields {
                     let FieldInfo { kind, ref name, offset, size, align } = field;

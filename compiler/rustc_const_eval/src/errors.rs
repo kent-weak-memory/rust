@@ -586,8 +586,10 @@ impl<'a> ReportErrorExt for UndefinedBehaviorInfo<'a> {
                 builder.set_arg("uninit", info.uninit);
             }
             ScalarSizeMismatch(info) => {
-                builder.set_arg("target_size", info.target_size);
-                builder.set_arg("data_size", info.data_size);
+                builder.set_arg("target_data_size", info.target_data_size);
+                builder.set_arg("target_memory_size", info.target_memory_size);
+                builder.set_arg("data_size", info.data_data_size);
+                builder.set_arg("memory_size", info.data_memory_size);
             }
             Validation(e) => e.add_args(handler, builder),
             Custom(custom) => {

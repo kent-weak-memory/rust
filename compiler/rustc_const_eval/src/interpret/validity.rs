@@ -790,9 +790,9 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
         match op.layout.ty.kind() {
             ty::Str => {
                 let mplace = op.assert_mem_place(); // strings are unsized and hence never immediate
-                let len = mplace.len(self.ecx)?;
+                let size = Size::from_bytes(mplace.len(self.ecx)?);
                 try_validation!(
-                    self.ecx.read_bytes_ptr_strip_provenance(mplace.ptr, Size::from_bytes(len)),
+                    self.ecx.read_bytes_ptr_strip_provenance(mplace.ptr, Some(size), size),
                     self.path,
                     InvalidUninitBytes(..) => { UninitStr },
                 );
@@ -840,7 +840,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> ValueVisitor<'mir, 'tcx, M>
                 // to reject those pointers, we just do not have the machinery to
                 // talk about parts of a pointer.
                 // We also accept uninit, for consistency with the slow path.
-                let alloc = self.ecx.get_ptr_alloc(mplace.ptr, size, mplace.align)?.expect("we already excluded size 0");
+                let alloc = self.ecx.get_ptr_alloc(mplace.ptr, None, size, mplace.align)?.expect("we already excluded size 0");
 
                 match alloc.get_bytes_strip_provenance() {
                     // In the happy case, we needn't check anything else.

@@ -827,8 +827,8 @@ impl<'a, 'tcx, Prov: Provenance, Extra, Bytes: AllocBytes> std::fmt::Display
 {
     fn fmt(&self, w: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let RenderAllocation { tcx, alloc } = *self;
-        write!(w, "size: {}, align: {})", alloc.memory_size().bytes(), alloc.align.bytes())?;
-        if alloc.memory_size() == Size::ZERO {
+        write!(w, "size: {}, align: {})", alloc.size().bytes(), alloc.align.bytes())?;
+        if alloc.size() == Size::ZERO {
             // We are done.
             return write!(w, " {{}}");
         }
@@ -873,9 +873,9 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
     w: &mut dyn std::fmt::Write,
     prefix: &str,
 ) -> std::fmt::Result {
-    let num_lines = alloc.memory_size().bytes_usize().saturating_sub(BYTES_PER_LINE);
+    let num_lines = alloc.size().bytes_usize().saturating_sub(BYTES_PER_LINE);
     // Number of chars needed to represent all line numbers.
-    let pos_width = hex_number_length(alloc.memory_size().bytes());
+    let pos_width = hex_number_length(alloc.size().bytes());
 
     if num_lines > 0 {
         write!(w, "{}0x{:02$x} │ ", prefix, 0, pos_width)?;
@@ -897,7 +897,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
         }
     };
 
-    while i < alloc.memory_size() {
+    while i < alloc.size() {
         // The line start already has a space. While we could remove that space from the line start
         // printing and unconditionally print a space here, that would cause the single-line case
         // to have a single space before it, which looks weird.
@@ -966,7 +966,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
         } else if let Some(prov) = alloc.provenance().get(i, &tcx) {
             // Memory with provenance must be defined
             assert!(
-                alloc.init_mask().is_range_initialized(alloc_range(i, Size::from_bytes(1), Size::from_bytes(1))).is_ok()
+                alloc.init_mask().is_range_initialized(alloc_range(i, Some(Size::from_bytes(1)), Size::from_bytes(1))).is_ok()
             );
             ascii.push('━'); // HEAVY HORIZONTAL
             // We have two characters to display this, which is obviously not enough.
@@ -977,7 +977,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
             i += Size::from_bytes(1);
         } else if alloc
             .init_mask()
-            .is_range_initialized(alloc_range(i, Size::from_bytes(1), Size::from_bytes(1)))
+            .is_range_initialized(alloc_range(i, Some(Size::from_bytes(1)), Size::from_bytes(1)))
             .is_ok()
         {
             let j = i.bytes_usize();
@@ -998,7 +998,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
             i += Size::from_bytes(1);
         }
         // Print a new line header if the next line still has some bytes to print.
-        if i == line_start + Size::from_bytes(BYTES_PER_LINE) && i != alloc.memory_size() {
+        if i == line_start + Size::from_bytes(BYTES_PER_LINE) && i != alloc.size() {
             line_start = write_allocation_newline(w, line_start, &ascii, pos_width, prefix)?;
             ascii.clear();
         }

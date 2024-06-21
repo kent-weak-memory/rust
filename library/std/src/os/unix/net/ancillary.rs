@@ -82,7 +82,7 @@ pub(super) fn send_vectored_with_ancillary_to(
             msg_name_data = name;
             (&mut msg_name_data as *mut _ as *mut _, length)
         } else {
-            (null_mut(), 0)
+            (crate::ptr::null_mut(), 0)
         };
 
         let mut msg: libc::msghdr = zeroed();

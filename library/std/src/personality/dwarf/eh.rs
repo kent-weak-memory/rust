@@ -12,7 +12,6 @@
 #![allow(unused)]
 
 use super::DwarfReader;
-use core::ffi::c_void;
 use core::mem;
 use core::ptr;
 
@@ -47,9 +46,9 @@ pub struct EHContext<'a> {
 pub enum EHAction {
     None,
     // TODO(seharris): is this really the right way to handle this?
-    Cleanup(*const c_void),
-    Catch(*const c_void),
-    Filter(*const c_void),
+    Cleanup(*const ()),
+    Catch(*const ()),
+    Filter(*const ()),
     Terminate,
 }
 
@@ -90,7 +89,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             // Set when landing pad is encoded as a pointer instead of an
             // offset from `lpad_base`.
             // This pointer should be used instead of `cs_lpad` when available.
-            let mut sealed_lpad: Option<*const c_void> = None;
+            let mut sealed_lpad: Option<*const ()> = None;
 
             // Handle special encoding of landing pads on Morello.
             // Landing pads are encoded as straight pointer values, either
@@ -99,9 +98,10 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             // Based on changes in
             // `morello-llvm-project/libcxxabi/src/cxa_personality.cpp`
             // from Morello LLVM release 1.5 (2022-10-5).
+            #[cfg(version("1.72"))] // bootstrap compiler doesn't understand purecap
             #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
             {
-                // Ideally get `align_of(*const c_void)` or equivalent, I'm not
+                // Ideally get `align_of(*const ())` or equivalent, I'm not
                 // aware of a good way to do this at the moment.
                 // This is the alignment of capabilities on Morello.
                 let pointer_align = 16;
@@ -112,7 +112,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
                     sealed_lpad = Some(reader.read_aligned(pointer_align));
                 } else if cs_lpad == 0xd {
                     let offset = reader.read::<u64>();
-                    sealed_lpad = Some(*(reader.ptr.add(offset as usize) as *const *const c_void));
+                    sealed_lpad = Some(*(reader.ptr.add(offset as usize) as *const *const ()));
                 } else if cs_lpad != 0 {
                     // Invalid encoding.
                     return Err(());
@@ -132,7 +132,8 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
                 } else if let Some(lpad) = sealed_lpad {
                     return Ok(interpret_cs_action(action_table as *mut u8, cs_action_entry, lpad));
                 } else {
-                    let lpad = (lpad_base + cs_lpad) as *const c_void;
+                    // TODO(seharris): is there a way to get proper provenance?
+                    let lpad = crate::ptr::from_exposed_addr(lpad_base + cs_lpad);
                     return Ok(interpret_cs_action(action_table as *mut u8, cs_action_entry, lpad));
                 }
             }
@@ -156,7 +157,8 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             if idx == 0 {
                 // Can never have null landing pad for sjlj -- that would have
                 // been indicated by a -1 call site index.
-                let lpad = (cs_lpad + 1) as usize as *const c_void;
+                // TODO(seharris): is there a way to get proper provenance?
+                let lpad = crate::ptr::from_exposed_addr((cs_lpad + 1) as usize);
                 return Ok(interpret_cs_action(action_table as *mut u8, cs_action_entry, lpad));
             }
         }
@@ -166,7 +168,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
 unsafe fn interpret_cs_action(
     action_table: *mut u8,
     cs_action_entry: u64,
-    lpad: *const c_void,
+    lpad: *const (),
 ) -> EHAction {
     if cs_action_entry == 0 {
         // If cs_action_entry is 0 then this is a cleanup (Drop::drop). We run these

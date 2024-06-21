@@ -88,7 +88,7 @@ where
 
             // At this point we know this must be a primitive of sorts.
             let unit = arg.layout.homogeneous_aggregate(cx).unwrap().unit().unwrap();
-            assert_eq!(unit.memory_size, arg.layout.memory_size);
+            assert_eq!(unit.size, arg.layout.memory_size);
             if unit.kind == RegKind::Float {
                 continue;
             }

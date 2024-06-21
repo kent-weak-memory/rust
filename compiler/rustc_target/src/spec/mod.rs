@@ -2324,7 +2324,6 @@ impl Target {
     /// operations on.
     pub fn max_atomic_width(&self) -> u64 {
         self.max_atomic_width.unwrap_or_else(|| self.pointer_data_size.into())
-        self.max_atomic_width.unwrap_or_else(|| self.pointer_memory_size.into())
     }
 
     /// Loads a target descriptor from a JSON object.

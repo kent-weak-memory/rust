@@ -155,7 +155,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
         match layout.abi {
             Abi::Scalar(s @ abi::Scalar::Initialized { .. }) => {
                 assert_eq!(s.memory_size(bx), layout.memory_size, "abi::Scalar size does not match layout size");
-                let val = read_scalar(Size::ZERO, s.data_size(bx), s.memory_size(bx), s, ty);
+                let val = read_scalar(Size::ZERO, Some(s.data_size(bx)), s.memory_size(bx), s, ty);
                 OperandRef { val: OperandValue::Immediate(val), layout }
             }
             Abi::ScalarPair(
@@ -166,14 +166,14 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 assert!(b_offset.bytes() > 0);
                 let a_val = read_scalar(
                     Size::ZERO,
-                    a.data_size(bx),
+                    Some(a.data_size(bx)),
                     a.memory_size(bx),
                     a,
                     bx.scalar_pair_element_backend_type(layout, 0, true),
                 );
                 let b_val = read_scalar(
                     b_offset,
-                    b.data_size(bx),
+                    Some(b.data_size(bx)),
                     b.memory_size(bx),
                     b,
                     bx.scalar_pair_element_backend_type(layout, 1, true),

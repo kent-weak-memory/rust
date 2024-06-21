@@ -256,7 +256,7 @@ impl<Prov> Scalar<Prov> {
 
     #[inline]
     pub fn from_target_usize(i: u64, cx: &impl HasDataLayout) -> Self {
-        let data_layout = cx.daya_layout();
+        let data_layout = cx.data_layout();
         Self::from_uint(i, data_layout.pointer_data_size, data_layout.pointer_memory_size)
     }
 
@@ -274,12 +274,14 @@ impl<Prov> Scalar<Prov> {
 
     #[inline]
     pub fn from_i32(i: i32) -> Self {
-        Self::from_int(i, Size::from_bits(32))
+        let size = Size::from_bits(32);
+        Self::from_int(i, size, size)
     }
 
     #[inline]
     pub fn from_i64(i: i64) -> Self {
-        Self::from_int(i, Size::from_bits(64))
+        let size = Size::from_bits(64);
+        Self::from_int(i, size, size)
     }
 
     #[inline]
@@ -314,7 +316,7 @@ impl<Prov> Scalar<Prov> {
     ) -> Result<Either<u128, Pointer<Prov>>, ScalarSizeMismatch> {
         assert_ne!(target_data_size.bytes(), 0, "you should never look at the bits of a ZST");
         Ok(match self {
-            Scalar::Int(int) => Left(int.to_bits(target_data_size, target_memory_size).map_err(|(data_size, memory_size)| {
+            Scalar::Int(int) => Left(int.to_bits(target_data_size).map_err(|(data_size, memory_size)| {
                 ScalarSizeMismatch {
                     target_data_size: target_data_size.bytes(),
                     target_memory_size: target_memory_size.bytes(),
@@ -389,7 +391,7 @@ impl<'tcx, Prov: Provenance> Scalar<Prov> {
     #[inline]
     pub fn to_bits(self, target_data_size: Size, target_memory_size: Size) -> InterpResult<'tcx, u128> {
         assert_ne!(target_data_size.bytes(), 0, "you should never look at the bits of a ZST");
-        self.try_to_int().map_err(|_| err_unsup!(ReadPointerAsBytes))?.to_bits(target_data_size, target_memory_size).map_err(
+        self.try_to_int().map_err(|_| err_unsup!(ReadPointerAsBytes))?.to_bits(target_data_size).map_err(
             |(data_size, memory_size)| {
                 err_ub!(ScalarSizeMismatch(ScalarSizeMismatch {
                     target_data_size: target_data_size.bytes(),

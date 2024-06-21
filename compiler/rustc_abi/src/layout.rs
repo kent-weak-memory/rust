@@ -21,7 +21,7 @@ pub trait LayoutCalculator {
         let b_align = b.align(dl);
         let align = a.align(dl).max(b_align).max(dl.aggregate_align);
         let b_offset = a.memory_size(dl).align_to(b_align.abi);
-        let size = (b_offset + b.memory_size(dl)).align_to(align.abi);
+        let memory_size = (b_offset + b.memory_size(dl)).align_to(align.abi);
 
         // HACK(nox): We iter on `b` and then `a` because `max_by_key`
         // returns the last maximum.
@@ -39,7 +39,8 @@ pub trait LayoutCalculator {
             abi: Abi::ScalarPair(a, b),
             largest_niche,
             align,
-            size,
+            data_size: None,
+            memory_size,
         }
     }
 
@@ -128,8 +129,13 @@ pub trait LayoutCalculator {
 
     fn data_size_for_abi(&self, abi: &Abi, memory_size: Size) -> Option<Size> {
         match abi {
-            Abi::Scalar(Scalar { value: Primitive::Pointer, .. } ) => Some(dl.pointer_data_size()),
-            Abi::Scalar({Scalar {..}) => Some(memory_size),
+            Abi::Scalar(scalar) => if let Primitive::Pointer(..) = scalar.primitive() {
+                let dl = self.current_data_layout();
+                let dl = dl.borrow();
+                Some(dl.pointer_data_size)
+            } else {
+                Some(memory_size)
+            },
             Abi::Aggregate{sized: true} if memory_size.bytes() == 0 => Some(memory_size),
             Abi::Uninhabited if memory_size.bytes() == 0 => Some(memory_size),
             _ => None,
@@ -206,7 +212,7 @@ pub trait LayoutCalculator {
             if is_unsafe_cell {
                 let hide_niches = |scalar: &mut _| match scalar {
                     Scalar::Initialized { value, valid_range } => {
-                        *valid_range = WrappingRange::full(value.size(dl))
+                        *valid_range = WrappingRange::full(value.data_size(dl))
                     }
                     // Already doesn't have any niches
                     Scalar::Union { .. } => {}
@@ -432,7 +438,7 @@ pub trait LayoutCalculator {
                 },
                 abi,
                 largest_niche,
-                data_size: self.data_size_for_abi(abi, memory_size),
+                data_size: self.data_size_for_abi(&abi, memory_size),
                 memory_size,
                 align,
             };
@@ -497,7 +503,7 @@ pub trait LayoutCalculator {
                     dl,
                     field_layouts,
                     repr,
-                    StructKind::Prefixed(min_ity.memory_size(), prefix_align),
+                    StructKind::Prefixed(min_ity.size(), prefix_align),
                 )?;
                 st.variants = Variants::Single { index: i };
                 // Find the first field we can't move later
@@ -703,7 +709,7 @@ pub trait LayoutCalculator {
             largest_niche,
             abi,
             align,
-            data_size: self.data_size_for_abi(abi, memory_size),
+            data_size: self.data_size_for_abi(&abi, memory_size),
             memory_size,
         };
 
@@ -816,14 +822,14 @@ pub trait LayoutCalculator {
             }
         };
 
-        let memory_size = size.align_to(align.abi);
+        memory_size = memory_size.align_to(align.abi);
         Some(LayoutS {
             variants: Variants::Single { index: FIRST_VARIANT },
             fields: FieldsShape::Union(NonZeroUsize::new(only_variant.len())?),
             abi,
             largest_niche: None,
             align,
-            data_size: self.data_size_for_abi(abi, memory_size),
+            data_size: self.data_size_for_abi(&abi, memory_size),
             memory_size,
         })
     }
@@ -1124,7 +1130,7 @@ fn univariant(
         abi,
         largest_niche,
         align,
-        data_size: self.data_size_for_abi(abi, memory_size),
+        data_size: this.data_size_for_abi(&abi, memory_size),
         memory_size,
     })
 }

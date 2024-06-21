@@ -44,9 +44,9 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // raw discriminants for enums are isize or bigger during
                 // their computation, but the in-memory tag is the smallest possible
                 // representation
-                let data_size = tag_layout.data_size(self).unwrap();
+                let data_size = tag_layout.data_size(self);
                 let memory_size = tag_layout.memory_size(self);
-                let tag_val = size.truncate(discr_val);
+                let tag_val = data_size.truncate(discr_val);
 
                 let tag_dest = self.place_field(dest, tag_field)?;
                 self.write_scalar(Scalar::from_uint(tag_val, data_size, memory_size), &tag_dest)?;
@@ -160,7 +160,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // discriminants are int-like.
                 let discr_val =
                     self.cast_from_int_like(scalar, tag_val.layout, discr_layout.ty).unwrap();
-                let discr_bits = discr_val.assert_bits(discr_layout.data_size.unwrap());
+                let discr_bits = discr_val.assert_bits(discr_layout.data_size.unwrap(), discr_layout.memory_size);
                 // Convert discriminant to variant index, and catch invalid discriminants.
                 let index = match *op.layout.ty.kind() {
                     ty::Adt(adt, _) => {
@@ -211,7 +211,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                         let variant_index_relative_val =
                             self.binary_op(mir::BinOp::Sub, &tag_val, &niche_start_val)?;
                         let variant_index_relative =
-                            variant_index_relative_val.to_scalar().assert_bits(tag_val.layout.data_size.unwrap());
+                            variant_index_relative_val.to_scalar().assert_bits(tag_val.layout.data_size.unwrap(), tag_val.layout.memory_size);
                         // Check if this is in the range that indicates an actual discriminant.
                         if variant_index_relative <= u128::from(variants_end - variants_start) {
                             let variant_index_relative = u32::try_from(variant_index_relative)

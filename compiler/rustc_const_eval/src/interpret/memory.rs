@@ -347,13 +347,13 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         }
 
         // Let the machine take some extra action
-        let memory_size = alloc.memory_size();
+        let memory_size = alloc.size();
         M::before_memory_deallocation(
             *self.tcx,
             &mut self.machine,
             &mut alloc.extra,
             (alloc_id, prov),
-            alloc_range(Size::ZERO, alloc.data_size(), memory_size),
+            alloc_range(Size::ZERO, None, memory_size),
         )?;
 
         // Don't forget to remember size and align of this now-dead allocation
@@ -602,7 +602,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
     pub fn get_ptr_alloc<'a>(
         &'a self,
         ptr: Pointer<Option<M::Provenance>>,
-        data_Size: Option<Size>,
+        data_size: Option<Size>,
         memory_size: Size,
         align: Align,
     ) -> InterpResult<'tcx, Option<AllocRef<'a, 'tcx, M::Provenance, M::AllocExtra, M::Bytes>>>
@@ -615,7 +615,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             CheckInAllocMsg::MemoryAccessTest,
             |alloc_id, offset, prov| {
                 let alloc = self.get_alloc_raw(alloc_id)?;
-                Ok((alloc.memory_size(), alloc.align, (alloc_id, offset, prov, alloc)))
+                Ok((alloc.size(), alloc.align, (alloc_id, offset, prov, alloc)))
             },
         )?;
         if let Some((alloc_id, offset, prov, alloc)) = ptr_and_alloc {

@@ -190,7 +190,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let ty = substs.type_at(0);
                 let layout_of = self.layout_of(ty)?;
                 let val = self.read_scalar(&args[0])?;
-                let bits = val.to_bits(layout_of.data_size.unwrap())?;
+                let bits = val.to_bits(layout_of.data_size.unwrap(), layout_of.memory_size)?;
                 let kind = match layout_of.abi {
                     Abi::Scalar(scalar) => scalar.primitive(),
                     _ => span_bug!(
@@ -239,9 +239,9 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // rotate_right: (X << ((BW - S) % BW)) | (X >> (S % BW))
                 let layout = self.layout_of(substs.type_at(0))?;
                 let val = self.read_scalar(&args[0])?;
-                let val_bits = val.to_bits(layout.data_size.unwrap())?;
+                let val_bits = val.to_bits(layout.data_size.unwrap(), layout.memory_size)?;
                 let raw_shift = self.read_scalar(&args[1])?;
-                let raw_shift_bits = raw_shift.to_bits(layout.data_size.unwrap())?;
+                let raw_shift_bits = raw_shift.to_bits(layout.data_size.unwrap(), layout.memory_size)?;
                 let width_bits = u128::from(layout.data_size.unwrap().bits());
                 let shift_bits = raw_shift_bits % width_bits;
                 let inv_shift_bits = (width_bits - shift_bits) % width_bits;
@@ -514,7 +514,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         // First, check x % y != 0 (or if that computation overflows).
         let (res, overflow, _ty) = self.overflowing_binary_op(BinOp::Rem, &a, &b)?;
         assert!(!overflow); // All overflow is UB, so this should never return on overflow.
-        if res.assert_bits(a.layout.memory_size) != 0 {
+        if res.assert_bits(a.layout.data_size.unwrap(), a.layout.memory_size) != 0 {
             throw_ub_custom!(
                 fluent::const_eval_exact_div_has_remainder,
                 a = format!("{a}"),
@@ -542,7 +542,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // term since the sign of the second term can be inferred from this and
                 // the fact that the operation has overflowed (if either is 0 no
                 // overflow can occur)
-                let first_term: u128 = l.to_scalar().to_bits(data_size)?;
+                let first_term: u128 = l.to_scalar().to_bits(data_size, memory_size)?;
                 let first_term_positive = first_term & (1 << (num_bits - 1)) == 0;
                 if first_term_positive {
                     // Negative overflow not possible since the positive first term
@@ -558,7 +558,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 // unsigned
                 if matches!(mir_op, BinOp::Add) {
                     // max unsigned
-                    Scalar::from_uint(size.unsigned_int_max(), data_size, memory_size)
+                    Scalar::from_uint(data_size.unsigned_int_max(), data_size, memory_size)
                 } else {
                     // underflow to 0
                     Scalar::from_uint(0u128, data_size, memory_size)
@@ -660,10 +660,11 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
         let get_bytes = |this: &InterpCx<'mir, 'tcx, M>,
                          op: &OpTy<'tcx, <M as Machine<'mir, 'tcx>>::Provenance>,
-                         size|
+                         data_size,
+                         memory_size|
          -> InterpResult<'tcx, &[u8]> {
             let ptr = this.read_pointer(op)?;
-            let Some(alloc_ref) = self.get_ptr_alloc(ptr, size, Align::ONE)? else {
+            let Some(alloc_ref) = self.get_ptr_alloc(ptr, data_size, memory_size, Align::ONE)? else {
                 // zero-sized access
                 return Ok(&[]);
             };
@@ -673,8 +674,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             alloc_ref.get_bytes_strip_provenance()
         };
 
-        let lhs_bytes = get_bytes(self, lhs, layout.data_size.unwrap())?;
-        let rhs_bytes = get_bytes(self, rhs, layout.data_size.unwrap())?;
+        let lhs_bytes = get_bytes(self, lhs, layout.data_size, layout.memory_size)?;
+        let rhs_bytes = get_bytes(self, rhs, layout.data_size, layout.memory_size)?;
         Ok(Scalar::from_bool(lhs_bytes == rhs_bytes))
     }
 }

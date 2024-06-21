@@ -216,7 +216,7 @@ pub(crate) mod rustc {
     struct LayoutSummary {
         total_align: Align,
         total_size: usize,
-        discriminant_size: usize,
+        discriminant_memory_size: usize,
         discriminant_align: Align,
     }
 
@@ -232,17 +232,17 @@ pub(crate) mod rustc {
             let total_size: usize = layout.memory_size().bytes_usize();
             let total_align: Align = layout.align().abi;
             let discriminant_align: Align;
-            let discriminant_size: usize;
+            let discriminant_memory_size: usize;
 
             if let Variants::Multiple { tag, .. } = layout.variants() {
                 discriminant_align = tag.align(&ctx).abi;
-                discriminant_size = tag.size(&ctx).bytes_usize();
+                discriminant_memory_size = tag.memory_size(&ctx).bytes_usize();
             } else {
                 discriminant_align = Align::ONE;
-                discriminant_size = 0;
+                discriminant_memory_size = 0;
             };
 
-            Ok(Self { total_align, total_size, discriminant_align, discriminant_size })
+            Ok(Self { total_align, total_size, discriminant_align, discriminant_memory_size })
         }
 
         fn into(&self) -> alloc::Layout {
@@ -353,7 +353,7 @@ pub(crate) mod rustc {
                             for field in adt_def.all_fields() {
                                 let variant_ty = field.ty(tcx, substs_ref);
                                 let variant_layout = layout_of(tcx, variant_ty)?;
-                                let padding_needed = ty_layout.memory_size() - variant_layout.memory_size();
+                                let padding_needed = ty_layout.size() - variant_layout.size();
                                 let variant = Self::def(Def::Field(field))
                                     .then(Self::from_ty(variant_ty, tcx)?)
                                     .then(Self::padding(padding_needed));
@@ -415,13 +415,13 @@ pub(crate) mod rustc {
             if let Some(discr) = discr {
                 trace!(?discr, "treeifying discriminant");
                 let discr_layout = alloc::Layout::from_size_align(
-                    layout_summary.discriminant_size,
+                    layout_summary.discriminant_memory_size,
                     clamp(layout_summary.discriminant_align),
                 )
                 .unwrap();
                 trace!(?discr_layout, "computed discriminant layout");
                 variant_layout = variant_layout.extend(discr_layout).unwrap().0;
-                tree = tree.then(Self::from_discr(discr, tcx, layout_summary.discriminant_size));
+                tree = tree.then(Self::from_discr(discr, tcx, layout_summary.discriminant_memory_size));
             }
 
             // Next come fields.
@@ -452,8 +452,8 @@ pub(crate) mod rustc {
 
             // finally: padding
             let padding_span = trace_span!("adding trailing padding").entered();
-            if layout_summary.total_size > variant_layout.memory_size() {
-                let padding_needed = layout_summary.total_size - variant_layout.memory_size();
+            if layout_summary.total_size > variant_layout.size() {
+                let padding_needed = layout_summary.total_size - variant_layout.size();
                 tree = tree.then(Self::padding(padding_needed));
             };
             drop(padding_span);

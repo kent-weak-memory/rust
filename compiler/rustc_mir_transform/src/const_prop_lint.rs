@@ -364,7 +364,8 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             let left_data_size = left_layout.data_size.unwrap();
             let left_memory_size = left_layout.memory_size;
             let right_data_size = r.layout.data_size.unwrap();
-            let r_bits = r.to_scalar().to_bits(right_data_size).ok();
+            let right_memory_size = r.layout.memory_size;
+            let r_bits = r.to_scalar().to_bits(right_data_size, right_memory_size).ok();
             if r_bits.is_some_and(|b| b >= left_data_size.bits() as u128) {
                 debug!("check_binary_op: reporting assert for {:?}", location);
                 let source_info = self.body().source_info(location);

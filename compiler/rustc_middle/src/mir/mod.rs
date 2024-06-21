@@ -1935,7 +1935,7 @@ impl<'tcx> Operand<'tcx> {
     ) -> Operand<'tcx> {
         debug_assert!({
             let param_env_and_ty = ty::ParamEnv::empty().and(ty);
-            ley layout = tcx
+            let layout = tcx
                 .layout_of(param_env_and_ty)
                 .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e));
             let (scalar_data_size, scalar_memory_size) = match val {
@@ -2870,7 +2870,11 @@ fn pretty_print_const_value<'tcx>(
             (ConstValue::ByRef { alloc, offset }, ty::Array(t, n)) if *t == u8_type => {
                 let n = n.try_to_bits(tcx.data_layout.pointer_data_size).unwrap();
                 // cast is ok because we already checked for pointer size (32 or 64 bit) above
-                let range = AllocRange { start: offset, size: Size::from_bytes(n) };
+                let range = AllocRange {
+                    start: offset,
+                    data_size: None,
+                    memory_size: Size::from_bytes(n),
+                };
                 let byte_str = alloc.inner().get_bytes_strip_provenance(&tcx, range).unwrap();
                 fmt.write_str("*")?;
                 pretty_print_byte_str(fmt, byte_str)?;

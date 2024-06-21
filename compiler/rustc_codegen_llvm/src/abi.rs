@@ -236,7 +236,7 @@ impl<'ll, 'tcx> ArgAbiExt<'ll, 'tcx> for ArgAbi<'tcx, Ty<'tcx>> {
                 //   bitcasting to the struct type yields invalid cast errors.
 
                 // We instead thus allocate some scratch space...
-                let scratch_size = cast.memory_size(bx);
+                let scratch_size = cast.size(bx);
                 let scratch_align = cast.align(bx);
                 let llscratch = bx.alloca(cast.llvm_type(bx), scratch_align);
                 bx.lifetime_start(llscratch, scratch_size);

@@ -8,7 +8,7 @@ where
     C: HasDataLayout,
 {
     arg.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()).and_then(|unit| {
-        let size = arg.layout.size;
+        let size = arg.layout.memory_size;
 
         // Ensure we have at most four uniquely addressable members.
         if size > unit.size.checked_mul(4, cx).unwrap() {

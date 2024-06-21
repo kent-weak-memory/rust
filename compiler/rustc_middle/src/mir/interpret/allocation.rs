@@ -500,7 +500,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> {
     /// Sets the init bit for the given range.
     fn mark_init(&mut self, range: AllocRange, is_init: bool) {
-        if range.size.bytes() == 0 {
+        if range.memory_size.bytes() == 0 {
             return;
         }
         assert!(self.mutability == Mutability::Mut);
@@ -548,7 +548,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
             // If we can work on pointers byte-wise, join the byte-wise provenances.
             if Prov::OFFSET_IS_ADDR {
                 let mut prov = self.provenance.get(range.start, cx);
-                for offset in Size::from_bytes(1)..range.size {
+                for offset in Size::from_bytes(1)..range.memory_size {
                     let this_prov = self.provenance.get(range.start + offset, cx);
                     prov = Prov::join(prov, this_prov);
                 }

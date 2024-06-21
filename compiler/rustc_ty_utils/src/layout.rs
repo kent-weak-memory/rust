@@ -100,7 +100,7 @@ fn layout_of_uncached<'tcx>(
     let param_env = cx.param_env;
     let dl = cx.data_layout();
     let scalar_unit = |value: Primitive| {
-        let size = value.data_size(dl).unwrap();
+        let size = value.data_size(dl);
         assert!(size.bits() <= 128);
         Scalar::Initialized { value, valid_range: WrappingRange::full(size) }
     };
@@ -144,7 +144,7 @@ fn layout_of_uncached<'tcx>(
 
         // Potentially-wide pointers.
         ty::Ref(_, pointee, _) | ty::RawPtr(ty::TypeAndMut { ty: pointee, .. }) => {
-            let mut data_ptr = scalar_unit(Pointer(AddressSpace::DATA));
+            let mut data_ptr = scalar_unit(Pointer(dl.data_address_space));
             if !ty.is_unsafe_ptr() {
                 data_ptr.valid_range_mut().start = 1;
             }
@@ -201,9 +201,9 @@ fn layout_of_uncached<'tcx>(
                     ty::Foreign(..) => {
                         return Ok(tcx.mk_layout(LayoutS::scalar(cx, data_ptr)));
                     }
-                    ty::Slice(_) | ty::Str => scalar_unit(Int(dl.ptr_sized_integer(), false)),
+                    ty::Slice(_) | ty::Str => scalar_unit(Int(dl.ptr_data_sized_integer(), false)),
                     ty::Dynamic(..) => {
-                        let mut vtable = scalar_unit(Pointer(AddressSpace::DATA));
+                        let mut vtable = scalar_unit(Pointer(dl.data_address_space));
                         vtable.valid_range_mut().start = 1;
                         vtable
                     }
@@ -218,9 +218,9 @@ fn layout_of_uncached<'tcx>(
         }
 
         ty::Dynamic(_, _, ty::DynStar) => {
-            let mut data = scalar_unit(Pointer(AddressSpace::DATA));
+            let mut data = scalar_unit(Pointer(dl.data_address_space));
             data.valid_range_mut().start = 0;
-            let mut vtable = scalar_unit(Pointer(AddressSpace::DATA));
+            let mut vtable = scalar_unit(Pointer(dl.data_address_space));
             vtable.valid_range_mut().start = 1;
             tcx.mk_layout(cx.scalar_pair(data, vtable))
         }
@@ -257,6 +257,7 @@ fn layout_of_uncached<'tcx>(
                 abi,
                 largest_niche,
                 align: element.align,
+                data_size: None,
                 memory_size,
             })
         }
@@ -268,6 +269,7 @@ fn layout_of_uncached<'tcx>(
                 abi: Abi::Aggregate { sized: false },
                 largest_niche: None,
                 align: element.align,
+                data_size: Some(Size::ZERO),
                 memory_size: Size::ZERO,
             })
         }
@@ -277,6 +279,7 @@ fn layout_of_uncached<'tcx>(
             abi: Abi::Aggregate { sized: false },
             largest_niche: None,
             align: dl.i8_align,
+            data_size: Some(Size::ZERO),
             memory_size: Size::ZERO,
         }),
 
@@ -429,6 +432,7 @@ fn layout_of_uncached<'tcx>(
                 fields,
                 abi: Abi::Vector { element: e_abi, count: e_len },
                 largest_niche: e_ly.largest_niche,
+                data_size: None,
                 memory_size,
                 align,
             })
@@ -877,6 +881,7 @@ fn generator_layout<'tcx>(
         fields: outer_fields,
         abi,
         largest_niche: prefix.largest_niche,
+        data_size: None,
         memory_size,
         align,
     });

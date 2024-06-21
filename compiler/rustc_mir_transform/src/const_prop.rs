@@ -539,7 +539,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                     return None;
                 }
 
-                let arg_value = const_arg.to_scalar().to_bits(const_arg.layout.data_size.unwrap()).ok()?;
+                let arg_value = const_arg.to_scalar().to_bits(const_arg.layout.data_size.unwrap(), const_arg.layout.memory_size).ok()?;
                 let dest = self.ecx.eval_place(place).ok()?;
 
                 match op {

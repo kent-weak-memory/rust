@@ -284,7 +284,7 @@ fn adjust_for_rust_scalar<'tcx>(
                 | PointerKind::SharedRef { frozen: false }
                 | PointerKind::MutableRef { unpin: false } => Size::ZERO,
                 PointerKind::SharedRef { frozen: true }
-                | PointerKind::MutableRef { unpin: true } => pointee.memory_size,
+                | PointerKind::MutableRef { unpin: true } => pointee.size,
             };
 
             // The aliasing rules for `Box<T>` are still not decided, but currently we emit
@@ -523,7 +523,7 @@ fn fn_abi_adjust_for_abi<'tcx>(
             //   capability register
             // TODO(seharris): can we use 128 bit capability registers for other things?
             let data_size = arg.layout.data_size.unwrap_or(arg.layout.memory_size);
-            if arg.layout.is_unsized() || data_size > cx.data_layout.pointer_data_size {
+            if arg.layout.is_unsized() || data_size > cx.data_layout().pointer_data_size {
                 arg.make_indirect();
             } else {
                 // We want to pass small aggregates as immediates, but using

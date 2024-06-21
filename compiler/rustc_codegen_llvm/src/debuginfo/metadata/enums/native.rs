@@ -5,7 +5,7 @@ use crate::{
     debuginfo::{
         metadata::{
             enums::tag_base_type,
-            file_metadata, size_and_align_of, type_di_node,
+            file_metadata, memory_size_and_align_of, type_di_node,
             type_map::{self, Stub, StubInfo, UniqueTypeId},
             unknown_file_metadata, DINodeCreationResult, SmallVec, NO_GENERICS,
             UNKNOWN_LINE_NUMBER,
@@ -72,7 +72,7 @@ pub(super) fn build_enum_type_di_node<'ll, 'tcx>(
             Stub::Struct,
             unique_type_id,
             &enum_type_name,
-            size_and_align_of(enum_type_and_layout),
+            memory_size_and_align_of(enum_type_and_layout),
             Some(containing_scope),
             DIFlags::FlagZero,
         ),
@@ -150,7 +150,7 @@ pub(super) fn build_generator_di_node<'ll, 'tcx>(
             Stub::Struct,
             unique_type_id,
             &generator_type_name,
-            size_and_align_of(generator_type_and_layout),
+            memory_size_and_align_of(generator_type_and_layout),
             Some(containing_scope),
             DIFlags::FlagZero,
         ),

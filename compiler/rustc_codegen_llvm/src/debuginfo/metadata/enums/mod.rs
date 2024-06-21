@@ -36,7 +36,7 @@ use crate::{
 };
 
 use super::{
-    size_and_align_of,
+    memory_size_and_align_of,
     type_map::{DINodeCreationResult, UniqueTypeId},
     SmallVec,
 };
@@ -265,7 +265,7 @@ fn build_enum_variant_struct_type_di_node<'ll, 'tcx>(
             ),
             variant_def.name.as_str(),
             // NOTE: We use size and align of enum_type, not from variant_layout:
-            size_and_align_of(enum_type_and_layout),
+            memory_size_and_align_of(enum_type_and_layout),
             Some(enum_type_di_node),
             DIFlags::FlagZero,
         ),
@@ -346,7 +346,7 @@ pub fn build_generator_variant_struct_type_di_node<'ll, 'tcx>(
             Stub::Struct,
             unique_type_id,
             &variant_name,
-            size_and_align_of(generator_type_and_layout),
+            memory_size_and_align_of(generator_type_and_layout),
             Some(generator_type_di_node),
             DIFlags::FlagZero,
         ),

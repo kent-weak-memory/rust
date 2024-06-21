@@ -24,7 +24,7 @@ use crate::{
         metadata::{
             build_field_di_node,
             enums::{tag_base_type, DiscrResult},
-            file_metadata, size_and_align_of, type_di_node,
+            file_metadata, memory_size_and_align_of, type_di_node,
             type_map::{self, Stub, UniqueTypeId},
             unknown_file_metadata, DINodeCreationResult, SmallVec, NO_GENERICS, NO_SCOPE_METADATA,
             UNKNOWN_LINE_NUMBER,
@@ -288,7 +288,7 @@ pub(super) fn build_generator_di_node<'ll, 'tcx>(
             type_map::Stub::Union,
             unique_type_id,
             &generator_type_name,
-            size_and_align_of(generator_type_and_layout),
+            memory_size_and_align_of(generator_type_and_layout),
             NO_SCOPE_METADATA,
             DIFlags::FlagZero,
         ),
@@ -362,7 +362,7 @@ fn build_single_variant_union_fields<'ll, 'tcx>(
             &variant_union_field_name(variant_index),
             // NOTE: We use the size and align of the entire type, not from variant_layout
             //       since the later is sometimes smaller (if it has fewer fields).
-            size_and_align_of(enum_type_and_layout),
+            memory_size_and_align_of(enum_type_and_layout),
             Size::ZERO,
             DIFlags::FlagZero,
             variant_struct_type_wrapper_di_node,
@@ -491,7 +491,7 @@ fn build_variant_struct_wrapper_type_di_node<'ll, 'tcx>(
             ),
             &variant_struct_wrapper_type_name(variant_index),
             // NOTE: We use size and align of enum_type, not from variant_layout:
-            size_and_align_of(enum_or_generator_type_and_layout),
+            memory_size_and_align_of(enum_or_generator_type_and_layout),
             Some(enum_or_generator_type_di_node),
             DIFlags::FlagZero,
         ),
@@ -535,7 +535,7 @@ fn build_variant_struct_wrapper_type_di_node<'ll, 'tcx>(
                 cx,
                 wrapper_struct_type_di_node,
                 "value",
-                size_and_align_of(enum_or_generator_type_and_layout),
+                memory_size_and_align_of(enum_or_generator_type_and_layout),
                 Size::ZERO,
                 DIFlags::FlagZero,
                 variant_struct_type_di_node,
@@ -767,7 +767,7 @@ fn build_union_fields_for_direct_tag_enum_or_generator<'ll, 'tcx>(
             .unwrap_or_else(|| (unknown_file_metadata(cx), UNKNOWN_LINE_NUMBER));
 
         let field_name = variant_union_field_name(variant_member_info.variant_index);
-        let (size, align) = size_and_align_of(enum_type_and_layout);
+        let (size, align) = memory_size_and_align_of(enum_type_and_layout);
 
         let variant_struct_type_wrapper = build_variant_struct_wrapper_type_di_node(
             cx,

@@ -401,8 +401,8 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     right.layout.ty
                 );
 
-                let l = left.to_scalar().to_bits(left.layout.data_size.unwrap())?;
-                let r = right.to_scalar().to_bits(right.layout.data_size.unwrap())?;
+                let l = left.to_scalar().to_bits(left.layout.data_size.unwrap(), left.layout.memory_size)?;
+                let r = right.to_scalar().to_bits(right.layout.data_size.unwrap(), right.layout.memory_size)?;
                 self.binary_int_op(bin_op, l, left.layout, r, right.layout)
             }
             _ if left.layout.ty.is_any_ptr() => {
@@ -470,7 +470,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             }
             _ => {
                 assert!(layout.ty.is_integral());
-                let val = val.to_bits(layout.data_size.unwrap())?;
+                let val = val.to_bits(layout.data_size.unwrap(), layout.memory_size)?;
                 let (res, overflow) = match un_op {
                     Not => (self.truncate(!val, layout), false), // bitwise negation, then truncate
                     Neg => {

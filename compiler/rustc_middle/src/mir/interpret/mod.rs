@@ -472,9 +472,7 @@ impl<'tcx> GlobalAlloc<'tcx> {
     pub fn address_space(&self, cx: &impl HasDataLayout) -> AddressSpace {
         match self {
             GlobalAlloc::Function(..) => cx.data_layout().instruction_address_space,
-            GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) | GlobalAlloc::VTable(..) => {
-                AddressSpace::DATA
-            }
+            GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) | GlobalAlloc::VTable(..) => cx.data_layout().data_address_space,
         }
     }
 }

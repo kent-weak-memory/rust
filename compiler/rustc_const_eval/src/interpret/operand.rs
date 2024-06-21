@@ -341,7 +341,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let memory_size = s.memory_size(self);
                 assert_eq!(memory_size, mplace.layout.memory_size, "abi::Scalar size does not match layout size");
                 let scalar = alloc.read_scalar(
-                    alloc_range(Size::ZERO, s.data_size(self), size),
+                    alloc_range(Size::ZERO, Some(s.data_size(self)), memory_size),
                     /*read_provenance*/ matches!(s, abi::Pointer(_)),
                 )?;
                 Some(ImmTy { imm: scalar.into(), layout: mplace.layout })
@@ -357,11 +357,11 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 let b_offset = a_memory_size.align_to(b.align(self).abi);
                 assert!(b_offset.bytes() > 0); // in `operand_field` we use the offset to tell apart the fields
                 let a_val = alloc.read_scalar(
-                    alloc_range(Size::ZERO, a.data_size(self), a_memory_size),
+                    alloc_range(Size::ZERO, Some(a.data_size(self)), a_memory_size),
                     /*read_provenance*/ matches!(a, abi::Pointer(_)),
                 )?;
                 let b_val = alloc.read_scalar(
-                    alloc_range(b_offset, b.data_size(self), b_memory_size),
+                    alloc_range(b_offset, Some(b.data_size(self)), b_memory_size),
                     /*read_provenance*/ matches!(b, abi::Pointer(_)),
                 )?;
                 Some(ImmTy { imm: Immediate::ScalarPair(a_val, b_val), layout: mplace.layout })
@@ -448,7 +448,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
 
     /// Turn the wide MPlace into a string (must already be dereferenced!)
     pub fn read_str(&self, mplace: &MPlaceTy<'tcx, M::Provenance>) -> InterpResult<'tcx, &str> {
-        let len = size::from_bytes(mplace.len(self)?);
+        let len = Size::from_bytes(mplace.len(self)?);
         let bytes = self.read_bytes_ptr_strip_provenance(mplace.ptr, Some(len), len)?;
         let str = std::str::from_utf8(bytes).map_err(|err| err_ub!(InvalidStr(err)))?;
         Ok(str)

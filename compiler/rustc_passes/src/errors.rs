@@ -838,7 +838,8 @@ pub struct Align {
 pub struct Size {
     #[primary_span]
     pub span: Span,
-    pub size: String,
+    pub data_size: String,
+    pub memory_size: String,
 }
 
 #[derive(Diagnostic)]

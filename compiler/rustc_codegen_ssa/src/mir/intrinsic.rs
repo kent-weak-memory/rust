@@ -117,7 +117,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 match name {
                     // Size is always <= isize::MAX.
                     sym::vtable_size => {
-                        let size_bound = bx.data_layout().ptr_sized_integer().signed_max() as u128;
+                        let size_bound = bx.data_layout().ptr_data_sized_integer().signed_max() as u128;
                         bx.range_metadata(value, WrappingRange { start: 0, end: size_bound });
                     },
                     // Alignment is always nonzero.

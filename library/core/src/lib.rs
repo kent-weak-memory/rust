@@ -96,8 +96,9 @@
 #![allow(explicit_outlives_requirements)]
 #![allow(incomplete_features)]
 #![warn(multiple_supertrait_upcastable)]
-#![feature(cfg_target_abi)]
-#![cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), warn(usize_as_pointer))]
+// TODO(seharris): re-enable this in a way that doesn't cause bootsrap compiler trouble
+// #![feature(cfg_target_abi)]
+// #![cfg_attr(all(target_arch = "aarch64", target_abi = "purecap"), warn(usize_as_pointer))]
 //
 // Library features:
 // tidy-alphabetical-start

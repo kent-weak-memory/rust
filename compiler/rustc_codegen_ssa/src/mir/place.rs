@@ -253,7 +253,7 @@ impl<'a, 'tcx, V: CodegenObject> PlaceRef<'tcx, V> {
                 let (tag, tag_llty) = match tag_scalar.primitive() {
                     // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
                     Pointer(_) => {
-                        let t = bx.type_from_integer(dl.ptr_sized_integer());
+                        let t = bx.type_from_integer(dl.ptr_data_sized_integer());
                         let tag = bx.ptrtoint(tag_imm, t);
                         (tag, t)
                     }
