@@ -140,7 +140,7 @@ impl<'ll, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                     abi::Abi::Scalar(scalar) => {
                         match scalar.primitive() {
                             Primitive::Int(..) => {
-                                if self.cx().size_of(ret_ty).bytes() < 4 {
+                                if self.cx().memory_size_of(ret_ty).bytes() < 4 {
                                     // `va_arg` should not be called on an integer type
                                     // less than 4 bytes in length. If it is, promote
                                     // the integer to an `i32` and truncate the result
@@ -316,7 +316,7 @@ impl<'ll, 'tcx> IntrinsicCallMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                 if layout.memory_size().bytes() == 0 {
                     self.const_bool(true)
                 } else if use_integer_compare {
-                    let integer_ty = self.type_ix(layout.data_size().bits());
+                    let integer_ty = self.type_ix(layout.data_size().unwrap_or(layout.memory_size()).bits());
                     let ptr_ty = self.type_ptr_to(integer_ty);
                     let a_ptr = self.bitcast(a, ptr_ty);
                     let a_val = self.load(integer_ty, a_ptr, layout.align().abi);

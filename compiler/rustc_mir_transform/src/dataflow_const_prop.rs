@@ -270,7 +270,7 @@ impl<'tcx> ValueAnalysis<'tcx> for ConstAnalysis<'_, 'tcx> {
                         FlatSet::Top => FlatSet::Top,
                         FlatSet::Elem(ScalarTy(scalar, _)) => {
                             let int = scalar.assert_int();
-                            FlatSet::Elem(int.assert_bits(int.size()))
+                            FlatSet::Elem(int.assert_bits(int.data_size()))
                         }
                         FlatSet::Bottom => FlatSet::Bottom,
                     };

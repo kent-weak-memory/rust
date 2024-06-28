@@ -5,10 +5,11 @@
 macro_rules! zst_set_len {
     ($self: ident, $new_len: expr) => {{
         #![allow(unused_unsafe)] // we're sometimes used within an unsafe block
+        #![allow(fuzzy_provenance_casts)] // pointer is not dereferenced, so this works on CHERI
 
         // SAFETY: same as `invalid(_mut)`, but the macro doesn't know
         // which versions of that function to call, so open-code it.
-        $self.end = unsafe { mem::transmute::<usize, _>($new_len) };
+        $self.end = unsafe { $new_len as *mut _ };
     }};
 }
 

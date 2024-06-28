@@ -13,8 +13,8 @@ use rustc_codegen_ssa::traits::*;
 use rustc_hir::def_id::DefId;
 use rustc_middle::middle::codegen_fn_attrs::{CodegenFnAttrFlags, CodegenFnAttrs};
 use rustc_middle::mir::interpret::{
-    read_target_uint, Allocation, ConstAllocation, ErrorHandled, InitChunk, Pointer,
-    Scalar as InterpScalar,
+    alloc_range, read_target_uint, Allocation, ConstAllocation, ErrorHandled,
+    InitChunk, Pointer, Scalar as InterpScalar,
 };
 use rustc_middle::mir::mono::MonoItem;
 use rustc_middle::ty::layout::LayoutOf;
@@ -41,7 +41,7 @@ pub fn const_alloc_to_llvm<'ll>(cx: &CodegenCx<'ll, '_>, alloc: ConstAllocation<
         alloc: &'a Allocation,
         range: Range<usize>,
     ) {
-        let chunks = alloc.init_mask().range_as_init_chunks(range.clone().into());
+        let chunks = alloc.init_mask().range_as_init_chunks(alloc_range(Size::from_bytes(range.start), None, Size::from_bytes(range.end-range.start)));
 
         let chunk_to_llval = move |chunk| match chunk {
             InitChunk::Init(range) => {

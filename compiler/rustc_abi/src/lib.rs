@@ -1686,6 +1686,10 @@ impl<'a> Layout<'a> {
         self.0.0.align
     }
 
+    pub fn data_size(self) -> Option<Size> {
+        self.0.0.data_size
+    }
+
     pub fn memory_size(self) -> Size {
         self.0.0.memory_size
     }

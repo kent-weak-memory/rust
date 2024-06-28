@@ -192,7 +192,7 @@ fn emit_s390x_va_arg<'ll, 'tcx>(
     let end = bx.append_sibling_block("va_arg.end");
 
     // FIXME: vector ABI not yet supported.
-    let target_ty_size = bx.cx.size_of(target_ty).bytes();
+    let target_ty_size = bx.cx.memory_size_of(target_ty).bytes();
     let indirect: bool = target_ty_size > 8 || !target_ty_size.is_power_of_two();
     let unpadded_size = if indirect { 8 } else { target_ty_size };
     let padded_size = 8;
@@ -286,7 +286,7 @@ pub(super) fn emit_va_arg<'ll, 'tcx>(
         "s390x" => emit_s390x_va_arg(bx, addr, target_ty),
         // Windows x86_64
         "x86_64" if target.is_like_windows => {
-            let target_ty_size = bx.cx.size_of(target_ty).bytes();
+            let target_ty_size = bx.cx.memory_size_of(target_ty).bytes();
             let indirect: bool = target_ty_size > 8 || !target_ty_size.is_power_of_two();
             emit_ptr_va_arg(bx, addr, target_ty, indirect, Align::from_bytes(8).unwrap(), false)
         }

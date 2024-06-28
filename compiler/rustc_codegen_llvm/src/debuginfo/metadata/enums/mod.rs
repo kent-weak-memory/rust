@@ -36,7 +36,7 @@ use crate::{
 };
 
 use super::{
-    memory_size_and_align_of,
+    size_and_align_of,
     type_map::{DINodeCreationResult, UniqueTypeId},
     SmallVec,
 };
@@ -131,7 +131,8 @@ fn tag_base_type<'ll, 'tcx>(
                     // pointer so we fix this up to just be `usize`.
                     // DWARF might be able to deal with this but with an integer type we are on
                     // the safe side there too.
-                    cx.data_layout().ptr_sized_integer()
+                    // TODO(seharris): review this decision.
+                    cx.data_layout().ptr_data_sized_integer()
                 }
             }
             .to_ty(cx.tcx, false)
@@ -265,7 +266,7 @@ fn build_enum_variant_struct_type_di_node<'ll, 'tcx>(
             ),
             variant_def.name.as_str(),
             // NOTE: We use size and align of enum_type, not from variant_layout:
-            memory_size_and_align_of(enum_type_and_layout),
+            size_and_align_of(enum_type_and_layout),
             Some(enum_type_di_node),
             DIFlags::FlagZero,
         ),
@@ -346,7 +347,7 @@ pub fn build_generator_variant_struct_type_di_node<'ll, 'tcx>(
             Stub::Struct,
             unique_type_id,
             &variant_name,
-            memory_size_and_align_of(generator_type_and_layout),
+            size_and_align_of(generator_type_and_layout),
             Some(generator_type_di_node),
             DIFlags::FlagZero,
         ),

@@ -203,9 +203,12 @@ impl<T: ?Sized> *const T {
     #[unstable(feature = "strict_provenance", issue = "95228")]
     pub fn addr(self) -> usize {
         // FIXME(strict_provenance_magic): I am magic and should be a compiler intrinsic.
+        // TODO(seharris): figure out a way to only do this for CHERI targets.
+        self as *const () as usize
+        // The way mainline does this:
         // SAFETY: Pointer-to-integer transmutes are valid (if you are okay with losing the
         // provenance).
-        unsafe { mem::transmute(self.cast::<()>()) }
+        // unsafe { mem::transmute(self.cast::<()>()) }
     }
 
     /// Gets the "address" portion of the pointer, and 'exposes' the "provenance" part for future

@@ -58,10 +58,17 @@ impl<'a, 'tcx> InlineAsmCtxt<'a, 'tcx> {
         if ty.has_non_region_infer() {
             bug!("inference variable in asm operand ty: {:?} {:?}", expr, ty);
         }
-        let asm_ty_isize = match self.tcx.sess.target.pointer_memory_size {
+        let asm_ty_isize = match self.tcx.sess.target.pointer_data_size {
             16 => InlineAsmType::I16,
             32 => InlineAsmType::I32,
             64 => InlineAsmType::I64,
+            _ => unreachable!(),
+        };
+        let asm_ty_ptr = match self.tcx.sess.target.pointer_memory_size {
+            16 => InlineAsmType::I16,
+            32 => InlineAsmType::I32,
+            64 => InlineAsmType::I64,
+            128 => InlineAsmType::I128,
             _ => unreachable!(),
         };
 
@@ -77,9 +84,9 @@ impl<'a, 'tcx> InlineAsmCtxt<'a, 'tcx> {
             ty::Int(IntTy::Isize) | ty::Uint(UintTy::Usize) => Some(asm_ty_isize),
             ty::Float(FloatTy::F32) => Some(InlineAsmType::F32),
             ty::Float(FloatTy::F64) => Some(InlineAsmType::F64),
-            ty::FnPtr(_) => Some(asm_ty_isize),
+            ty::FnPtr(_) => Some(asm_ty_ptr),
             ty::RawPtr(ty::TypeAndMut { ty, mutbl: _ }) if self.is_thin_ptr_ty(ty) => {
-                Some(asm_ty_isize)
+                Some(asm_ty_ptr)
             }
             ty::Adt(adt, substs) if adt.repr().simd() => {
                 let fields = &adt.non_enum_variant().fields;

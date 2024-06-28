@@ -566,13 +566,17 @@ pub const fn null_mut<T: ?Sized + Thin>() -> *mut T {
 #[must_use]
 #[rustc_const_stable(feature = "stable_things_using_strict_provenance", since = "1.61.0")]
 #[unstable(feature = "strict_provenance", issue = "95228")]
+#[allow(fuzzy_provenance_casts)]
 pub const fn invalid<T>(addr: usize) -> *const T {
     // FIXME(strict_provenance_magic): I am magic and should be a compiler intrinsic.
+    // TODO(seharris): figure out a way to only do this for CHERI targets.
+    addr as *const T
+    // The way mainline does this:
     // We use transmute rather than a cast so tools like Miri can tell that this
     // is *not* the same as from_exposed_addr.
     // SAFETY: every valid integer is also a valid pointer (as long as you don't dereference that
     // pointer).
-    unsafe { mem::transmute(addr) }
+    // unsafe { mem::transmute(addr) }
 }
 
 /// Creates an invalid mutable pointer with the given address.
@@ -597,13 +601,17 @@ pub const fn invalid<T>(addr: usize) -> *const T {
 #[must_use]
 #[rustc_const_stable(feature = "stable_things_using_strict_provenance", since = "1.61.0")]
 #[unstable(feature = "strict_provenance", issue = "95228")]
+#[allow(fuzzy_provenance_casts)]
 pub const fn invalid_mut<T>(addr: usize) -> *mut T {
     // FIXME(strict_provenance_magic): I am magic and should be a compiler intrinsic.
+    // TODO(seharris): figure out a way to only do this for CHERI targets.
+    addr as *mut T
+    // The way mainline does this:
     // We use transmute rather than a cast so tools like Miri can tell that this
     // is *not* the same as from_exposed_addr.
     // SAFETY: every valid integer is also a valid pointer (as long as you don't dereference that
     // pointer).
-    unsafe { mem::transmute(addr) }
+    // unsafe { mem::transmute(addr) }
 }
 
 /// Convert an address back to a pointer, picking up a previously 'exposed' provenance.
@@ -1637,6 +1645,7 @@ pub unsafe fn write_volatile<T>(dst: *mut T, src: T) {
 ///
 /// Any questions go to @nagisa.
 #[lang = "align_offset"]
+#[allow(fuzzy_provenance_casts)]
 pub(crate) const unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usize {
     // FIXME(#75598): Direct use of these intrinsics improves codegen significantly at opt-level <=
     // 1, where the method versions of these operations are not inlined.
@@ -1702,7 +1711,19 @@ pub(crate) const unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usiz
     // a `const fn` so we cannot call it).
     // During const eval, we hook this function to ensure that the pointer never
     // has provenance, making this sound.
-    let addr: usize = unsafe { mem::transmute(p) };
+    // let addr: usize = unsafe { mem::transmute(p) };
+    let addr: usize = unsafe {
+        // TODO(seharris): can we avoid this grossness?
+        assert!(crate::mem::size_of::<*const ()>() >= crate::mem::size_of::<usize>());
+        let pointer_bytes = mem::transmute::<*const T, [u8; crate::mem::size_of::<*const ()>()]>(p);
+        #[cfg(target_pointer_width = "16")]
+        let usize_bytes = [pointer_bytes[0], pointer_bytes[1]];
+        #[cfg(target_pointer_width = "32")]
+        let usize_bytes = [pointer_bytes[0], pointer_bytes[1], pointer_bytes[2], pointer_bytes[3]];
+        #[cfg(target_pointer_width = "64")]
+        let usize_bytes = [pointer_bytes[0], pointer_bytes[1], pointer_bytes[2], pointer_bytes[3], pointer_bytes[4], pointer_bytes[5], pointer_bytes[6], pointer_bytes[7]];
+        usize::from_ne_bytes(usize_bytes)
+    };
 
     // SAFETY: `a` is a power-of-two, therefore non-zero.
     let a_minus_one = unsafe { unchecked_sub(a, 1) };

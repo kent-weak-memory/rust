@@ -915,7 +915,7 @@ fn llvm_fixup_input<'ll, 'tcx>(
             let vec_ty = bx.cx.type_vector(elem_ty, count);
             // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
             if let Primitive::Pointer(_) = s.primitive() {
-                let t = bx.type_from_integer(dl.ptr_sized_integer());
+                let t = bx.type_from_integer(dl.ptr_memory_sized_integer());
                 value = bx.ptrtoint(value, t);
             }
             bx.insert_element(bx.const_undef(vec_ty), value, bx.const_i32(0))

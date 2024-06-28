@@ -666,7 +666,6 @@ where
                 if dest.layout.is_unsized() {
                     throw_inval!(SizeOfUnsizedType(dest.layout.ty));
                 }
-                assert_eq!(src.layout.data_size, dest.layout.data_size);
                 assert_eq!(src.layout.memory_size, dest.layout.memory_size);
                 // Yay, we got a value that we can write directly.
                 return if layout_compat {

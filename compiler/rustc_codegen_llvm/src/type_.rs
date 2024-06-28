@@ -14,7 +14,7 @@ use rustc_middle::bug;
 use rustc_middle::ty::layout::TyAndLayout;
 use rustc_middle::ty::{self, Ty};
 use rustc_target::abi::call::{CastTarget, FnAbi, Reg};
-use rustc_target::abi::{AddressSpace, Align, Integer, Size};
+use rustc_target::abi::{AddressSpace, Align, HasDataLayout, Integer, Size};
 
 use std::fmt;
 use std::ptr;
@@ -123,8 +123,7 @@ impl<'ll> CodegenCx<'ll, '_> {
     pub(crate) fn type_padding_filler(&self, size: Size, align: Align) -> &'ll Type {
         let unit = Integer::approximate_align(self, align);
         let size = size.bytes();
-        // TODO(seharris): not sure this is correct.
-        let unit_size = unit.memory_size().bytes();
+        let unit_size = unit.size().bytes();
         assert_eq!(size % unit_size, 0);
         self.type_array(self.type_from_integer(unit), size / unit_size)
     }
