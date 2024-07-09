@@ -593,6 +593,10 @@ fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) ->
             } else if let Some(idx) = a64_reg_index(reg) {
                 let class = if let Some(layout) = layout {
                     match layout.memory_size.bytes() {
+                        // TODO(seharris): Review; I'm not at all sure this is right.
+                        //                 If nothing else, this probably causes capability registers to be accepted on AArch64 (without Morello) which is silly.
+                        //                 I'm also not clear whether this code is talking about template modifiers or names of registers.
+                        16 => 'c', // CHERI Morello only.
                         8 => 'x',
                         _ => 'w',
                     }

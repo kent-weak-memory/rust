@@ -1,14 +1,18 @@
 #[cfg(test)]
 mod tests;
 
-#[cfg(target_pointer_width = "64")]
+#[cfg_attr(bootstrap, cfg(target_pointer_width = "64"))]
+#[cfg_attr(not(bootstrap), cfg(all(target_pointer_width = "64", not(target_abi = "purecap"))))]
 mod repr_bitpacked;
-#[cfg(target_pointer_width = "64")]
+#[cfg_attr(bootstrap, cfg(target_pointer_width = "64"))]
+#[cfg_attr(not(bootstrap), cfg(all(target_pointer_width = "64", not(target_abi = "purecap"))))]
 use repr_bitpacked::Repr;
 
-#[cfg(not(target_pointer_width = "64"))]
+#[cfg_attr(bootstrap, cfg(not(target_pointer_width = "64")))]
+#[cfg_attr(not(bootstrap), cfg(any(not(target_pointer_width = "64"), target_abi = "purecap")))]
 mod repr_unpacked;
-#[cfg(not(target_pointer_width = "64"))]
+#[cfg_attr(bootstrap, cfg(not(target_pointer_width = "64")))]
+#[cfg_attr(not(bootstrap), cfg(any(not(target_pointer_width = "64"), target_abi = "purecap")))]
 use repr_unpacked::Repr;
 
 use crate::error;

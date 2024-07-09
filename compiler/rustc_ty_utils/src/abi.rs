@@ -515,21 +515,24 @@ fn fn_abi_adjust_for_abi<'tcx>(
                 _ => return,
             }
 
-            // Use data size when available:
-            // - integers less that fit usize will fit registers
-            // - pointers, even when using CHERI capabilities, will fit registers
-            // - aggregates that fit usize will fit registers
-            // - everything else is too big, even if it would technically fit in a
-            //   capability register
-            // TODO(seharris): can we use 128 bit capability registers for other things?
-            let data_size = arg.layout.data_size.unwrap_or(arg.layout.memory_size);
-            if arg.layout.is_unsized() || data_size > cx.data_layout().pointer_data_size {
+            // On non-CHERI targets:
+            // - pointer memory size is the machine word size
+            // - any value that fits into that amount of space will fit into a register
+            // On CHERI targets:
+            // - pointer memory size is twice the machine word size
+            // - general purpose registers can still hold a value of this size
+            // - we can't necessarily perform arithmetic on it, but that doesn't matter
+            // - any value that fits into that amount of space will fit into a register
+            // Ultimately, we can do the same thing regardless of whether the target is
+            // CHERI.
+            let memory_size = arg.layout.memory_size;
+            if arg.layout.is_unsized() || memory_size > cx.data_layout().pointer_memory_size {
                 arg.make_indirect();
             } else {
                 // We want to pass small aggregates as immediates, but using
                 // a LLVM aggregate type for this leads to bad optimizations,
                 // so we pick an appropriately sized integer type instead.
-                arg.cast_to(Reg { kind: RegKind::Integer, size: arg.layout.memory_size });
+                arg.cast_to(Reg { kind: RegKind::Integer, size: memory_size });
             }
 
             // If we deduced that this parameter was read-only, add that to the attribute list now.

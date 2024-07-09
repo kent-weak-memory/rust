@@ -9,12 +9,9 @@ rebuild LLVM via cheribuild without pulling commits:
 getting rustc and other compiler components built for CHERI:
  - write a config.toml based on config.toml.sarah
  - this will need to reference clang-morello.sh wrapper to link
- - use Morello LLVM commit `f35a94e96b1c3cc017ca9581ecfeb405ed86508d` (2021-06-03)
- - ~~We're now using an up-to-date LLVM, subject to some minor hacks being applied~~
+ - use Morello LLVM commit `671d6dbe2b74525702368edfa086e68f5afadc24`
  - apply hacks in `llvm.patch`. They are:
     - stop broken SROA pass being added in `llvm/lib/Transforms/IPO/PassManagerBuilder.cpp`.
-    - name metadata sections as `.rmeta` in `llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp`.
-    - prevents compiler emitting badly aligned memcpys in `llvm/lib/CodeGen/TargetLoweringObjectFileImpl.cpp`.
  - you probably need to copy `FileCheck` from `<cheribuild-dir>/build/morello-llvm-project-build/bin/FileCheck` to `<cheribuild-dir>/output/morello-sdk/bin/FileCheck`
 
 ```
@@ -23,7 +20,8 @@ getting rustc and other compiler components built for CHERI:
 ```
 
 ~~Last tested version of LLVM: `aba2e0847d0dbc33d7292876c2c22c2d610d5359` (2022-07-16)~~
-Last tested version of LLVM: `f35a94e96b1c3cc017ca9581ecfeb405ed86508d` (2022-10-19)
+~~Last tested version of LLVM: `f35a94e96b1c3cc017ca9581ecfeb405ed86508d` (2022-10-19)~~
+~~Last tested version of LLVM: `671d6dbe2b74525702368edfa086e68f5afadc24` (2024-07-09)~~
 The version of LLVM needs to also match the version used to build CHERI BSD because changes have been made to the ABI in some versions.
 For more information see: https://github.com/CTSRD-CHERI/cheribsd/blob/main/CHERI-UPDATING.md
 
@@ -67,6 +65,7 @@ only build part of a program when compiling for Morello in purecap mode:
 ```
 #![feature(cfg_target_abi)]
 
+#[cfg(not(bootstrap))] // the bootstrap compiler doesn't know about purecap `target_abi`.
 #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
 {
 	// Morello specific code.

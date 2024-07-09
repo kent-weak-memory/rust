@@ -217,13 +217,13 @@ cfg_if::cfg_if! {
                             exception_object as uintptr_t,
                         );
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, crate::ptr::null());
-                        // TODO(seharris) check this code executes, consider removing it.
-                        // TODO(seharris) don't forget to remove `#![feature(asm)]` from lib.rs if removing this code.
-                        #[cfg(version("1.72"))] // bootstrap compiler doesn't understand purecap
+                        // TODO(seharris) consider removing it.
+                        #[cfg(not(bootstrap))] // bootstrap compiler doesn't understand purecap
                         #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
                         {
                             let is_valid: u64;
-                            asm!("gctag {0}, {1}", out(reg) is_valid, in(reg) lpad);
+                            // TODO(seharris):  check this still works with x template modifier
+                            crate::arch::asm!("gctag {:x}, {:x}", out(reg) is_valid, in(reg) lpad);
                             assert!(is_valid == 1);
                         }
                         uw::_Unwind_SetIP(context, lpad);
