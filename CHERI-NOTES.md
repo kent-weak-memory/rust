@@ -21,7 +21,7 @@ getting rustc and other compiler components built for CHERI:
 
 ~~Last tested version of LLVM: `aba2e0847d0dbc33d7292876c2c22c2d610d5359` (2022-07-16)~~
 ~~Last tested version of LLVM: `f35a94e96b1c3cc017ca9581ecfeb405ed86508d` (2022-10-19)~~
-~~Last tested version of LLVM: `671d6dbe2b74525702368edfa086e68f5afadc24` (2024-07-09)~~
+Last tested version of LLVM: `671d6dbe2b74525702368edfa086e68f5afadc24` (2024-07-09)
 The version of LLVM needs to also match the version used to build CHERI BSD because changes have been made to the ABI in some versions.
 For more information see: https://github.com/CTSRD-CHERI/cheribsd/blob/main/CHERI-UPDATING.md
 
