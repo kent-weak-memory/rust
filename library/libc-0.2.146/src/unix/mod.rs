@@ -25,7 +25,7 @@ pub type ssize_t = isize;
 pub type pid_t = i32;
 pub type in_addr_t = u32;
 pub type in_port_t = u16;
-pub type sighandler_t = ::size_t;
+pub type sighandler_t = *const ();
 pub type cc_t = ::c_uchar;
 
 cfg_if! {

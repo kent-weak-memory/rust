@@ -112,6 +112,7 @@ rustc-std-workspace-std = { path = 'library/rustc-std-workspace-std' }
 
 # Override libraries with modifications to fix CHERI compatbility problems
 libc = { path = "library/libc-0.2.146" }
+jobserver = { path = "library/jobserver-0.1.26" }
 
 [patch."https://github.com/rust-lang/rust-clippy"]
 clippy_lints = { path = "src/tools/clippy/clippy_lints" }
