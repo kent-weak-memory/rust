@@ -208,6 +208,7 @@ impl<T: ?Sized> *mut T {
     #[unstable(feature = "strict_provenance", issue = "95228")]
     pub fn addr(self) -> usize {
         // TODO(seharris): figure out a way to only do this for CHERI targets.
+        // TODO(seharris): this exposes the pointer, which it shouldn't.
         self as *mut () as usize
         // The way mainline does this:
         // FIXME(strict_provenance_magic): I am magic and should be a compiler intrinsic.

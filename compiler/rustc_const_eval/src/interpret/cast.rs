@@ -31,6 +31,12 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 self.unsize_into(src, cast_ty, dest)?;
             }
 
+            CastKind::PointerAddress => {
+                let src = self.read_immediate(src)?;
+                let res = self.pointer_nonexpose_address_cast(&src, cast_ty)?;
+                self.write_immediate(res, dest)?;
+            }
+
             CastKind::PointerExposeAddress => {
                 let src = self.read_immediate(src)?;
                 let res = self.pointer_expose_address_cast(&src, cast_ty)?;
@@ -224,6 +230,18 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 Immediate::Uninit => throw_ub!(InvalidUninitBytes(None)),
             };
         }
+    }
+
+    pub fn pointer_nonexpose_address_cast(
+        &mut self,
+        src: &ImmTy<'tcx, M::Provenance>,
+        cast_ty: Ty<'tcx>,
+    ) -> InterpResult<'tcx, Immediate<M::Provenance>> {
+        assert_matches!(src.layout.ty.kind(), ty::RawPtr(_) | ty::FnPtr(_));
+        assert!(cast_ty.is_integral());
+
+        let scalar = src.to_scalar();
+        Ok(self.cast_from_int_like(scalar, src.layout, cast_ty)?.into())
     }
 
     pub fn pointer_expose_address_cast(

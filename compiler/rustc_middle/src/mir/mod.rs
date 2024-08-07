@@ -2013,6 +2013,7 @@ impl<'tcx> Rvalue<'tcx> {
                 | CastKind::IntToFloat
                 | CastKind::FnPtrToPtr
                 | CastKind::PtrToPtr
+                | CastKind::PointerAddress
                 | CastKind::PointerCoercion(_)
                 | CastKind::PointerFromExposedAddress
                 | CastKind::DynStar

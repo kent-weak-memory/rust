@@ -649,6 +649,7 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
                     }
                     // FIXME: Add Checks for these
                     CastKind::PointerFromExposedAddress
+                    | CastKind::PointerAddress
                     | CastKind::PointerExposeAddress
                     | CastKind::PointerCoercion(_) => {}
                     CastKind::IntToInt | CastKind::IntToFloat => {

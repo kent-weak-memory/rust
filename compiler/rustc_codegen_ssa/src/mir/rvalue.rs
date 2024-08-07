@@ -411,7 +411,14 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let cast = bx.cx().layout_of(self.monomorphize(mir_cast_ty));
 
                 let val = match *kind {
-                    mir::CastKind::PointerExposeAddress => {
+                    // TODO(seharris): presumably this exposes the pointer,
+                    // which is not what this should do, but there doesn't seem
+                    // to be a way to do this cast in standard LLVM IR (as of
+                    // 20240801).
+                    // CHERI LLVM may have some extra intrinsics that allow
+                    // this (llvm.address.get)?
+                    mir::CastKind::PointerAddress
+                    | mir::CastKind::PointerExposeAddress => {
                         assert!(bx.cx().is_backend_immediate(cast));
                         let llptr = operand.immediate();
                         let llcast_ty = bx.cx().immediate_backend_type(cast);

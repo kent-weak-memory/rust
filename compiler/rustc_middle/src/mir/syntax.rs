@@ -1223,6 +1223,10 @@ pub enum Rvalue<'tcx> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, TyEncodable, TyDecodable, Hash, HashStable)]
 pub enum CastKind {
+    /// A non-exposing pointer to address cast.
+    /// A cast between a pointer and an integer type, or between a function
+    /// pointer and an integer type.
+    PointerAddress,
     /// An exposing pointer to address cast. A cast between a pointer and an integer type, or
     /// between a function pointer and an integer type.
     /// See the docs on `expose_addr` for more details.

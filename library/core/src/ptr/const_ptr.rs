@@ -204,6 +204,7 @@ impl<T: ?Sized> *const T {
     pub fn addr(self) -> usize {
         // FIXME(strict_provenance_magic): I am magic and should be a compiler intrinsic.
         // TODO(seharris): figure out a way to only do this for CHERI targets.
+        // TODO(seharris): this exposes the pointer, which it shouldn't.
         self as *const () as usize
         // The way mainline does this:
         // SAFETY: Pointer-to-integer transmutes are valid (if you are okay with losing the
