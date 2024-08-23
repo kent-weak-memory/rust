@@ -414,7 +414,10 @@ fn offset_of() {
     assert_eq!(offs_of_z::<u8>(), 8);
 
     // Ensure that it works with the implicit lifetime in `Box<dyn Trait + '_>`.
+    #[cfg(not(all(target_arch = "aarch64", target_abi = "purecap")))]
     assert_eq!(offset_of!(Generic<Box<dyn Trait>>, z), 8);
+    #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+    assert_eq!(offset_of!(Generic<Box<dyn Trait>>, z), 16);
 }
 
 #[test]
