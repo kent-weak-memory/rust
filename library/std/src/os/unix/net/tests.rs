@@ -649,6 +649,8 @@ fn test_send_vectored_fds_unix_stream() {
 #[cfg(any(target_os = "android", target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_send_vectored_with_ancillary_to_unix_datagram() {
+    use crate::os::unix::net::{SocketCred, SocketAncillary};
+
     fn getpid() -> libc::pid_t {
         unsafe { libc::getpid() }
     }
@@ -716,6 +718,8 @@ fn test_send_vectored_with_ancillary_to_unix_datagram() {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 #[test]
 fn test_send_vectored_with_ancillary_unix_datagram() {
+    use crate::os::unix::net::{AncillaryData, SocketAncillary};
+
     let dir = tmpdir();
     let path1 = dir.path().join("sock1");
     let path2 = dir.path().join("sock2");

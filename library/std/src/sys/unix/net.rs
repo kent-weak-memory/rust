@@ -307,7 +307,7 @@ impl Socket {
         self.recv_from_with_flags(buf, 0)
     }
 
-    #[cfg(any(target_os = "android", target_os = "linux"))]
+    #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
     pub fn recv_msg(&self, msg: &mut libc::msghdr) -> io::Result<usize> {
         let n = cvt(unsafe { libc::recvmsg(self.as_raw_fd(), msg, libc::MSG_CMSG_CLOEXEC) })?;
         Ok(n as usize)
@@ -330,7 +330,7 @@ impl Socket {
         self.0.is_write_vectored()
     }
 
-    #[cfg(any(target_os = "android", target_os = "linux"))]
+    #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
     pub fn send_msg(&self, msg: &mut libc::msghdr) -> io::Result<usize> {
         let n = cvt(unsafe { libc::sendmsg(self.as_raw_fd(), msg, 0) })?;
         Ok(n as usize)

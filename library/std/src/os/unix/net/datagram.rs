@@ -1,7 +1,7 @@
-#[cfg(any(doc, target_os = "android", target_os = "linux"))]
+#[cfg(any(doc, target_os = "android", target_os = "freebsd", target_os = "linux"))]
 use super::{recv_vectored_with_ancillary_from, send_vectored_with_ancillary_to, SocketAncillary};
 use super::{sockaddr_un, SocketAddr};
-#[cfg(any(doc, target_os = "android", target_os = "linux"))]
+#[cfg(any(doc, target_os = "android", target_os = "freebsd", target_os = "linux"))]
 use crate::io::{IoSlice, IoSliceMut};
 use crate::net::Shutdown;
 use crate::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
@@ -386,8 +386,8 @@ impl UnixDatagram {
     ///
     /// # Examples
     ///
-    #[cfg_attr(any(target_os = "android", target_os = "linux"), doc = "```no_run")]
-    #[cfg_attr(not(any(target_os = "android", target_os = "linux")), doc = "```ignore")]
+    #[cfg_attr(any(target_os = "android", target_os = "freebsd", target_os = "linux"), doc = "```no_run")]
+    #[cfg_attr(not(any(target_os = "android", target_os = "freebsd", target_os = "linux")), doc = "```ignore")]
     /// #![feature(unix_socket_ancillary_data)]
     /// use std::os::unix::net::{UnixDatagram, SocketAncillary, AncillaryData};
     /// use std::io::IoSliceMut;
@@ -417,7 +417,7 @@ impl UnixDatagram {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(any(doc, target_os = "android", target_os = "linux"))]
+    #[cfg(any(doc, target_os = "android", target_os = "freebsd", target_os = "linux"))]
     #[unstable(feature = "unix_socket_ancillary_data", issue = "76915")]
     pub fn recv_vectored_with_ancillary_from(
         &self,
@@ -436,8 +436,8 @@ impl UnixDatagram {
     ///
     /// # Examples
     ///
-    #[cfg_attr(any(target_os = "android", target_os = "linux"), doc = "```no_run")]
-    #[cfg_attr(not(any(target_os = "android", target_os = "linux")), doc = "```ignore")]
+    #[cfg_attr(any(target_os = "android", target_os = "freebsd", target_os = "linux"), doc = "```no_run")]
+    #[cfg_attr(not(any(target_os = "android", target_os = "freebsd", target_os = "linux")), doc = "```ignore")]
     /// #![feature(unix_socket_ancillary_data)]
     /// use std::os::unix::net::{UnixDatagram, SocketAncillary, AncillaryData};
     /// use std::io::IoSliceMut;
@@ -467,7 +467,7 @@ impl UnixDatagram {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(any(doc, target_os = "android", target_os = "linux"))]
+    #[cfg(any(doc, target_os = "android", target_os = "freebsd", target_os = "linux"))]
     #[unstable(feature = "unix_socket_ancillary_data", issue = "76915")]
     pub fn recv_vectored_with_ancillary(
         &self,
@@ -577,8 +577,8 @@ impl UnixDatagram {
     ///
     /// # Examples
     ///
-    #[cfg_attr(any(target_os = "android", target_os = "linux"), doc = "```no_run")]
-    #[cfg_attr(not(any(target_os = "android", target_os = "linux")), doc = "```ignore")]
+    #[cfg_attr(any(target_os = "android", target_os = "freebsd", target_os = "linux"), doc = "```no_run")]
+    #[cfg_attr(not(any(target_os = "android", target_os = "freebsd", target_os = "linux")), doc = "```ignore")]
     /// #![feature(unix_socket_ancillary_data)]
     /// use std::os::unix::net::{UnixDatagram, SocketAncillary};
     /// use std::io::IoSlice;
@@ -602,7 +602,7 @@ impl UnixDatagram {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(any(doc, target_os = "android", target_os = "linux"))]
+    #[cfg(any(doc, target_os = "android", target_os = "freebsd", target_os = "linux"))]
     #[unstable(feature = "unix_socket_ancillary_data", issue = "76915")]
     pub fn send_vectored_with_ancillary_to<P: AsRef<Path>>(
         &self,
@@ -619,8 +619,8 @@ impl UnixDatagram {
     ///
     /// # Examples
     ///
-    #[cfg_attr(any(target_os = "android", target_os = "linux"), doc = "```no_run")]
-    #[cfg_attr(not(any(target_os = "android", target_os = "linux")), doc = "```ignore")]
+    #[cfg_attr(any(target_os = "android", target_os = "freebsd", target_os = "linux"), doc = "```no_run")]
+    #[cfg_attr(not(any(target_os = "android", target_os = "freebsd", target_os = "linux")), doc = "```ignore")]
     /// #![feature(unix_socket_ancillary_data)]
     /// use std::os::unix::net::{UnixDatagram, SocketAncillary};
     /// use std::io::IoSlice;
@@ -644,7 +644,7 @@ impl UnixDatagram {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(any(doc, target_os = "android", target_os = "linux"))]
+    #[cfg(any(doc, target_os = "android", target_os = "freebsd", target_os = "linux"))]
     #[unstable(feature = "unix_socket_ancillary_data", issue = "76915")]
     pub fn send_vectored_with_ancillary(
         &self,
