@@ -1343,6 +1343,9 @@ pub enum Abi {
         count: u64,
     },
     Aggregate {
+        /// `true` if any field uses hardware-controlled metadata (CHERI
+        /// capabilities).
+        metadata: bool,
         /// If true, the size is exact, otherwise it's only a lower bound.
         sized: bool,
     },
@@ -1354,7 +1357,7 @@ impl Abi {
     pub fn is_unsized(&self) -> bool {
         match *self {
             Abi::Uninhabited | Abi::Scalar(_) | Abi::ScalarPair(..) | Abi::Vector { .. } => false,
-            Abi::Aggregate { sized } => !sized,
+            Abi::Aggregate { metadata: _, sized } => !sized,
         }
     }
 
@@ -1385,6 +1388,18 @@ impl Abi {
     #[inline]
     pub fn is_scalar(&self) -> bool {
         matches!(*self, Abi::Scalar(_))
+    }
+
+    /// Returns `true` if type contains hardware-controlled metadata (CHERI
+    /// capabilities).
+    pub fn has_metadata<C: HasDataLayout>(&self, cx: &C) -> bool {
+        match self {
+            Abi::Uninhabited => false,
+            Abi::Scalar(scalar) => scalar.data_size(cx) != scalar.memory_size(cx),
+            Abi::ScalarPair(a, b) => a.data_size(cx) != a.memory_size(cx) || b.data_size(cx) != b.memory_size(cx),
+            Abi::Vector{element, count: _} => element.data_size(cx) != element.memory_size(cx),
+            Abi::Aggregate{metadata, sized: _} => *metadata,
+        }
     }
 
     /// Returns the fixed alignment of this ABI, if any is mandated.
@@ -1424,10 +1439,11 @@ impl Abi {
     pub fn to_union(&self) -> Self {
         assert!(self.is_sized());
         match *self {
+            Abi::Uninhabited => Abi::Aggregate { metadata: false, sized: true },
             Abi::Scalar(s) => Abi::Scalar(s.to_union()),
             Abi::ScalarPair(s1, s2) => Abi::ScalarPair(s1.to_union(), s2.to_union()),
             Abi::Vector { element, count } => Abi::Vector { element: element.to_union(), count },
-            Abi::Uninhabited | Abi::Aggregate { .. } => Abi::Aggregate { sized: true },
+            Abi::Aggregate { metadata, sized: _ } => Abi::Aggregate { metadata, sized: true },
         }
     }
 }
@@ -1703,6 +1719,12 @@ impl<'a> Layout<'a> {
             && self.align().abi == data_layout.pointer_align.abi
             && matches!(self.abi(), Abi::Scalar(..))
     }
+
+    /// Returns `true` if there is hardware-controlled metadata (like a CHERI
+    /// capability) anywhere in this type.
+    pub fn has_metadata<C: HasDataLayout>(self, cx: &C) -> bool {
+        self.0.0.abi.has_metadata(cx)
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -1739,7 +1761,7 @@ impl LayoutS {
         match self.abi {
             Abi::Scalar(_) | Abi::ScalarPair(..) | Abi::Vector { .. } => false,
             Abi::Uninhabited => self.memory_size.bytes() == 0,
-            Abi::Aggregate { sized } => sized && self.memory_size.bytes() == 0,
+            Abi::Aggregate { metadata: _, sized } => sized && self.memory_size.bytes() == 0,
         }
     }
 }

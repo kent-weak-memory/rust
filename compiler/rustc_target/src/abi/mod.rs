@@ -157,7 +157,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
         match self.abi {
             Abi::Scalar(_) | Abi::ScalarPair(..) | Abi::Vector { .. } => false,
             Abi::Uninhabited => self.memory_size.bytes() == 0,
-            Abi::Aggregate { sized } => sized && self.memory_size.bytes() == 0,
+            Abi::Aggregate { metadata: _, sized } => sized && self.memory_size.bytes() == 0,
         }
     }
 }

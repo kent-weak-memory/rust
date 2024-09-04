@@ -246,7 +246,8 @@ fn layout_of_uncached<'tcx>(
             let abi = if count != 0 && ty.is_privately_uninhabited(tcx, param_env) {
                 Abi::Uninhabited
             } else {
-                Abi::Aggregate { sized: true }
+                let has_metadata = element.layout.has_metadata(cx);
+                Abi::Aggregate { metadata: has_metadata, sized: true }
             };
 
             let largest_niche = if count != 0 { element.largest_niche } else { None };
@@ -263,10 +264,11 @@ fn layout_of_uncached<'tcx>(
         }
         ty::Slice(element) => {
             let element = cx.layout_of(element)?;
+            let has_metadata = element.layout.has_metadata(cx);
             tcx.mk_layout(LayoutS {
                 variants: Variants::Single { index: FIRST_VARIANT },
                 fields: FieldsShape::Array { stride: element.memory_size, count: 0 },
-                abi: Abi::Aggregate { sized: false },
+                abi: Abi::Aggregate { metadata: has_metadata, sized: false },
                 largest_niche: None,
                 align: element.align,
                 data_size: Some(Size::ZERO),
@@ -276,7 +278,7 @@ fn layout_of_uncached<'tcx>(
         ty::Str => tcx.mk_layout(LayoutS {
             variants: Variants::Single { index: FIRST_VARIANT },
             fields: FieldsShape::Array { stride: Size::from_bytes(1), count: 0 },
-            abi: Abi::Aggregate { sized: false },
+            abi: Abi::Aggregate { metadata: false, sized: false },
             largest_niche: None,
             align: dl.i8_align,
             data_size: Some(Size::ZERO),
@@ -296,7 +298,7 @@ fn layout_of_uncached<'tcx>(
                 StructKind::AlwaysSized,
             )?;
             match unit.abi {
-                Abi::Aggregate { ref mut sized } => *sized = false,
+                Abi::Aggregate { metadata: _, ref mut sized } => *sized = false,
                 _ => bug!(),
             }
             tcx.mk_layout(unit)
@@ -868,7 +870,8 @@ fn generator_layout<'tcx>(
     let abi = if prefix.abi.is_uninhabited() || variants.iter().all(|v| v.abi.is_uninhabited()) {
         Abi::Uninhabited
     } else {
-        Abi::Aggregate { sized: true }
+        let has_metadata = prefix.abi.has_metadata(cx) || variants.iter().any(|v| v.abi.has_metadata(cx));
+        Abi::Aggregate { metadata: has_metadata, sized: true }
     };
 
     let layout = tcx.mk_layout(LayoutS {

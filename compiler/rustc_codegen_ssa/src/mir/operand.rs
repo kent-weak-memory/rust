@@ -335,7 +335,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 }
             }
             // Newtype vector of array, e.g. #[repr(simd)] struct S([i32; 4]);
-            (OperandValue::Immediate(llval), Abi::Aggregate { sized: true }) => {
+            (OperandValue::Immediate(llval), Abi::Aggregate { metadata: _, sized: true }) => {
                 assert!(matches!(self.layout.abi, Abi::Vector { .. }));
 
                 let llty = bx.cx().backend_type(self.layout);
@@ -347,7 +347,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 bx.store(*llval, llptr, field.align.abi);
                 *llval = bx.load(llfield_ty, lltemp, field.align.abi);
             }
-            (OperandValue::Immediate(_), Abi::Uninhabited | Abi::Aggregate { sized: false }) => {
+            (OperandValue::Immediate(_), Abi::Uninhabited | Abi::Aggregate { metadata: _, sized: false }) => {
                 bug!()
             }
             (OperandValue::Pair(..), _) => bug!(),

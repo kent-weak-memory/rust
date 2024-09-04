@@ -136,7 +136,7 @@ pub trait LayoutCalculator {
             } else {
                 Some(memory_size)
             },
-            Abi::Aggregate{sized: true} if memory_size.bytes() == 0 => Some(memory_size),
+            Abi::Aggregate{metadata: _, sized: true} if memory_size.bytes() == 0 => Some(memory_size),
             Abi::Uninhabited if memory_size.bytes() == 0 => Some(memory_size),
             _ => None,
         }
@@ -190,6 +190,9 @@ pub trait LayoutCalculator {
             None => FIRST_VARIANT,
         };
 
+        let has_metadata = variants
+            .iter()
+            .any(|fields| fields.iter().any(|field| field.abi().has_metadata(dl)));
         let is_struct = !is_enum ||
                     // Only one variant is present.
                     (present_second.is_none() &&
@@ -225,7 +228,7 @@ pub trait LayoutCalculator {
                         hide_niches(b);
                     }
                     Abi::Vector { element, count: _ } => hide_niches(element),
-                    Abi::Aggregate { sized: _ } => {}
+                    Abi::Aggregate { .. } => {}
                 }
                 st.largest_niche = None;
                 return Some(st);
@@ -379,7 +382,7 @@ pub trait LayoutCalculator {
 
                 // It can't be a Scalar or ScalarPair because the offset isn't 0.
                 if !layout.abi.is_uninhabited() {
-                    layout.abi = Abi::Aggregate { sized: true };
+                    layout.abi = Abi::Aggregate { metadata: has_metadata, sized: true };
                 }
                 layout.data_size = None;
                 layout.memory_size += this_offset;
@@ -415,10 +418,10 @@ pub trait LayoutCalculator {
                             Abi::ScalarPair(first.to_union(), niche_scalar)
                         }
                     }
-                    _ => Abi::Aggregate { sized: true },
+                    _ => Abi::Aggregate { metadata: has_metadata, sized: true },
                 }
             } else {
-                Abi::Aggregate { sized: true }
+                Abi::Aggregate { metadata: has_metadata, sized: true }
             };
 
             let layout = LayoutS {
@@ -598,7 +601,7 @@ pub trait LayoutCalculator {
                 end: (max as u128 & tag_mask),
             },
         };
-        let mut abi = Abi::Aggregate { sized: true };
+        let mut abi = Abi::Aggregate { metadata: has_metadata, sized: true };
 
         if layout_variants.iter().all(|v| v.abi.is_uninhabited()) {
             abi = Abi::Uninhabited;
@@ -808,14 +811,18 @@ pub trait LayoutCalculator {
             align = align.min(AbiAndPrefAlign::new(pack));
         }
 
+        let has_metadata = variants
+            .iter()
+            .any(|fields| fields.iter().any(|field| field.abi().has_metadata(dl)));
+
         // If all non-ZST fields have the same ABI, we may forward that ABI
         // for the union as a whole, unless otherwise inhibited.
         let abi = match common_non_zst_abi_and_align {
-            Err(AbiMismatch) | Ok(None) => Abi::Aggregate { sized: true },
+            Err(AbiMismatch) | Ok(None) => Abi::Aggregate { metadata: has_metadata, sized: true },
             Ok(Some((abi, _))) => {
                 if abi.inherent_align(dl).map(|a| a.abi) != Some(align.abi) {
                     // Mismatched alignment (e.g. union is #[repr(packed)]): disable opt
-                    Abi::Aggregate { sized: true }
+                    Abi::Aggregate { metadata: has_metadata, sized: true }
                 } else {
                     abi
                 }
@@ -1057,8 +1064,9 @@ fn univariant(
         debug_assert!(inverse_memory_index.iter().copied().eq(fields.indices()));
         inverse_memory_index.into_iter().map(FieldIdx::as_u32).collect()
     };
+    let has_metadata = fields.iter().any(|field| field.abi().has_metadata(dl));
     let memory_size = min_size.align_to(align.abi);
-    let mut abi = Abi::Aggregate { sized };
+    let mut abi = Abi::Aggregate { metadata: has_metadata, sized };
     // Unpack newtype ABIs and find scalar pairs.
     if sized && memory_size.bytes() > 0 {
         // All other fields must be ZSTs.

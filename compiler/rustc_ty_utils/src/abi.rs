@@ -524,14 +524,18 @@ fn fn_abi_adjust_for_abi<'tcx>(
             // - we can't necessarily perform arithmetic on it, but that doesn't matter
             // - any value that fits into that amount of space will fit into a register
             // Ultimately, we can do the same thing regardless of whether the target is
-            // CHERI.
+            // CHERI, except that capabilities mustn't be cast to integer types.
             let memory_size = arg.layout.memory_size;
             if arg.layout.is_unsized() || memory_size > cx.data_layout().pointer_memory_size {
                 arg.make_indirect();
-            } else {
+            } else if !arg.layout.layout.has_metadata(cx) {
                 // We want to pass small aggregates as immediates, but using
                 // a LLVM aggregate type for this leads to bad optimizations,
                 // so we pick an appropriately sized integer type instead.
+                //
+                // We don't do this for values containing metadata
+                // (i.e. capabilities) because casting like this will
+                // invalidate capabilities.
                 arg.cast_to(Reg { kind: RegKind::Integer, size: memory_size });
             }
 
