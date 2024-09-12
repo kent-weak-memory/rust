@@ -94,7 +94,7 @@ cfg_if::cfg_if! {
             let mut out = ptr::null_mut();
             // posix_memalign requires that the alignment be a multiple of `sizeof(void*)`.
             // Since these are all powers of 2, we can just use max.
-            let align = layout.align().max(crate::mem::size_of::<usize>());
+            let align = layout.align().max(crate::mem::size_of::<*const ()>());
             let ret = libc::posix_memalign(&mut out, align, layout.size());
             if ret != 0 { ptr::null_mut() } else { out as *mut u8 }
         }
