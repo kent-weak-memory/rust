@@ -1037,7 +1037,7 @@ impl ::Clone for fpos_t {
 
 f! {
     pub {const} fn CMSG_ALIGN(len: usize) -> usize {
-        len + ::mem::size_of::<usize>() - 1 & !(::mem::size_of::<usize>() - 1)
+        len + ::mem::size_of::<*const ()>() - 1 & !(::mem::size_of::<*const ()>() - 1)
     }
 
     pub fn CMSG_NXTHDR(mhdr: *const msghdr,

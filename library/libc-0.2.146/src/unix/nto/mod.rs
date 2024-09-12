@@ -2505,7 +2505,7 @@ pub const PTHREAD_RWLOCK_INITIALIZER: pthread_rwlock_t = pthread_rwlock_t {
 
 const_fn! {
     {const} fn _CMSG_ALIGN(len: usize) -> usize {
-        len + ::mem::size_of::<usize>() - 1 & !(::mem::size_of::<usize>() - 1)
+        len + ::mem::size_of::<*const ()>() - 1 & !(::mem::size_of::<*const ()>() - 1)
     }
 
     {const} fn _ALIGN(p: usize, b: usize) -> usize {

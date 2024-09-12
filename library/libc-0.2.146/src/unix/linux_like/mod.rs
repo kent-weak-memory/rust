@@ -1535,7 +1535,7 @@ cfg_if! {
 
 const_fn! {
     {const} fn CMSG_ALIGN(len: usize) -> usize {
-        len + ::mem::size_of::<usize>() - 1 & !(::mem::size_of::<usize>() - 1)
+        len + ::mem::size_of::<*const ()>() - 1 & !(::mem::size_of::<*const ()>() - 1)
     }
 }
 
