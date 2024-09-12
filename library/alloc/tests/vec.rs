@@ -12,7 +12,7 @@ use std::fmt::Debug;
 use std::hint;
 use std::iter::InPlaceIterable;
 use std::mem;
-use std::mem::{size_of, swap};
+use std::mem::{align_of, size_of, swap};
 use std::ops::Bound::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
@@ -31,7 +31,21 @@ impl Drop for DropCounter<'_> {
 
 #[test]
 fn test_small_vec_struct() {
-    assert_eq!(size_of::<Vec<u8>>(), size_of::<usize>() * 3);
+    fn add_padding(size: usize, alignment: usize) -> usize {
+        if size%alignment == 0 {
+            size
+        } else {
+            size+alignment-size%alignment
+        }
+    }
+
+    let size_of_ptr = size_of::<*const u8>();
+    let size_of_cap = size_of::<usize>();
+    let size_of_len = size_of::<usize>();
+    let alignment = align_of::<*const u8>().max(align_of::<usize>());
+    let size_of_raw_vec = add_padding(size_of_ptr+size_of_cap, alignment);
+    let size_of_vec = add_padding(size_of_raw_vec+size_of_len, alignment);
+    assert_eq!(size_of::<Vec<u8>>(), size_of_vec);
 }
 
 #[test]
