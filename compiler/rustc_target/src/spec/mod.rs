@@ -2822,6 +2822,7 @@ impl Target {
         key!(max_atomic_width, Option<u64>);
         key!(min_atomic_width, Option<u64>);
         key!(atomic_cas, bool);
+        key!(atomic_pointers_via_integers, bool);
         key!(panic_strategy, PanicStrategy)?;
         key!(crt_static_allows_dylibs, bool);
         key!(crt_static_default, bool);
@@ -3079,6 +3080,7 @@ impl ToJson for Target {
         target_option_val!(min_atomic_width);
         target_option_val!(max_atomic_width);
         target_option_val!(atomic_cas);
+        target_option_val!(atomic_pointers_via_integers);
         target_option_val!(panic_strategy);
         target_option_val!(crt_static_allows_dylibs);
         target_option_val!(crt_static_default);

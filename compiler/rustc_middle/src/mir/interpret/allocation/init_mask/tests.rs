@@ -82,8 +82,7 @@ fn grow_same_state_within_unused_bits() {
 
     // Grow without requiring an additional block. The gap between the current length and the
     // range's beginning should be set to the same value as the range.
-    let range = range(24, 32);
-    mask.set_range(range, true);
+    mask.set_range(range(24, 32), true);
 
     // We want to make sure the unused bits in the first block are correct
     for i in 16..24 {
@@ -112,8 +111,7 @@ fn grow_mixed_state_within_unused_bits() {
     // Grow without requiring an additional block. The gap between the current length and the
     // range's beginning should be set to the same value as the range. Note: since this is fully
     // out-of-bounds of the current mask, this is case #3 described in the `set_range` method.
-    let range = range(24, 32);
-    mask.set_range(range, false);
+    mask.set_range(range(24, 32), false);
 
     // We want to make sure the unused bits in the first block are correct
     for i in 16..24 {
@@ -143,8 +141,7 @@ fn grow_within_unused_bits_with_overlap() {
     // Grow without requiring an additional block, but leave no gap after the current len. Note:
     // since this is partially out-of-bounds of the current mask, this is case #2 described in the
     // `set_range` method.
-    let range = range(8, 24);
-    mask.set_range(range, false);
+    mask.set_range(range(8, 24), false);
 
     // We want to make sure the unused bits in the first block are correct
     for i in 8..24 {
@@ -161,19 +158,16 @@ fn grow_within_unused_bits_with_overlap() {
 fn grow_mixed_state_within_unused_bits_and_full_overwrite() {
     // To have spare bits, we use a mask size smaller than its block size of 64.
     let mut mask = InitMask::new(Size::from_bytes(16), true);
-    let range = range(0, 16);
-    assert!(mask.is_range_initialized(range).is_ok());
+    assert!(mask.is_range_initialized(range(0, 16)).is_ok());
 
     // Force materialization.
-    let range = range(8, 24);
-    mask.set_range(range, false);
-    assert!(mask.is_range_initialized(range).is_err());
+    mask.set_range(range(8, 24), false);
+    assert!(mask.is_range_initialized(range(8, 24)).is_err());
     assert_eq!(materialized_block_count(&mask), 1);
 
     // Full overwrite, lazy blocks would be enough from now on.
-    let range = range(0, 32);
-    mask.set_range(range, true);
-    assert!(mask.is_range_initialized(range).is_ok());
+    mask.set_range(range(0, 32), true);
+    assert!(mask.is_range_initialized(range(0, 32)).is_ok());
 
     assert_eq!(1, mask.range_as_init_chunks(range(0, 32)).count());
     assert_eq!(materialized_block_count(&mask), 0);
@@ -191,8 +185,7 @@ fn grow_same_state_outside_capacity() {
     assert_eq!(materialized_block_count(&mask), 0);
 
     // Grow to 10 blocks with the same init state.
-    let range = range(24, 640);
-    mask.set_range(range, true);
+    mask.set_range(range(24, 640), true);
 
     assert_eq!(1, mask.range_as_init_chunks(range(0, 640)).count());
     assert_eq!(materialized_block_count(&mask), 0);

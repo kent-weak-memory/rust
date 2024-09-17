@@ -8,7 +8,8 @@ fn report_unused_fields() {
         "arch": "powerpc64",
         "data-layout": "e-m:e-i64:64-n32:64",
         "llvm-target": "powerpc64le-elf",
-        "target-pointer-width": "64",
+        "target-pointer-data-size": "64",
+        "target-pointer-memory-size": "64",
         "code-mode": "foo"
     }
     "#,
@@ -27,7 +28,8 @@ fn report_incorrect_json_type() {
         "arch": "powerpc64",
         "data-layout": "e-m:e-i64:64-n32:64",
         "llvm-target": "powerpc64le-elf",
-        "target-pointer-width": "64",
+        "target-pointer-data-size": "64",
+        "target-pointer-memory-size": "64",
         "link-env-remove": "foo"
     }
     "#,
@@ -46,7 +48,8 @@ fn no_warnings_for_valid_target() {
         "arch": "powerpc64",
         "data-layout": "e-m:e-i64:64-n32:64",
         "llvm-target": "powerpc64le-elf",
-        "target-pointer-width": "64",
+        "target-pointer-data-size": "64",
+        "target-pointer-memory-size": "64",
         "link-env-remove": ["foo"]
     }
     "#,

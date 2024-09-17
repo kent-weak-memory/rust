@@ -636,7 +636,7 @@ passes_should_be_applied_to_trait =
     .label = not a trait
 
 passes_size =
-    size: {$size}
+    size: {$memory_size} ({$data_size} is normal data)
 
 passes_skipping_const_checks = skipping const checks
 
