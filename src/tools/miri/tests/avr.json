@@ -20,6 +20,7 @@
   },
   "target-c-int-width": "16",
   "target-endian": "little",
-  "target-pointer-width": "16",
+  "target-pointer-data-size": "16",
+  "target-pointer-memory-size": "16",
   "vendor": "unknown"
 }
