@@ -1712,18 +1712,9 @@ pub(crate) const unsafe fn align_offset<T: Sized>(p: *const T, a: usize) -> usiz
     // During const eval, we hook this function to ensure that the pointer never
     // has provenance, making this sound.
     // let addr: usize = unsafe { mem::transmute(p) };
-    let addr: usize = unsafe {
-        // TODO(seharris): can we avoid this grossness?
-        assert!(crate::mem::size_of::<*const ()>() >= crate::mem::size_of::<usize>());
-        let pointer_bytes = mem::transmute::<*const T, [u8; crate::mem::size_of::<*const ()>()]>(p);
-        #[cfg(target_pointer_width = "16")]
-        let usize_bytes = [pointer_bytes[0], pointer_bytes[1]];
-        #[cfg(target_pointer_width = "32")]
-        let usize_bytes = [pointer_bytes[0], pointer_bytes[1], pointer_bytes[2], pointer_bytes[3]];
-        #[cfg(target_pointer_width = "64")]
-        let usize_bytes = [pointer_bytes[0], pointer_bytes[1], pointer_bytes[2], pointer_bytes[3], pointer_bytes[4], pointer_bytes[5], pointer_bytes[6], pointer_bytes[7]];
-        usize::from_ne_bytes(usize_bytes)
-    };
+    // TODO(seharris): can we avoid this grossness?
+    assert!(crate::mem::size_of::<*const ()>() >= crate::mem::size_of::<usize>());
+    let addr = unsafe { *(&p as *const *const T as *const usize) };
 
     // SAFETY: `a` is a power-of-two, therefore non-zero.
     let a_minus_one = unsafe { unchecked_sub(a, 1) };
