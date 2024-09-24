@@ -404,8 +404,12 @@ impl Config {
         self.target_cfg().endian == Endian::Big
     }
 
-    pub fn get_pointer_width(&self) -> u32 {
-        *&self.target_cfg().pointer_width
+    pub fn get_pointer_data_size(&self) -> u32 {
+        *&self.target_cfg().pointer_data_size
+    }
+
+    pub fn get_pointer_memory_size(&self) -> u32 {
+        *&self.target_cfg().pointer_memory_size
     }
 
     pub fn can_unwind(&self) -> bool {
@@ -433,7 +437,8 @@ pub struct TargetCfgs {
     pub all_envs: HashSet<String>,
     pub all_abis: HashSet<String>,
     pub all_families: HashSet<String>,
-    pub all_pointer_widths: HashSet<String>,
+    pub all_pointer_data_sizes: HashSet<String>,
+    pub all_pointer_memory_sizes: HashSet<String>,
 }
 
 impl TargetCfgs {
@@ -451,7 +456,8 @@ impl TargetCfgs {
         let mut all_envs = HashSet::new();
         let mut all_abis = HashSet::new();
         let mut all_families = HashSet::new();
-        let mut all_pointer_widths = HashSet::new();
+        let mut all_pointer_data_sizes = HashSet::new();
+        let mut all_pointer_memory_sizes = HashSet::new();
 
         // Handle custom target specs, which are not included in `--print=all-target-specs-json`.
         if config.target.ends_with(".json") {
@@ -474,7 +480,8 @@ impl TargetCfgs {
             for family in &cfg.families {
                 all_families.insert(family.clone());
             }
-            all_pointer_widths.insert(format!("{}bit", cfg.pointer_width));
+            all_pointer_data_sizes.insert(format!("{}bit", cfg.pointer_data_size));
+            all_pointer_memory_sizes.insert(format!("{}bit", cfg.pointer_memory_size));
 
             all_targets.insert(target.clone());
         }
@@ -488,7 +495,8 @@ impl TargetCfgs {
             all_envs,
             all_abis,
             all_families,
-            all_pointer_widths,
+            all_pointer_data_sizes,
+            all_pointer_memory_sizes,
         }
     }
 
@@ -548,8 +556,10 @@ pub struct TargetCfg {
     pub(crate) abi: String,
     #[serde(rename = "target-family", default)]
     pub(crate) families: Vec<String>,
-    #[serde(rename = "target-pointer-width", deserialize_with = "serde_parse_u32")]
-    pub(crate) pointer_width: u32,
+    #[serde(rename = "target-pointer-data-size", deserialize_with = "serde_parse_u32")]
+    pub(crate) pointer_data_size: u32,
+    #[serde(rename = "target-pointer-memory-size", deserialize_with = "serde_parse_u32")]
+    pub(crate) pointer_memory_size: u32,
     #[serde(rename = "target-endian", default)]
     endian: Endian,
     #[serde(rename = "panic-strategy", default)]
