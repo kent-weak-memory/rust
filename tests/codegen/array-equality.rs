@@ -7,8 +7,12 @@
 #[no_mangle]
 pub fn array_eq_value(a: [u16; 3], b: [u16; 3]) -> bool {
     // CHECK-NEXT: start:
-    // CHECK-NEXT: %2 = icmp eq i48 %0, %1
-    // CHECK-NEXT: ret i1 %2
+    // TODO(seharris): This seems to be broken for all targets by disabling
+    //                 SROA in LLVM. Review if we find a way to re-enable SROA.
+    // COM: CHECK-NEXT: %2 = icmp eq i48 %0, %1
+    // COM: CHECK-NEXT: ret i1 %2
+    // CHECK: %[[EQ:.+]] = icmp eq i48
+    // CHECK-NEXT: ret i1 %[[EQ]]
     a == b
 }
 
@@ -56,7 +60,11 @@ pub fn array_char_eq(a: [char; 2], b: [char; 2]) -> bool {
 #[no_mangle]
 pub fn array_eq_zero_short(x: [u16; 3]) -> bool {
     // CHECK-NEXT: start:
-    // CHECK-NEXT: %[[EQ:.+]] = icmp eq i48 %0, 0
+    // TODO(seharris): This seems to be broken for all targets by disabling
+    //                 SROA in LLVM. Review if we find a way to re-enable SROA.
+    // COM: CHECK-NEXT: %[[EQ:.+]] = icmp eq i48 %0, 0
+    // COM: CHECK-NEXT: ret i1 %[[EQ]]
+    // CHECK: %[[EQ:.+]] = icmp eq i48 %{{.+}}, 0
     // CHECK-NEXT: ret i1 %[[EQ]]
     x == [0; 3]
 }
@@ -65,7 +73,11 @@ pub fn array_eq_zero_short(x: [u16; 3]) -> bool {
 #[no_mangle]
 pub fn array_eq_none_short(x: [Option<std::num::NonZeroU8>; 5]) -> bool {
     // CHECK-NEXT: start:
-    // CHECK-NEXT: %[[EQ:.+]] = icmp eq i40 %0, 0
+    // TODO(seharris): This seems to be broken for all targets by disabling
+    //                 SROA in LLVM. Review if we find a way to re-enable SROA.
+    // COM: CHECK-NEXT: %[[EQ:.+]] = icmp eq i40 %0, 0
+    // COM: CHECK-NEXT: ret i1 %[[EQ]]
+    // CHECK: %[[EQ:.+]] = icmp eq i40 %{{.+}}, 0
     // CHECK-NEXT: ret i1 %[[EQ]]
     x == [None; 5]
 }
