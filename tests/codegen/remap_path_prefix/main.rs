@@ -13,7 +13,7 @@ include!("aux_mod.rs");
 
 // Here we check that the expansion of the file!() macro is mapped.
 // NONCHERI: @alloc_5761061597a97f66e13ef2ff92712c4b = private unnamed_addr constant <{ [34 x i8] }> <{ [34 x i8] c"/the/src/remap_path_prefix/main.rs" }>
-// CHERI: @alloc_5761061597a97f66e13ef2ff92712c4b = private unnamed_addr addrspace\(200\) constant <{ [34 x i8] }> <{ [34 x i8] c"/the/src/remap_path_prefix/main.rs" }>
+// CHERI: @alloc_5761061597a97f66e13ef2ff92712c4b = private unnamed_addr addrspace(200) constant <{ [34 x i8] }> <{ [34 x i8] c"/the/src/remap_path_prefix/main.rs" }>
 pub static FILE_PATH: &'static str = file!();
 
 fn main() {

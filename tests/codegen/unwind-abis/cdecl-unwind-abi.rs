@@ -8,12 +8,12 @@
 #![crate_type = "lib"]
 #![feature(c_unwind)]
 
-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
+// CHECK: @rust_item_that_cannot_unwind() unnamed_addr{{( addrspace\(200\))?}} #0 {
 #[no_mangle]
 pub extern "cdecl" fn rust_item_that_cannot_unwind() {
 }
 
-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
+// CHECK: @rust_item_that_can_unwind() unnamed_addr{{( addrspace\(200\))?}} #1 {
 #[no_mangle]
 pub extern "cdecl-unwind" fn rust_item_that_can_unwind() {
 }

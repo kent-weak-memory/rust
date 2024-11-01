@@ -8,7 +8,7 @@
 
 #[no_mangle]
 pub fn foo() {
-    // CHECK: @foo() unnamed_addr #0
+    // CHECK: @foo() unnamed_addr{{( addrspace\(200\))?}} #0
 
     // all-NOT: attributes #0 = { {{.*}}sspstrong {{.*}} }
     // all-NOT: attributes #0 = { {{.*}}ssp {{.*}} }

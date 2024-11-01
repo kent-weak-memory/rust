@@ -21,6 +21,7 @@ pub struct Simd<T, const LANES: usize>([T; LANES]);
 // CHECK-LABEL: smoke
 #[no_mangle]
 pub fn smoke(ptrs: SimdConstPtr<u8, 8>, offsets: Simd<usize, 8>) -> SimdConstPtr<u8, 8> {
-    // CHECK: getelementptr i8, <8 x {{i8\*|ptr}}> %1, <8 x i64> %2
+    // NONCHERI: getelementptr i8, <8 x {{i8\*|ptr}}> %1, <8 x i64> %2
+    // CHERI: getelementptr i8, <8 x {{i8 addrspace\(200\)\*|ptr addrspace\(200\)}}> %1, <8 x i64> %2
     unsafe { simd_arith_offset(ptrs, offsets) }
 }

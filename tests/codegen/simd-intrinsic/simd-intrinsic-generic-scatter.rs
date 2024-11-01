@@ -24,7 +24,7 @@ extern "platform-intrinsic" {
 pub unsafe fn scatter_f32x2(pointers: Vec2<*mut f32>, mask: Vec2<i32>,
                             values: Vec2<f32>) {
     // NONCHERI: call void @llvm.masked.scatter.v2f32.v2p0{{.*}}(<2 x float> {{.*}}, <2 x {{float\*|ptr}}> {{.*}}, i32 {{.*}}, <2 x i1> {{.*}})
-    // CHERI: call void @llvm.masked.scatter.v2f32.v2p200{{.*}}(<2 x float> {{.*}}, <2 x {{float\*|ptr}}> {{.*}}, i32 {{.*}}, <2 x i1> {{.*}})
+    // CHERI: call void @llvm.masked.scatter.v2f32.v2p200{{.*}}(<2 x float> {{.*}}, <2 x {{float addrspace\(200\)\*|ptr addrspace\(200\)}}> {{.*}}, i32 {{.*}}, <2 x i1> {{.*}})
     simd_scatter(values, pointers, mask)
 }
 
