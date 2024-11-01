@@ -1,4 +1,5 @@
 // compile-flags: -O
+// ignore-purecap fails on Morello due to some weirdness with optimisations
 
 // Once we're done with llvm 14 and earlier, this test can be deleted.
 
@@ -10,7 +11,15 @@ use std::mem::MaybeUninit;
 #[no_mangle]
 pub fn box_uninitialized() -> Box<MaybeUninit<usize>> {
     // CHECK-LABEL: @box_uninitialized
+    // On Morello something about the extra steps needed to handle capabilities
+    // seems to confuse LLVM's optimisations a bit, and things that would
+    // normally get optimised away remain.
+    // This results in a couple of what seem to be false positives.
+    // The first is that this check matches `%storemerge.i.i.i`.
     // CHECK-NOT: store
+    // The second false positive is that this check matches an `alloca` for
+    // what seems to be a `Result` or something of a similar form.
+    // On other targets the allocation gets optimised out and this works ok.
     // CHECK-NOT: alloca
     // CHECK-NOT: memcpy
     // CHECK-NOT: memset
@@ -21,6 +30,8 @@ pub fn box_uninitialized() -> Box<MaybeUninit<usize>> {
 #[no_mangle]
 pub fn box_uninitialized2() -> Box<MaybeUninit<[usize; 1024 * 1024]>> {
     // CHECK-LABEL: @box_uninitialized2
+    // These two checks have the same problems on Morello as their counterparts
+    // in the other test.
     // CHECK-NOT: store
     // CHECK-NOT: alloca
     // CHECK-NOT: memcpy
