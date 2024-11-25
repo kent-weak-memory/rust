@@ -5,6 +5,7 @@
 // ignore-emscripten globals are used instead of thread locals
 // ignore-android does not use #[thread_local]
 // ignore-nto does not use #[thread_local]
+// ignore-freebsd this seems to be broken upstream (seharris)
 
 #![crate_type = "lib"]
 
