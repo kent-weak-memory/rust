@@ -69,7 +69,7 @@ pub fn test_UnionU128(_: UnionU128) -> UnionU128 { loop {} }
 
 #[repr(C)]
 pub union CUnionU128{a:u128}
-// CHECK: define {{(dso_local )?}}void @test_CUnionU128({{%CUnionU128\*|ptr}} {{.*}} %_1)
+// CHECK: define {{(dso_local )?}}void @test_CUnionU128({{%CUnionU128( addrspace\(200\))?\*|ptr( addrspace\(200\))?}} {{.*}} %_1)
 #[no_mangle]
 pub fn test_CUnionU128(_: CUnionU128) { loop {} }
 
