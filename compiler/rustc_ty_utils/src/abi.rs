@@ -517,18 +517,29 @@ fn fn_abi_adjust_for_abi<'tcx>(
 
             // On non-CHERI targets:
             // - pointer memory size is the machine word size
-            // - any value that fits into that amount of space will fit into a register
+            // - any value that fits into that amount of space will fit into a
+            //   register
             // On CHERI targets:
             // - pointer memory size is twice the machine word size
-            // - general purpose registers can still hold a value of this size
-            // - we can't necessarily perform arithmetic on it, but that doesn't matter
-            // - any value that fits into that amount of space will fit into a register
-            // Ultimately, we can do the same thing regardless of whether the target is
-            // CHERI, except that capabilities mustn't be cast to integer types.
+            // - while this can be held in registers, we can't do much with it
+            // - as a result, integers of the same size have to be split
+            //   between registers
+            // In the end, they're both mostly the same, but we need to handle
+            // capabilities as a special case.
+            let data_layout = cx.data_layout();
             let memory_size = arg.layout.memory_size;
-            if arg.layout.is_unsized() || memory_size > cx.data_layout().pointer_memory_size {
+            let data_size = arg.layout.data_size;
+            if arg.layout.is_unsized() {
+                arg.make_indirect();
+            } else if memory_size == data_layout.pointer_memory_size && data_size.is_some() && data_size.unwrap() <= data_layout.pointer_data_size {
+                // Capability.
+                // Do nothing.
+            } else if memory_size > data_layout.pointer_data_size {
+                // Not a capability, larger than the machine word size.
                 arg.make_indirect();
             } else if !arg.layout.layout.has_metadata(cx) {
+                // Not a capability, fits in a machine word size and registers.
+                //
                 // We want to pass small aggregates as immediates, but using
                 // a LLVM aggregate type for this leads to bad optimizations,
                 // so we pick an appropriately sized integer type instead.
