@@ -25,9 +25,11 @@ fn check_unused_files(path: &Path, bless: bool, bad: &mut bool) {
 
     for file in rs_files {
         for bw in [32, 64] {
-            for ps in [PanicStrategy::Unwind, PanicStrategy::Abort] {
-                for output_file in miropt_test_tools::files_for_miropt_test(&file, bw, ps) {
-                    output_files.remove(&output_file.expected_file);
+            for ch in [false, true] {
+                for ps in [PanicStrategy::Unwind, PanicStrategy::Abort] {
+                    for output_file in miropt_test_tools::files_for_miropt_test(&file, bw, ch, ps) {
+                        output_files.remove(&output_file.expected_file);
+                    }
                 }
             }
         }

@@ -17,10 +17,12 @@ pub enum PanicStrategy {
 pub fn output_file_suffix(
     testfile: &Path,
     bit_width: u32,
+    is_cheri: bool,
     panic_strategy: PanicStrategy,
 ) -> String {
     let mut each_bit_width = false;
     let mut each_panic_strategy = false;
+    let mut each_cheri = false;
     for line in fs::read_to_string(testfile).unwrap().lines() {
         if line == "// EMIT_MIR_FOR_EACH_BIT_WIDTH" {
             each_bit_width = true;
@@ -28,11 +30,17 @@ pub fn output_file_suffix(
         if line == "// EMIT_MIR_FOR_EACH_PANIC_STRATEGY" {
             each_panic_strategy = true;
         }
+        if line == "// EMIT_MIR_FOR_EACH_CHERI" {
+            each_cheri = true;
+        }
     }
 
     let mut suffix = String::new();
     if each_bit_width {
         suffix.push_str(&format!(".{}bit", bit_width));
+    }
+    if each_cheri && is_cheri {
+        suffix.push_str(".cheri");
     }
     if each_panic_strategy {
         match panic_strategy {
@@ -46,6 +54,7 @@ pub fn output_file_suffix(
 pub fn files_for_miropt_test(
     testfile: &std::path::Path,
     bit_width: u32,
+    is_cheri: bool,
     panic_strategy: PanicStrategy,
 ) -> Vec<MiroptTestFiles> {
     let mut out = Vec::new();
@@ -54,7 +63,7 @@ pub fn files_for_miropt_test(
     let test_dir = testfile.parent().unwrap();
     let test_crate = testfile.file_stem().unwrap().to_str().unwrap().replace('-', "_");
 
-    let suffix = output_file_suffix(testfile, bit_width, panic_strategy);
+    let suffix = output_file_suffix(testfile, bit_width, is_cheri, panic_strategy);
 
     for l in test_file_contents.lines() {
         if l.starts_with("// EMIT_MIR ") {

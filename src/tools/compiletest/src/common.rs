@@ -404,6 +404,10 @@ impl Config {
         self.target_cfg().endian == Endian::Big
     }
 
+    pub fn is_cheri(&self) -> bool {
+        self.target_cfg().pointer_data_size < self.target_cfg().pointer_memory_size
+    }
+
     pub fn get_pointer_data_size(&self) -> u32 {
         *&self.target_cfg().pointer_data_size
     }

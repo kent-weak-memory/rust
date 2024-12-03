@@ -3876,6 +3876,7 @@ impl<'test> TestCx<'test> {
         let files = miropt_test_tools::files_for_miropt_test(
             &self.testpaths.file,
             self.config.get_pointer_data_size(),
+            self.config.is_cheri(),
             self.config.target_cfg().panic.for_miropt_test_tools(),
         );
 
@@ -3901,6 +3902,7 @@ impl<'test> TestCx<'test> {
         let suffix = miropt_test_tools::output_file_suffix(
             &self.testpaths.file,
             self.config.get_pointer_data_size(),
+            self.config.is_cheri(),
             self.config.target_cfg().panic.for_miropt_test_tools(),
         );
 
@@ -3920,6 +3922,7 @@ impl<'test> TestCx<'test> {
         let files = miropt_test_tools::files_for_miropt_test(
             &self.testpaths.file,
             self.config.get_pointer_data_size(),
+            self.config.is_cheri(),
             self.config.target_cfg().panic.for_miropt_test_tools(),
         );
         for miropt_test_tools::MiroptTestFiles { from_file, to_file, expected_file, passes: _ } in
