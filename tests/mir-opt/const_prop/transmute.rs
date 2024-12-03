@@ -44,19 +44,19 @@ pub unsafe fn unreachable_direct() -> ! {
 
 // EMIT_MIR transmute.unreachable_ref.ConstProp.diff
 pub unsafe fn unreachable_ref() -> ! {
-    let x: &Never = unsafe { transmute(1_usize) };
+    let x: &Never = unsafe { transmute(1_usize as *const Never) };
     match *x {}
 }
 
 // EMIT_MIR transmute.unreachable_mut.ConstProp.diff
 pub unsafe fn unreachable_mut() -> ! {
-    let x: &mut Never = unsafe { transmute(1_usize) };
+    let x: &mut Never = unsafe { transmute(1_usize as *const Never) };
     match *x {}
 }
 
 // EMIT_MIR transmute.unreachable_box.ConstProp.diff
 pub unsafe fn unreachable_box() -> ! {
-    let x: Box<Never> = unsafe { transmute(1_usize) };
+    let x: Box<Never> = unsafe { transmute(1_usize as *const Never) };
     match *x {}
 }
 
