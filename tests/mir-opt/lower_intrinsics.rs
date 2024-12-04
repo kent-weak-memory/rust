@@ -66,19 +66,19 @@ pub unsafe fn transmute_ref_dst<T: ?Sized>(u: &T) -> *const T {
 
 // EMIT_MIR lower_intrinsics.transmute_to_ref_uninhabited.LowerIntrinsics.diff
 pub unsafe fn transmute_to_ref_uninhabited() -> ! {
-    let x: &Never = std::mem::transmute(1usize);
+    let x: &Never = std::mem::transmute(1usize as *const Never);
     match *x {}
 }
 
 // EMIT_MIR lower_intrinsics.transmute_to_mut_uninhabited.LowerIntrinsics.diff
 pub unsafe fn transmute_to_mut_uninhabited() -> ! {
-    let x: &mut Never = std::mem::transmute(1usize);
+    let x: &mut Never = std::mem::transmute(1usize as *const Never);
     match *x {}
 }
 
 // EMIT_MIR lower_intrinsics.transmute_to_box_uninhabited.LowerIntrinsics.diff
 pub unsafe fn transmute_to_box_uninhabited() -> ! {
-    let x: Box<Never> = std::mem::transmute(1usize);
+    let x: Box<Never> = std::mem::transmute(1usize as *const Never);
     match *x {}
 }
 
