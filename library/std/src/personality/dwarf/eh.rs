@@ -46,9 +46,9 @@ pub struct EHContext<'a> {
 pub enum EHAction {
     None,
     // TODO(seharris): is this really the right way to handle this?
-    Cleanup(*const ()),
-    Catch(*const ()),
-    Filter(*const ()),
+    Cleanup(*const u8),
+    Catch(*const u8),
+    Filter(*const u8),
     Terminate,
 }
 
@@ -89,7 +89,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
             // Set when landing pad is encoded as a pointer instead of an
             // offset from `lpad_base`.
             // This pointer should be used instead of `cs_lpad` when available.
-            let mut sealed_lpad: Option<*const ()> = None;
+            let mut sealed_lpad: Option<*const u8> = None;
 
             // Handle special encoding of landing pads on Morello.
             // Landing pads are encoded as straight pointer values, either
@@ -112,7 +112,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
                     sealed_lpad = Some(reader.read_aligned(pointer_align));
                 } else if cs_lpad == 0xd {
                     let offset = reader.read::<u64>();
-                    sealed_lpad = Some(*(reader.ptr.add(offset as usize) as *const *const ()));
+                    sealed_lpad = Some(*(reader.ptr.add(offset as usize) as *const *const u8));
                 } else if cs_lpad != 0 {
                     // Invalid encoding.
                     return Err(());
@@ -168,7 +168,7 @@ pub unsafe fn find_eh_action(lsda: *const u8, context: &EHContext<'_>) -> Result
 unsafe fn interpret_cs_action(
     action_table: *mut u8,
     cs_action_entry: u64,
-    lpad: *const (),
+    lpad: *const u8,
 ) -> EHAction {
     if cs_action_entry == 0 {
         // If cs_action_entry is 0 then this is a cleanup (Drop::drop). We run these

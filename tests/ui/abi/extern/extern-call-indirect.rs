@@ -18,18 +18,24 @@ mod rustrt {
 }
 
 extern "C" fn cb(data: libc::uintptr_t) -> libc::uintptr_t {
-    if data == 1 { data } else { fact(data - 1) * data }
+    // TODO(seharris): tidy this bodging if we figure out a better way to
+    //                 implement uintptr_t.
+    if data == 1 as libc::uintptr_t {
+        data
+    } else {
+        (fact(data.wrapping_sub(1)) as usize * data as usize) as libc::uintptr_t
+    }
 }
 
 fn fact(n: libc::uintptr_t) -> libc::uintptr_t {
     unsafe {
-        println!("n = {}", n);
+        println!("n = {}", n as usize);
         rustrt::rust_dbg_call(cb, n)
     }
 }
 
 pub fn main() {
-    let result = fact(10);
-    println!("result = {}", result);
-    assert_eq!(result, 3628800);
+    let result = fact(10 as libc::uintptr_t);
+    println!("result = {}", result as usize);
+    assert_eq!(result, 3628800 as libc::uintptr_t);
 }

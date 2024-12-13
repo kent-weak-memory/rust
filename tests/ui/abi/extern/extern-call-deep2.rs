@@ -19,12 +19,12 @@ mod rustrt {
 }
 
 extern "C" fn cb(data: libc::uintptr_t) -> libc::uintptr_t {
-    if data == 1 { data } else { count(data - 1) + 1 }
+    if data == 1 as libc::uintptr_t { data } else { count(data.wrapping_sub(1)).wrapping_add(1) }
 }
 
 fn count(n: libc::uintptr_t) -> libc::uintptr_t {
     unsafe {
-        println!("n = {}", n);
+        println!("n = {}", n as usize);
         rustrt::rust_dbg_call(cb, n)
     }
 }
@@ -33,9 +33,9 @@ pub fn main() {
     // Make sure we're on a thread with small Rust stacks (main currently
     // has a large stack)
     thread::spawn(move || {
-        let result = count(1000);
-        println!("result = {}", result);
-        assert_eq!(result, 1000);
+        let result = count(1000 as libc::uintptr_t);
+        println!("result = {}", result as usize);
+        assert_eq!(result, 1000 as libc::uintptr_t);
     })
     .join();
 }

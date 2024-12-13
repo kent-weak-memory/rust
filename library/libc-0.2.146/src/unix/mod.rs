@@ -18,8 +18,10 @@ pub type uintmax_t = u64;
 
 pub type size_t = usize;
 pub type ptrdiff_t = isize;
-pub type intptr_t = *const ();
-pub type uintptr_t = *const ();
+// We use `u8` so that it is possible to do some arithmetic, though ideally
+// we'd use an actual integer instead of a pointer.
+pub type intptr_t = *const u8;
+pub type uintptr_t = *const u8;
 pub type ssize_t = isize;
 
 pub type pid_t = i32;
