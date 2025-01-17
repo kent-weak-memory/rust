@@ -4,7 +4,7 @@ use super::place::PlaceRef;
 use super::{CachedLlbb, FunctionCx, LocalRef};
 
 use crate::base;
-use crate::common::{self, IntPredicate};
+use crate::common::{self, IntPredicate, PreserveCheriTags};
 use crate::meth;
 use crate::traits::*;
 use crate::MemFlags;
@@ -1410,9 +1410,41 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
         if by_ref && !arg.is_indirect() {
             // Have to load the argument, maybe while casting it.
             if let PassMode::Cast(ty, _) = &arg.mode {
+                // This extra copy makes sure we don't try to load a larger
+                // value than the pointer refers to.
+                // On CHERI targets this would trigger SIGPROT and cause the
+                // program to terminate.
+                // While the from and to types here often seem to be the same
+                // size (are they always the same?) the actual LLVM IR
+                // generated can end up loading small values into larger
+                // registers.
+                // As an example: on AArch64 if you pass an aggregate of two
+                // u16s to an `extern "C"` call, they'll be combined into one
+                // 64 bit register.
+                // This casuses a situation where LLVM generates a load of 64
+                // bits from a pointer to a 32 bit aggregate.
+                // On CHERI this trips out-of-bounds read protection.
+                //
+                // We could possibly do this copy only on CHERI targets and/or
+                // only when this kind of cast-to-larger-register issue
+                // happens, but for now I've gone the direction of trading
+                // slightly degraded performance for simpler code.
+                // I'm not sure how you'd go about detecting the buggy path as
+                // `ty.size()` returns 4 bytes for the example of two u16s.
                 let llty = bx.cast_backend_type(ty);
-                let addr = bx.pointercast(llval, bx.type_ptr_to(llty));
-                llval = bx.load(llty, addr, align.min(arg.layout.align.abi));
+                let align = ty.align(bx);
+                let size = ty.size(bx).min(arg.layout.memory_size);
+                let scratch = bx.alloca(llty, align);
+                bx.memcpy(
+                    scratch,
+                    align,
+                    llval,
+                    arg.layout.align.abi,
+                    bx.cx().const_usize(size.bytes()),
+                    MemFlags::empty(),
+                    PreserveCheriTags::Unknown,
+                );
+                llval = bx.load(llty, scratch, align);
             } else {
                 // We can't use `PlaceRef::load` here because the argument
                 // may have a type we don't treat as immediate, but the ABI
