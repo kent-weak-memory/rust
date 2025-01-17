@@ -612,6 +612,12 @@ pub const SIGSEGV: ::c_int = 11;
 pub const SIGPIPE: ::c_int = 13;
 pub const SIGALRM: ::c_int = 14;
 pub const SIGTERM: ::c_int = 15;
+// TODO(seharris): libc has some special magic that enforces a list of "allowed
+//                 features" that disallows this logic, it'd be nice to
+//                 circumvent this so this constant isn't defined on platforms
+//                 where it will be irrelevant.
+// #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+pub const SIGPROT: ::c_int = 34;
 
 pub const PROT_NONE: ::c_int = 0;
 pub const PROT_READ: ::c_int = 1;

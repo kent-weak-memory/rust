@@ -4,6 +4,7 @@
 // ignore-emscripten can't run commands
 // ignore-sgx no processes
 // ignore-fuchsia must translate zircon signal to SIGSEGV/SIGBUS, FIXME (#58590)
+#![feature(cfg_target_abi)]
 #![feature(rustc_private)]
 
 extern crate libc;
@@ -21,7 +22,10 @@ fn check_status(status: std::process::ExitStatus) {
     use libc;
     use std::os::unix::process::ExitStatusExt;
 
+    #[cfg(not(all(target_arch = "aarch64", target_abi = "purecap")))]
     assert!(status.signal() == Some(libc::SIGSEGV) || status.signal() == Some(libc::SIGBUS));
+    #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
+    assert!(status.signal() == Some(libc::SIGSEGV) || status.signal() == Some(libc::SIGBUS) || status.signal() == Some(libc::SIGPROT));
 }
 
 #[cfg(not(unix))]
