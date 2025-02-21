@@ -290,6 +290,49 @@ double rust_interesting_average(uint64_t n, ...) {
     return sum;
 }
 
+typedef struct {
+    uint32_t a;
+    uint64_t b;
+    double c;
+} Aggregate;
+
+double rust_aggregate_sum(uint64_t count, ...) {
+    double total = 0.0;
+    va_list arguments;
+    va_start(arguments, count);
+    uint64_t index;
+    for (index = 0; index < count; index ++) {
+        const Aggregate data = va_arg(arguments, Aggregate);
+        total += data.a;
+        total += data.b;
+        total += data.c;
+    }
+    va_end(arguments);
+    return total;
+}
+
+typedef struct {
+    uint64_t int_count;
+    uint64_t double_count;
+    uint64_t *int_values;
+    double *double_values;
+} ListOfValues;
+
+double rust_aggregate_sum1(uint64_t count, ...) {
+    double total = 0.0;
+    va_list arguments;
+    va_start(arguments, count);
+    uint64_t index;
+    for (index = 0; index < count; index ++) {
+        const ListOfValues data = va_arg(arguments, ListOfValues);
+        uint64_t index;
+        for (index = 0; index < data.int_count; index ++) total += data.int_values[index];
+        for (index = 0; index < data.double_count; index ++) total += data.double_values[index];
+    }
+    va_end(arguments);
+    return total;
+}
+
 int32_t rust_int8_to_int32(int8_t x) {
     return (int32_t)x;
 }

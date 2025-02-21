@@ -236,19 +236,37 @@ impl fmt::Debug for c_void {
 
 /// Basic implementation of a `va_list`.
 // The name is WIP, using `VaListImpl` for now.
-#[cfg(any(
-    all(
-        not(target_arch = "aarch64"),
-        not(target_arch = "powerpc"),
-        not(target_arch = "s390x"),
-        not(target_arch = "x86_64")
-    ),
-    all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
-    target_family = "wasm",
-    target_arch = "asmjs",
-    target_os = "uefi",
-    windows,
-))]
+#[cfg_attr(bootstrap,
+    cfg(any(
+        all(
+            not(target_arch = "aarch64"),
+            not(target_arch = "powerpc"),
+            not(target_arch = "s390x"),
+            not(target_arch = "x86_64")
+        ),
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        target_family = "wasm",
+        target_arch = "asmjs",
+        target_os = "uefi",
+        windows,
+    ))
+)]
+#[cfg_attr(not(bootstrap),
+    cfg(any(
+        all(
+            not(target_arch = "aarch64"),
+            not(target_arch = "powerpc"),
+            not(target_arch = "s390x"),
+            not(target_arch = "x86_64")
+        ),
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        all(target_arch = "aarch64", target_abi = "purecap"),
+        target_family = "wasm",
+        target_arch = "asmjs",
+        target_os = "uefi",
+        windows,
+    ))
+)]
 #[cfg_attr(not(doc), repr(transparent))] // work around https://github.com/rust-lang/rust/issues/90435
 #[unstable(
     feature = "c_variadic",
@@ -265,19 +283,37 @@ pub struct VaListImpl<'f> {
     _marker: PhantomData<&'f mut &'f c_void>,
 }
 
-#[cfg(any(
-    all(
-        not(target_arch = "aarch64"),
-        not(target_arch = "powerpc"),
-        not(target_arch = "s390x"),
-        not(target_arch = "x86_64")
-    ),
-    all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
-    target_family = "wasm",
-    target_arch = "asmjs",
-    target_os = "uefi",
-    windows,
-))]
+#[cfg_attr(bootstrap,
+    cfg(any(
+        all(
+            not(target_arch = "aarch64"),
+            not(target_arch = "powerpc"),
+            not(target_arch = "s390x"),
+            not(target_arch = "x86_64")
+        ),
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        target_family = "wasm",
+        target_arch = "asmjs",
+        target_os = "uefi",
+        windows,
+    ))
+)]
+#[cfg_attr(not(bootstrap),
+    cfg(any(
+        all(
+            not(target_arch = "aarch64"),
+            not(target_arch = "powerpc"),
+            not(target_arch = "s390x"),
+            not(target_arch = "x86_64")
+        ),
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        all(target_arch = "aarch64", target_abi = "purecap"),
+        target_family = "wasm",
+        target_arch = "asmjs",
+        target_os = "uefi",
+        windows,
+    ))
+)]
 #[unstable(
     feature = "c_variadic",
     reason = "the `c_variadic` feature has not been properly tested on \
@@ -295,12 +331,23 @@ impl<'f> fmt::Debug for VaListImpl<'f> {
 ///
 /// [AArch64 Procedure Call Standard]:
 /// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
-#[cfg(all(
-    target_arch = "aarch64",
-    not(any(target_os = "macos", target_os = "ios", target_os = "tvos")),
-    not(target_os = "uefi"),
-    not(windows),
-))]
+#[cfg_attr(bootstrap,
+    cfg(all(
+        target_arch = "aarch64",
+        not(any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        not(target_os = "uefi"),
+        not(windows),
+    ))
+)]
+#[cfg_attr(not(bootstrap),
+    cfg(all(
+        target_arch = "aarch64",
+        not(any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        not(target_abi = "purecap"),
+        not(target_os = "uefi"),
+        not(windows),
+    ))
+)]
 #[cfg_attr(not(doc), repr(C))] // work around https://github.com/rust-lang/rust/issues/66401
 #[derive(Debug)]
 #[unstable(
@@ -387,58 +434,124 @@ pub struct VaListImpl<'f> {
     issue = "44930"
 )]
 pub struct VaList<'a, 'f: 'a> {
-    #[cfg(any(
+    #[cfg_attr(bootstrap,
+        cfg(any(
+            all(
+                not(target_arch = "aarch64"),
+                not(target_arch = "powerpc"),
+                not(target_arch = "s390x"),
+                not(target_arch = "x86_64")
+            ),
+            all(
+                target_arch = "aarch64",
+                any(target_os = "macos", target_os = "ios", target_os = "tvos")
+            ),
+            target_family = "wasm",
+            target_arch = "asmjs",
+            target_os = "uefi",
+            windows,
+        ))
+    )]
+    #[cfg_attr(not(bootstrap),
+        cfg(any(
+            all(
+                not(target_arch = "aarch64"),
+                not(target_arch = "powerpc"),
+                not(target_arch = "s390x"),
+                not(target_arch = "x86_64")
+            ),
+            all(
+                target_arch = "aarch64",
+                any(target_os = "macos", target_os = "ios", target_os = "tvos")
+            ),
+            all(
+                target_arch = "aarch64",
+                target_abi = "purecap"
+            ),
+            target_family = "wasm",
+            target_arch = "asmjs",
+            target_os = "uefi",
+            windows,
+        ))
+    )]
+    inner: VaListImpl<'f>,
+
+    #[cfg_attr(bootstrap,
+        cfg(all(
+            any(
+                target_arch = "aarch64",
+                target_arch = "powerpc",
+                target_arch = "s390x",
+                target_arch = "x86_64"
+            ),
+            any(
+                not(target_arch = "aarch64"),
+                not(any(target_os = "macos", target_os = "ios", target_os = "tvos"))
+            ),
+            not(target_family = "wasm"),
+            not(target_arch = "asmjs"),
+            not(target_os = "uefi"),
+            not(windows),
+        ))
+    )]
+    #[cfg_attr(not(bootstrap),
+        cfg(all(
+            any(
+                target_arch = "aarch64",
+                target_arch = "powerpc",
+                target_arch = "s390x",
+                target_arch = "x86_64"
+            ),
+            any(
+                not(target_arch = "aarch64"),
+                not(any(target_os = "macos", target_os = "ios", target_os = "tvos"))
+            ),
+            any(
+                not(target_arch = "aarch64"),
+                not(target_abi = "purecap")
+            ),
+            not(target_family = "wasm"),
+            not(target_arch = "asmjs"),
+            not(target_os = "uefi"),
+            not(windows),
+        ))
+    )]
+    inner: &'a mut VaListImpl<'f>,
+
+    _marker: PhantomData<&'a mut VaListImpl<'f>>,
+}
+
+#[cfg_attr(bootstrap,
+    cfg(any(
         all(
             not(target_arch = "aarch64"),
             not(target_arch = "powerpc"),
             not(target_arch = "s390x"),
             not(target_arch = "x86_64")
         ),
-        all(
-            target_arch = "aarch64",
-            any(target_os = "macos", target_os = "ios", target_os = "tvos")
-        ),
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
         target_family = "wasm",
         target_arch = "asmjs",
         target_os = "uefi",
         windows,
-    ))]
-    inner: VaListImpl<'f>,
-
-    #[cfg(all(
-        any(
-            target_arch = "aarch64",
-            target_arch = "powerpc",
-            target_arch = "s390x",
-            target_arch = "x86_64"
-        ),
-        any(
+    ))
+)]
+#[cfg_attr(not(bootstrap),
+    cfg(any(
+        all(
             not(target_arch = "aarch64"),
-            not(any(target_os = "macos", target_os = "ios", target_os = "tvos"))
+            not(target_arch = "powerpc"),
+            not(target_arch = "s390x"),
+            not(target_arch = "x86_64")
         ),
-        not(target_family = "wasm"),
-        not(target_arch = "asmjs"),
-        not(target_os = "uefi"),
-        not(windows),
-    ))]
-    inner: &'a mut VaListImpl<'f>,
-
-    _marker: PhantomData<&'a mut VaListImpl<'f>>,
-}
-
-#[cfg(any(
-    all(
-        not(target_arch = "aarch64"),
-        not(target_arch = "powerpc"),
-        not(target_arch = "s390x"),
-        not(target_arch = "x86_64")
-    ),
-    all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
-    target_family = "wasm",
-    target_arch = "asmjs",
-    target_os = "uefi",
-    windows,
-))]
+        all(target_arch = "aarch64", any(target_os = "macos", target_os = "ios", target_os = "tvos")),
+        all(target_arch = "aarch64", target_abi = "purecap"),
+        target_family = "wasm",
+        target_arch = "asmjs",
+        target_os = "uefi",
+        windows,
+    ))
+)]
 #[unstable(
     feature = "c_variadic",
     reason = "the `c_variadic` feature has not been properly tested on \
@@ -453,22 +566,46 @@ impl<'f> VaListImpl<'f> {
     }
 }
 
-#[cfg(all(
-    any(
-        target_arch = "aarch64",
-        target_arch = "powerpc",
-        target_arch = "s390x",
-        target_arch = "x86_64"
-    ),
-    any(
-        not(target_arch = "aarch64"),
-        not(any(target_os = "macos", target_os = "ios", target_os = "tvos"))
-    ),
-    not(target_family = "wasm"),
-    not(target_arch = "asmjs"),
-    not(target_os = "uefi"),
-    not(windows),
-))]
+#[cfg_attr(bootstrap,
+    cfg(all(
+        any(
+            target_arch = "aarch64",
+            target_arch = "powerpc",
+            target_arch = "s390x",
+            target_arch = "x86_64"
+        ),
+        any(
+            not(target_arch = "aarch64"),
+            not(any(target_os = "macos", target_os = "ios", target_os = "tvos"))
+        ),
+        not(target_family = "wasm"),
+        not(target_arch = "asmjs"),
+        not(target_os = "uefi"),
+        not(windows),
+    ))
+)]
+#[cfg_attr(not(bootstrap),
+    cfg(all(
+        any(
+            target_arch = "aarch64",
+            target_arch = "powerpc",
+            target_arch = "s390x",
+            target_arch = "x86_64"
+        ),
+        any(
+            not(target_arch = "aarch64"),
+            not(any(target_os = "macos", target_os = "ios", target_os = "tvos"))
+        ),
+        any(
+            not(target_arch = "aarch64"),
+            not(target_abi = "purecap")
+        ),
+        not(target_family = "wasm"),
+        not(target_arch = "asmjs"),
+        not(target_os = "uefi"),
+        not(windows),
+    ))
+)]
 #[unstable(
     feature = "c_variadic",
     reason = "the `c_variadic` feature has not been properly tested on \

@@ -175,6 +175,51 @@ fn emit_aapcs_va_arg<'ll, 'tcx>(
     val
 }
 
+fn emit_aapcs_cap_va_arg<'ll, 'tcx>(
+    bx: &mut Builder<'_, 'll, 'tcx>,
+    list: OperandRef<'tcx, &'ll Value>,
+    target_ty: Ty<'tcx>,
+) -> &'ll Value {
+    // For ABI details, see this page:
+    // https://github.com/ARM-software/abi-aa/blob/main/aapcs64-morello/aapcs64-morello.rst#the-va-arg-macro
+    //
+    // `list` is a pointer to a pointer to an array of slots, each slot is 16
+    // bytes in size.
+    // The array is stored in memory.
+    // If a value fits in a slot then it will be stored directly in the array.
+    // Otherwise, it will be stored in memory and a pointer stored in the array.
+    // All we have to do is follow the pointers, load a value, and update the
+    // pointer into the array ready to read the next argument.
+
+    assert_eq!(list.layout.llvm_type(bx.cx), bx.type_ptr_to(bx.type_i8p()));
+
+    // Get pointer to slot.
+    let pointer_align = bx.cx.data_layout().pointer_align;
+    let slot_pointer = bx.load(bx.type_i8p(), list.immediate(), pointer_align.abi);
+
+    // Get pointer to argument.
+    // For direct arguments this is just the pointer to the slot.
+    // If the argument is too big, we need to get the pointer from the slot.
+    let mut argument_pointer = slot_pointer;
+    let layout = bx.cx.layout_of(target_ty);
+    let argument_type = layout.llvm_type(bx.cx);
+    if layout.align.abi.bytes() > 16 || layout.memory_size.bytes() > 16 {
+        // Argument is indirect.
+        argument_pointer = bx.load(bx.cx().type_ptr_to(argument_type), argument_pointer, pointer_align.abi);
+    } else {
+        // Argument is direct.
+        argument_pointer = bx.bitcast(argument_pointer, bx.cx().type_ptr_to(argument_type));
+    }
+
+    // Update list pointer to next slot.
+    let slot_size = bx.cx().const_i32(pointer_align.abi.bytes() as i32);
+    let next = bx.gep(bx.type_i8(), slot_pointer, &[slot_size]);
+    bx.store(next, list.immediate(), bx.tcx().data_layout.pointer_align.abi);
+
+    // Load argument.
+    bx.load(argument_type, argument_pointer, pointer_align.abi)
+}
+
 fn emit_s390x_va_arg<'ll, 'tcx>(
     bx: &mut Builder<'_, 'll, 'tcx>,
     list: OperandRef<'tcx, &'ll Value>,
@@ -281,6 +326,9 @@ pub(super) fn emit_va_arg<'ll, 'tcx>(
         // macOS / iOS AArch64
         "aarch64" if target.is_like_osx => {
             emit_ptr_va_arg(bx, addr, target_ty, false, Align::from_bytes(8).unwrap(), true)
+        }
+        "aarch64" if target.abi == "purecap" => {
+            emit_aapcs_cap_va_arg(bx, addr, target_ty)
         }
         "aarch64" => emit_aapcs_va_arg(bx, addr, target_ty),
         "s390x" => emit_s390x_va_arg(bx, addr, target_ty),
