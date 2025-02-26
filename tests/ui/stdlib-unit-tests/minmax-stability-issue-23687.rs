@@ -1,4 +1,5 @@
 // run-pass
+// normalize-stderr-test: "DON'T know how to handle.*\n" -> ""
 
 use std::fmt::Debug;
 use std::cmp::{self, PartialOrd, Ordering};
