@@ -42,6 +42,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                     | asm::InlineAsmArch::X86_64
                     | asm::InlineAsmArch::Arm
                     | asm::InlineAsmArch::AArch64
+                    | asm::InlineAsmArch::Morello
                     | asm::InlineAsmArch::RiscV32
                     | asm::InlineAsmArch::RiscV64
                     | asm::InlineAsmArch::LoongArch64

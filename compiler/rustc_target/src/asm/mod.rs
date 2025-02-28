@@ -4,7 +4,6 @@ use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
 use rustc_macros::HashStable_Generic;
 use rustc_span::Symbol;
 use std::fmt;
-use std::str::FromStr;
 
 macro_rules! def_reg_class {
     ($arch:ident $arch_regclass:ident {
@@ -171,6 +170,7 @@ mod hexagon;
 mod loongarch;
 mod m68k;
 mod mips;
+mod morello;
 mod msp430;
 mod nvptx;
 mod powerpc;
@@ -188,6 +188,7 @@ pub use hexagon::{HexagonInlineAsmReg, HexagonInlineAsmRegClass};
 pub use loongarch::{LoongArchInlineAsmReg, LoongArchInlineAsmRegClass};
 pub use m68k::{M68kInlineAsmReg, M68kInlineAsmRegClass};
 pub use mips::{MipsInlineAsmReg, MipsInlineAsmRegClass};
+pub use morello::{MorelloInlineAsmReg, MorelloInlineAsmRegClass};
 pub use msp430::{Msp430InlineAsmReg, Msp430InlineAsmRegClass};
 pub use nvptx::{NvptxInlineAsmReg, NvptxInlineAsmRegClass};
 pub use powerpc::{PowerPCInlineAsmReg, PowerPCInlineAsmRegClass};
@@ -220,17 +221,25 @@ pub enum InlineAsmArch {
     Avr,
     Msp430,
     M68k,
+    Morello,
 }
 
-impl FromStr for InlineAsmArch {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<InlineAsmArch, ()> {
-        match s {
+impl InlineAsmArch {
+    // This is a bit yucky, sorry.
+    // We need to know the ABI to detect the difference between AArch64 and
+    // AArch64 with CHERI instructions (Morello CPUs).
+    // Ideally we perhaps want to exhaustively match on `abi` or not need access
+    // to it.
+    pub fn from_target_arch(arch: &str, abi: &str) -> Result<Self, ()> {
+        match arch {
             "x86" => Ok(Self::X86),
             "x86_64" => Ok(Self::X86_64),
             "arm" => Ok(Self::Arm),
-            "aarch64" => Ok(Self::AArch64),
+            "aarch64" => if abi == "purecap" {
+                Ok(Self::Morello)
+            } else {
+                Ok(Self::AArch64)
+            },
             "riscv32" => Ok(Self::RiscV32),
             "riscv64" => Ok(Self::RiscV64),
             "nvptx64" => Ok(Self::Nvptx64),
@@ -272,6 +281,7 @@ pub enum InlineAsmReg {
     Avr(AvrInlineAsmReg),
     Msp430(Msp430InlineAsmReg),
     M68k(M68kInlineAsmReg),
+    Morello(MorelloInlineAsmReg),
     // Placeholder for invalid register constraints for the current target
     Err,
 }
@@ -292,6 +302,7 @@ impl InlineAsmReg {
             Self::Avr(r) => r.name(),
             Self::Msp430(r) => r.name(),
             Self::M68k(r) => r.name(),
+            Self::Morello(r) => r.name(),
             Self::Err => "<reg>",
         }
     }
@@ -311,6 +322,7 @@ impl InlineAsmReg {
             Self::Avr(r) => InlineAsmRegClass::Avr(r.reg_class()),
             Self::Msp430(r) => InlineAsmRegClass::Msp430(r.reg_class()),
             Self::M68k(r) => InlineAsmRegClass::M68k(r.reg_class()),
+            Self::Morello(r) => InlineAsmRegClass::Morello(r.reg_class()),
             Self::Err => InlineAsmRegClass::Err,
         }
     }
@@ -344,6 +356,7 @@ impl InlineAsmReg {
             InlineAsmArch::Avr => Self::Avr(AvrInlineAsmReg::parse(name)?),
             InlineAsmArch::Msp430 => Self::Msp430(Msp430InlineAsmReg::parse(name)?),
             InlineAsmArch::M68k => Self::M68k(M68kInlineAsmReg::parse(name)?),
+            InlineAsmArch::Morello => Self::Morello(MorelloInlineAsmReg::parse(name)?),
         })
     }
 
@@ -371,6 +384,7 @@ impl InlineAsmReg {
             Self::Avr(r) => r.validate(arch, reloc_model, target_features, target, is_clobber),
             Self::Msp430(r) => r.validate(arch, reloc_model, target_features, target, is_clobber),
             Self::M68k(r) => r.validate(arch, reloc_model, target_features, target, is_clobber),
+            Self::Morello(r) => r.validate(arch, reloc_model, target_features, target, is_clobber),
             Self::Err => unreachable!(),
         }
     }
@@ -397,6 +411,7 @@ impl InlineAsmReg {
             Self::Avr(r) => r.emit(out, arch, modifier),
             Self::Msp430(r) => r.emit(out, arch, modifier),
             Self::M68k(r) => r.emit(out, arch, modifier),
+            Self::Morello(r) => r.emit(out, arch, modifier),
             Self::Err => unreachable!("Use of InlineAsmReg::Err"),
         }
     }
@@ -416,6 +431,7 @@ impl InlineAsmReg {
             Self::Avr(r) => r.overlapping_regs(|r| cb(Self::Avr(r))),
             Self::Msp430(_) => cb(self),
             Self::M68k(_) => cb(self),
+            Self::Morello(_) => cb(self),
             Self::Err => unreachable!("Use of InlineAsmReg::Err"),
         }
     }
@@ -440,6 +456,7 @@ pub enum InlineAsmRegClass {
     Avr(AvrInlineAsmRegClass),
     Msp430(Msp430InlineAsmRegClass),
     M68k(M68kInlineAsmRegClass),
+    Morello(MorelloInlineAsmRegClass),
     // Placeholder for invalid register constraints for the current target
     Err,
 }
@@ -463,6 +480,7 @@ impl InlineAsmRegClass {
             Self::Avr(r) => r.name(),
             Self::Msp430(r) => r.name(),
             Self::M68k(r) => r.name(),
+            Self::Morello(r) => r.name(),
             Self::Err => rustc_span::symbol::sym::reg,
         }
     }
@@ -488,6 +506,7 @@ impl InlineAsmRegClass {
             Self::Avr(r) => r.suggest_class(arch, ty).map(InlineAsmRegClass::Avr),
             Self::Msp430(r) => r.suggest_class(arch, ty).map(InlineAsmRegClass::Msp430),
             Self::M68k(r) => r.suggest_class(arch, ty).map(InlineAsmRegClass::M68k),
+            Self::Morello(r) => r.suggest_class(arch, ty).map(InlineAsmRegClass::Morello),
             Self::Err => unreachable!("Use of InlineAsmRegClass::Err"),
         }
     }
@@ -520,6 +539,7 @@ impl InlineAsmRegClass {
             Self::Avr(r) => r.suggest_modifier(arch, ty),
             Self::Msp430(r) => r.suggest_modifier(arch, ty),
             Self::M68k(r) => r.suggest_modifier(arch, ty),
+            Self::Morello(r) => r.suggest_modifier(arch, ty),
             Self::Err => unreachable!("Use of InlineAsmRegClass::Err"),
         }
     }
@@ -548,6 +568,7 @@ impl InlineAsmRegClass {
             Self::Avr(r) => r.default_modifier(arch),
             Self::Msp430(r) => r.default_modifier(arch),
             Self::M68k(r) => r.default_modifier(arch),
+            Self::Morello(r) => r.default_modifier(arch),
             Self::Err => unreachable!("Use of InlineAsmRegClass::Err"),
         }
     }
@@ -575,6 +596,7 @@ impl InlineAsmRegClass {
             Self::Avr(r) => r.supported_types(arch),
             Self::Msp430(r) => r.supported_types(arch),
             Self::M68k(r) => r.supported_types(arch),
+            Self::Morello(r) => r.supported_types(arch),
             Self::Err => unreachable!("Use of InlineAsmRegClass::Err"),
         }
     }
@@ -607,6 +629,7 @@ impl InlineAsmRegClass {
             InlineAsmArch::Avr => Self::Avr(AvrInlineAsmRegClass::parse(name)?),
             InlineAsmArch::Msp430 => Self::Msp430(Msp430InlineAsmRegClass::parse(name)?),
             InlineAsmArch::M68k => Self::M68k(M68kInlineAsmRegClass::parse(name)?),
+            InlineAsmArch::Morello => Self::Morello(MorelloInlineAsmRegClass::parse(name)?),
         })
     }
 
@@ -630,6 +653,7 @@ impl InlineAsmRegClass {
             Self::Avr(r) => r.valid_modifiers(arch),
             Self::Msp430(r) => r.valid_modifiers(arch),
             Self::M68k(r) => r.valid_modifiers(arch),
+            Self::Morello(r) => r.valid_modifiers(arch),
             Self::Err => unreachable!("Use of InlineAsmRegClass::Err"),
         }
     }
@@ -826,6 +850,11 @@ pub fn allocatable_registers(
             m68k::fill_reg_map(arch, reloc_model, target_features, target, &mut map);
             map
         }
+        InlineAsmArch::Morello => {
+            let mut map = morello::regclass_map();
+            morello::fill_reg_map(arch, reloc_model, target_features, target, &mut map);
+            map
+        }
     }
 }
 
@@ -838,6 +867,8 @@ pub enum InlineAsmClobberAbi {
     Arm,
     AArch64,
     AArch64NoX18,
+    Morello,
+    MorelloNoX18,
     RiscV,
     LoongArch,
 }
@@ -874,6 +905,14 @@ impl InlineAsmClobberAbi {
                     InlineAsmClobberAbi::AArch64NoX18
                 } else {
                     InlineAsmClobberAbi::AArch64
+                }),
+                _ => Err(&["C", "system", "efiapi"]),
+            },
+            InlineAsmArch::Morello => match name {
+                "C" | "system" | "efiapi" => Ok(if morello::target_reserves_x18(target) {
+                    InlineAsmClobberAbi::MorelloNoX18
+                } else {
+                    InlineAsmClobberAbi::Morello
                 }),
                 _ => Err(&["C", "system", "efiapi"]),
             },
@@ -975,6 +1014,44 @@ impl InlineAsmClobberAbi {
                     x0, x1, x2, x3, x4, x5, x6, x7,
                     x8, x9, x10, x11, x12, x13, x14, x15,
                     x16, x17, x30,
+
+                    // Technically the low 64 bits of v8-v15 are preserved, but
+                    // we have no way of expressing this using clobbers.
+                    v0, v1, v2, v3, v4, v5, v6, v7,
+                    v8, v9, v10, v11, v12, v13, v14, v15,
+                    v16, v17, v18, v19, v20, v21, v22, v23,
+                    v24, v25, v26, v27, v28, v29, v30, v31,
+
+                    p0, p1, p2, p3, p4, p5, p6, p7,
+                    p8, p9, p10, p11, p12, p13, p14, p15,
+                    ffr,
+
+                }
+            },
+            InlineAsmClobberAbi::Morello => clobbered_regs! {
+                Morello MorelloInlineAsmReg {
+                    c0, c1, c2, c3, c4, c5, c6, c7,
+                    c8, c9, c10, c11, c12, c13, c14, c15,
+                    c16, c17, c18, c30,
+
+                    // Technically the low 64 bits of v8-v15 are preserved, but
+                    // we have no way of expressing this using clobbers.
+                    v0, v1, v2, v3, v4, v5, v6, v7,
+                    v8, v9, v10, v11, v12, v13, v14, v15,
+                    v16, v17, v18, v19, v20, v21, v22, v23,
+                    v24, v25, v26, v27, v28, v29, v30, v31,
+
+                    p0, p1, p2, p3, p4, p5, p6, p7,
+                    p8, p9, p10, p11, p12, p13, p14, p15,
+                    ffr,
+
+                }
+            },
+            InlineAsmClobberAbi::MorelloNoX18 => clobbered_regs! {
+                Morello MorelloInlineAsmReg {
+                    c0, c1, c2, c3, c4, c5, c6, c7,
+                    c8, c9, c10, c11, c12, c13, c14, c15,
+                    c16, c17, c30,
 
                     // Technically the low 64 bits of v8-v15 are preserved, but
                     // we have no way of expressing this using clobbers.

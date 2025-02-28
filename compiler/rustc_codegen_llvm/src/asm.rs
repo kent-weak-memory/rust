@@ -212,7 +212,7 @@ impl<'ll, 'tcx> AsmBuilderMethods<'tcx> for Builder<'_, 'll, 'tcx> {
         constraints.append(&mut clobbers);
         if !options.contains(InlineAsmOptions::PRESERVES_FLAGS) {
             match asm_arch {
-                InlineAsmArch::AArch64 | InlineAsmArch::Arm => {
+                InlineAsmArch::AArch64 | InlineAsmArch::Morello | InlineAsmArch::Arm => {
                     constraints.push("~{cc}".to_string());
                 }
                 InlineAsmArch::X86 | InlineAsmArch::X86_64 => {
@@ -573,6 +573,57 @@ fn a64_vreg_index(reg: InlineAsmReg) -> Option<u32> {
     }
 }
 
+/// If the register is an Morello integer register then return its index.
+fn morello_reg_index(reg: InlineAsmReg) -> Option<u32> {
+    match reg {
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c0) => Some(0),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c1) => Some(1),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c2) => Some(2),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c3) => Some(3),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c4) => Some(4),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c5) => Some(5),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c6) => Some(6),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c7) => Some(7),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c8) => Some(8),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c9) => Some(9),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c10) => Some(10),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c11) => Some(11),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c12) => Some(12),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c13) => Some(13),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c14) => Some(14),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c15) => Some(15),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c16) => Some(16),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c17) => Some(17),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c18) => Some(18),
+        // c19 is reserved
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c20) => Some(20),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c21) => Some(21),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c22) => Some(22),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c23) => Some(23),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c24) => Some(24),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c25) => Some(25),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c26) => Some(26),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c27) => Some(27),
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c28) => Some(28),
+        // c29 is reserved
+        InlineAsmReg::Morello(MorelloInlineAsmReg::c30) => Some(30),
+        _ => None,
+    }
+}
+
+/// If the register is an Morello vector register then return its index.
+fn morello_vreg_index(reg: InlineAsmReg) -> Option<u32> {
+    match reg {
+        InlineAsmReg::Morello(reg)
+            if reg as u32 >= MorelloInlineAsmReg::v0 as u32
+                && reg as u32 <= MorelloInlineAsmReg::v31 as u32 =>
+        {
+            Some(reg as u32 - MorelloInlineAsmReg::v0 as u32)
+        }
+        _ => None,
+    }
+}
+
 /// Converts a register class to an LLVM constraint code.
 fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) -> String {
     match reg {
@@ -625,6 +676,43 @@ fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) ->
                     'q'
                 };
                 format!("{{{}{}}}", class, idx)
+            } else if let Some(idx) = morello_reg_index(reg) {
+                let class = if let Some(layout) = layout {
+                    match layout.memory_size.bytes() {
+                        // TODO(seharris): Review.
+                        //                 I'm not clear whether this code is talking about template modifiers or names of registers.
+                        16 => 'c',
+                        8 => 'x',
+                        _ => 'w',
+                    }
+                } else {
+                    // We use i32 as the type for discarded outputs
+                    'w'
+                };
+                if class == 'c' && reg == InlineAsmReg::Morello(MorelloInlineAsmReg::c30) {
+                    // TODO(seharris): based on the comment in the next branch of this `if`, I'm guessing Morello LLVM also won't recognise c30, perhaps check whether it really doesn't.
+                    "{clr}".to_string()
+                } else if class == 'x' && reg == InlineAsmReg::AArch64(AArch64InlineAsmReg::x30) {
+                    // LLVM doesn't recognize x30. use lr instead.
+                    "{lr}".to_string()
+                } else {
+                    format!("{{{}{}}}", class, idx)
+                }
+            } else if let Some(idx) = morello_vreg_index(reg) {
+                let class = if let Some(layout) = layout {
+                    match layout.memory_size.bytes() {
+                        16 => 'q',
+                        8 => 'd',
+                        4 => 's',
+                        2 => 'h',
+                        1 => 'd', // We fixup i8 to i8x8
+                        _ => unreachable!(),
+                    }
+                } else {
+                    // We use i64x2 as the type for discarded outputs
+                    'q'
+                };
+                format!("{{{}{}}}", class, idx)
             } else if reg == InlineAsmReg::Arm(ArmInlineAsmReg::r14) {
                 // LLVM doesn't recognize r14
                 "{lr}".to_string()
@@ -639,6 +727,12 @@ fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) ->
             InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg) => "w",
             InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16) => "x",
             InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::preg) => {
+                unreachable!("clobber-only")
+            }
+            InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::reg) => "r",
+            InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg) => "w",
+            InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16) => "x",
+            InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::preg) => {
                 unreachable!("clobber-only")
             }
             InlineAsmRegClass::Arm(ArmInlineAsmRegClass::reg) => "r",
@@ -721,6 +815,14 @@ fn modifier_to_llvm(
             if modifier == Some('v') { None } else { modifier }
         }
         InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::preg) => {
+            unreachable!("clobber-only")
+        }
+        InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::reg) => modifier,
+        InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg)
+        | InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16) => {
+            if modifier == Some('v') { None } else { modifier }
+        }
+        InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::preg) => {
             unreachable!("clobber-only")
         }
         InlineAsmRegClass::Arm(ArmInlineAsmRegClass::reg) => None,
@@ -810,6 +912,14 @@ fn dummy_output_type<'ll>(cx: &CodegenCx<'ll, '_>, reg: InlineAsmRegClass) -> &'
             cx.type_vector(cx.type_i64(), 2)
         }
         InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::preg) => {
+            unreachable!("clobber-only")
+        }
+        InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::reg) => cx.type_i32(),
+        InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg)
+        | InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16) => {
+            cx.type_vector(cx.type_i64(), 2)
+        }
+        InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::preg) => {
             unreachable!("clobber-only")
         }
         InlineAsmRegClass::Arm(ArmInlineAsmRegClass::reg) => cx.type_i32(),
@@ -905,7 +1015,7 @@ fn llvm_fixup_input<'ll, 'tcx>(
 ) -> &'ll Value {
     let dl = &bx.tcx.data_layout;
     match (reg, layout.abi) {
-        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg), Abi::Scalar(s)) => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg), Abi::Scalar(s)) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg), Abi::Scalar(s)) => {
             if let Primitive::Int(Integer::I8, _) = s.primitive() {
                 let vec_ty = bx.cx.type_vector(bx.cx.type_i8(), 8);
                 bx.insert_element(bx.const_undef(vec_ty), value, bx.const_i32(0))
@@ -913,7 +1023,7 @@ fn llvm_fixup_input<'ll, 'tcx>(
                 value
             }
         }
-        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Scalar(s)) => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Scalar(s)) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16), Abi::Scalar(s)) => {
             let elem_ty = llvm_asm_scalar_type(bx.cx, s);
             let count = 16 / layout.memory_size.bytes();
             let vec_ty = bx.cx.type_vector(elem_ty, count);
@@ -924,10 +1034,7 @@ fn llvm_fixup_input<'ll, 'tcx>(
             }
             bx.insert_element(bx.const_undef(vec_ty), value, bx.const_i32(0))
         }
-        (
-            InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16),
-            Abi::Vector { element, count },
-        ) if layout.memory_size.bytes() == 8 => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Vector { element, count }) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16), Abi::Vector { element, count }) if layout.memory_size.bytes() == 8 => {
             let elem_ty = llvm_asm_scalar_type(bx.cx, element);
             let vec_ty = bx.cx.type_vector(elem_ty, count);
             let indices: Vec<_> = (0..count * 2).map(|x| bx.const_i32(x as i32)).collect();
@@ -987,24 +1094,21 @@ fn llvm_fixup_output<'ll, 'tcx>(
     layout: &TyAndLayout<'tcx>,
 ) -> &'ll Value {
     match (reg, layout.abi) {
-        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg), Abi::Scalar(s)) => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg), Abi::Scalar(s)) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg), Abi::Scalar(s)) => {
             if let Primitive::Int(Integer::I8, _) = s.primitive() {
                 bx.extract_element(value, bx.const_i32(0))
             } else {
                 value
             }
         }
-        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Scalar(s)) => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Scalar(s)) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16), Abi::Scalar(s)) => {
             value = bx.extract_element(value, bx.const_i32(0));
             if let Primitive::Pointer(_) = s.primitive() {
                 value = bx.inttoptr(value, layout.llvm_type(bx.cx));
             }
             value
         }
-        (
-            InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16),
-            Abi::Vector { element, count },
-        ) if layout.memory_size.bytes() == 8 => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Vector { element, count }) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16), Abi::Vector { element, count }) if layout.memory_size.bytes() == 8 => {
             let elem_ty = llvm_asm_scalar_type(bx.cx, element);
             let vec_ty = bx.cx.type_vector(elem_ty, count * 2);
             let indices: Vec<_> = (0..count).map(|x| bx.const_i32(x as i32)).collect();
@@ -1064,22 +1168,19 @@ fn llvm_fixup_output_type<'ll, 'tcx>(
     layout: &TyAndLayout<'tcx>,
 ) -> &'ll Type {
     match (reg, layout.abi) {
-        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg), Abi::Scalar(s)) => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg), Abi::Scalar(s)) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg), Abi::Scalar(s)) => {
             if let Primitive::Int(Integer::I8, _) = s.primitive() {
                 cx.type_vector(cx.type_i8(), 8)
             } else {
                 layout.llvm_type(cx)
             }
         }
-        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Scalar(s)) => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Scalar(s)) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16), Abi::Scalar(s)) => {
             let elem_ty = llvm_asm_scalar_type(cx, s);
             let count = 16 / layout.memory_size.bytes();
             cx.type_vector(elem_ty, count)
         }
-        (
-            InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16),
-            Abi::Vector { element, count },
-        ) if layout.memory_size.bytes() == 8 => {
+        (InlineAsmRegClass::AArch64(AArch64InlineAsmRegClass::vreg_low16), Abi::Vector { element, count }) | (InlineAsmRegClass::Morello(MorelloInlineAsmRegClass::vreg_low16), Abi::Vector { element, count }) if layout.memory_size.bytes() == 8 => {
             let elem_ty = llvm_asm_scalar_type(cx, element);
             cx.type_vector(elem_ty, count * 2)
         }

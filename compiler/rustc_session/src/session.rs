@@ -44,7 +44,6 @@ use std::env;
 use std::fmt;
 use std::ops::{Div, Mul};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -1501,8 +1500,11 @@ pub fn build_session(
         _ => CtfeBacktrace::Disabled,
     });
 
-    let asm_arch =
-        if target_cfg.allow_asm { InlineAsmArch::from_str(&target_cfg.arch).ok() } else { None };
+    let asm_arch = if target_cfg.allow_asm {
+        InlineAsmArch::from_target_arch(&target_cfg.arch, &target_cfg.abi).ok()
+    } else {
+        None
+    };
 
     let sess = Session {
         target: target_cfg,

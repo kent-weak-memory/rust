@@ -62,9 +62,7 @@ impl AArch64InlineAsmRegClass {
         _arch: InlineAsmArch,
     ) -> &'static [(InlineAsmType, Option<Symbol>)] {
         match self {
-            // TODO(seharris):  does this break anything when building for plain AArch64?
-            // `I128` is only true when targetting CHERI Morello.
-            Self::reg => types! { _: I8, I16, I32, I64, I128, F32, F64; },
+            Self::reg => types! { _: I8, I16, I32, I64, F32, F64; },
             Self::vreg | Self::vreg_low16 => types! {
                 neon: I8, I16, I32, I64, F32, F64,
                     VecI8(8), VecI16(4), VecI32(2), VecI64(1), VecF32(2), VecF64(1),
@@ -95,39 +93,35 @@ fn reserved_x18(
 
 def_regs! {
     AArch64 AArch64InlineAsmReg AArch64InlineAsmRegClass {
-        // TODO(seharris): Review; this seems questionable.
-        //                 If nothing else, this probably causes capability registers to be accepted on AArch64 (without Morello) which is silly.
-        //                 I'm also not sure if this is really how LLVM's inline assembler expects capability registers to be talked about.
-        // cx registers are only available on CHERI Morello.
-        x0: reg = ["x0", "c0", "w0"],
-        x1: reg = ["x1", "c1", "w1"],
-        x2: reg = ["x2", "c2", "w2"],
-        x3: reg = ["x3", "c3", "w3"],
-        x4: reg = ["x4", "c4", "w4"],
-        x5: reg = ["x5", "c5", "w5"],
-        x6: reg = ["x6", "c6", "w6"],
-        x7: reg = ["x7", "c7", "w7"],
-        x8: reg = ["x8", "c8", "w8"],
-        x9: reg = ["x9", "c9", "w9"],
-        x10: reg = ["x10", "c10", "w10"],
-        x11: reg = ["x11", "c11", "w11"],
-        x12: reg = ["x12", "c12", "w12"],
-        x13: reg = ["x13", "c13", "w13"],
-        x14: reg = ["x14", "c14", "w14"],
-        x15: reg = ["x15", "c15", "w15"],
-        x16: reg = ["x16", "c16", "w16"],
-        x17: reg = ["x17", "c17", "w17"],
-        x18: reg = ["x18", "c18", "w18"] % reserved_x18,
-        x20: reg = ["x20", "c20", "w20"],
-        x21: reg = ["x21", "c21", "w21"],
-        x22: reg = ["x22", "c22", "w22"],
-        x23: reg = ["x23", "c23", "w23"],
-        x24: reg = ["x24", "c24", "w24"],
-        x25: reg = ["x25", "c25", "w25"],
-        x26: reg = ["x26", "c26", "w26"],
-        x27: reg = ["x27", "c27", "w27"],
-        x28: reg = ["x28", "c28", "w28"],
-        x30: reg = ["x30", "c30", "w30", "lr", "wlr"],
+        x0: reg = ["x0", "w0"],
+        x1: reg = ["x1", "w1"],
+        x2: reg = ["x2", "w2"],
+        x3: reg = ["x3", "w3"],
+        x4: reg = ["x4", "w4"],
+        x5: reg = ["x5", "w5"],
+        x6: reg = ["x6", "w6"],
+        x7: reg = ["x7", "w7"],
+        x8: reg = ["x8", "w8"],
+        x9: reg = ["x9", "w9"],
+        x10: reg = ["x10", "w10"],
+        x11: reg = ["x11", "w11"],
+        x12: reg = ["x12", "w12"],
+        x13: reg = ["x13", "w13"],
+        x14: reg = ["x14", "w14"],
+        x15: reg = ["x15", "w15"],
+        x16: reg = ["x16", "w16"],
+        x17: reg = ["x17", "w17"],
+        x18: reg = ["x18", "w18"] % reserved_x18,
+        x20: reg = ["x20", "w20"],
+        x21: reg = ["x21", "w21"],
+        x22: reg = ["x22", "w22"],
+        x23: reg = ["x23", "w23"],
+        x24: reg = ["x24", "w24"],
+        x25: reg = ["x25", "w25"],
+        x26: reg = ["x26", "w26"],
+        x27: reg = ["x27", "w27"],
+        x28: reg = ["x28", "w28"],
+        x30: reg = ["x30", "w30", "lr", "wlr"],
         v0: vreg, vreg_low16 = ["v0", "b0", "h0", "s0", "d0", "q0", "z0"],
         v1: vreg, vreg_low16 = ["v1", "b1", "h1", "s1", "d1", "q1", "z1"],
         v2: vreg, vreg_low16 = ["v2", "b2", "h2", "s2", "d2", "q2", "z2"],
@@ -177,13 +171,13 @@ def_regs! {
         p14: preg = ["p14"],
         p15: preg = ["p15"],
         ffr: preg = ["ffr"],
-        #error = ["c19", "x19", "w19"] =>
+        #error = ["x19", "w19"] =>
             "x19 is used internally by LLVM and cannot be used as an operand for inline asm",
-        #error = ["c29", "x29", "w29", "fp", "wfp"] =>
+        #error = ["x29", "w29", "fp", "wfp"] =>
             "the frame pointer cannot be used as an operand for inline asm",
-        #error = ["csp", "sp", "wsp"] =>
+        #error = ["sp", "wsp"] =>
             "the stack pointer cannot be used as an operand for inline asm",
-        #error = ["czr", "xzr", "wzr"] =>
+        #error = ["xzr", "wzr"] =>
             "the zero register cannot be used as an operand for inline asm",
     }
 }
