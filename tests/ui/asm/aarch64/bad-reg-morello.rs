@@ -1,5 +1,4 @@
-// only-aarch64
-// ignore-aarch64-unknown-freebsd-purecap
+// only-aarch64-unknown-freebsd-purecap
 // compile-flags: -C target-feature=+neon
 
 #![feature(asm_const)]
@@ -33,7 +32,7 @@ fn main() {
         asm!("", in("xzr") foo);
         //~^ ERROR invalid register `xzr`: the zero register cannot be used as an operand
         asm!("", in("x19") foo);
-        //~^ ERROR invalid register `x19`: x19 is used internally by LLVM and cannot be used as an operand for inline asm
+        //~^ ERROR invalid register `x19`: c19 is used internally by LLVM and cannot be used as an operand for inline asm
 
         asm!("", in("p0") foo);
         //~^ ERROR register class `preg` can only be used as a clobber, not as an input or output
@@ -49,9 +48,9 @@ fn main() {
         // (except in/lateout which don't conflict)
 
         asm!("", in("x0") foo, in("w0") bar);
-        //~^ ERROR register `x0` conflicts with register `x0`
+        //~^ ERROR register `c0` conflicts with register `c0`
         asm!("", in("x0") foo, out("x0") bar);
-        //~^ ERROR register `x0` conflicts with register `x0`
+        //~^ ERROR register `c0` conflicts with register `c0`
         asm!("", in("w0") foo, lateout("w0") bar);
         asm!("", in("v0") foo, in("q0") bar);
         //~^ ERROR register `v0` conflicts with register `v0`

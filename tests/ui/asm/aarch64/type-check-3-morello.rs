@@ -1,5 +1,4 @@
-// only-aarch64
-// ignore-aarch64-unknown-freebsd-purecap
+// only-aarch64-unknown-freebsd-purecap
 // compile-flags: -C target-feature=+neon
 
 #![feature(repr_simd, stdsimd, asm_const)]
@@ -25,6 +24,8 @@ fn main() {
         asm!("{:w}", in(reg) 0f32);
         asm!("{}", in(reg) 0i64);
         asm!("{}", in(reg) 0f64);
+        asm!("{:c}", in(reg) 0i64);
+        asm!("{:c}", in(reg) 0f64);
 
         asm!("{:b}", in(vreg) 0u8);
         asm!("{:h}", in(vreg) 0u16);
@@ -41,6 +42,7 @@ fn main() {
         // Template modifiers of a different size to the argument are fine
         asm!("{:w}", in(reg) 0u64);
         asm!("{:x}", in(reg) 0u32);
+        asm!("{:c}", in(reg) 0u32);
         asm!("{:b}", in(vreg) 0u64);
         asm!("{:d}", in(vreg_low16) f64x2);
 
@@ -71,8 +73,6 @@ fn main() {
 
         // Invalid registers
 
-        asm!("{}", in(reg) 0i128);
-        //~^ ERROR type `i128` cannot be used with this register class
         asm!("{}", in(reg) f64x2);
         //~^ ERROR type `float64x2_t` cannot be used with this register class
         asm!("{}", in(vreg) f64x4);
@@ -84,6 +84,7 @@ fn main() {
         let mut val_f32: f32;
         let mut val_u32: u32;
         let mut val_u64: u64;
+        let mut val_u128: u128;
         let mut val_ptr: *mut u8;
         asm!("{:x}", inout(reg) 0u16 => val_i16);
         asm!("{:x}", inout(reg) 0u32 => val_f32);
@@ -93,6 +94,10 @@ fn main() {
         asm!("{:x}", inout(reg) main => val_u32);
         //~^ ERROR incompatible types for asm inout argument
         asm!("{:x}", inout(reg) 0u64 => val_ptr);
+        //~^ ERROR incompatible types for asm inout argument
         asm!("{:x}", inout(reg) main => val_u64);
+        //~^ ERROR incompatible types for asm inout argument
+        asm!("{:x}", inout(reg) 0u128 => val_ptr);
+        asm!("{:x}", inout(reg) main => val_u128);
     }
 }

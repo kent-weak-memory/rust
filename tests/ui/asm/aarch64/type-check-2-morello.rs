@@ -1,5 +1,4 @@
-// only-aarch64
-// ignore-aarch64-unknown-freebsd-purecap
+// only-aarch64-unknown-freebsd-purecap
 
 #![feature(repr_simd, never_type)]
 
@@ -36,9 +35,9 @@ fn main() {
         asm!("{}", in(reg) 0i64);
         asm!("{}", in(reg) 0f64);
         asm!("{:v}", in(vreg) SimdType(0.0, 0.0, 0.0, 0.0));
-        asm!("{}", in(reg) 0 as *const u8);
-        asm!("{}", in(reg) 0 as *mut u8);
-        asm!("{}", in(reg) main as fn());
+        asm!("{:c}", in(reg) 0 as *const u8);
+        asm!("{:c}", in(reg) 0 as *mut u8);
+        asm!("{:c}", in(reg) main as fn());
         asm!("{}", in(reg) |x: i32| x);
         //~^ ERROR cannot use value of type
         asm!("{}", in(reg) vec![0]);
@@ -52,10 +51,10 @@ fn main() {
 
         let mut f = main;
         let mut r = &mut 0;
-        asm!("{}", in(reg) f);
+        asm!("{:c}", in(reg) f);
         asm!("{}", inout(reg) f);
         //~^ ERROR cannot use value of type `fn() {main}` for inline assembly
-        asm!("{}", in(reg) r);
+        asm!("{:c}", in(reg) r);
         asm!("{}", inout(reg) r);
         //~^ ERROR cannot use value of type `&mut i32` for inline assembly
         let _ = (f, r);
