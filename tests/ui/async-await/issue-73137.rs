@@ -6,6 +6,11 @@
 // [normal]compile-flags: -Zdrop-tracking=no
 // [drop-tracking]compile-flags: -Zdrop-tracking
 
+// ignore-aarch64-unknown-freebsd-purecap
+// This test is ignored on Morello because making `usize` and `&` different
+// sizes breaks the test, possibly changes the way this regression would show
+// up, and because I don't want to risk breaking the test on other platforms.
+
 #![allow(dead_code)]
 use std::future::Future;
 use std::task::{Waker, Wake, Context};
