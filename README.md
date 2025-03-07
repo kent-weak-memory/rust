@@ -129,7 +129,7 @@ Checkout a known working version of Morello LLVM and apply patches:
 ```
 cd /path/to/cheribuild-working-directory/morello-llvm-project
 git fetch --unshallow
-git checkout f35a94e96b1c3cc017ca9581ecfeb405ed86508d
+git checkout 671d6dbe2b74525702368edfa086e68f5afadc24
 git apply /path/to/rust-repository/llvm.patch
 ```
 
