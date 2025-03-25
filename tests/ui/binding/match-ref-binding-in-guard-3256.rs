@@ -1,4 +1,5 @@
 // run-pass
+// normalize-stderr-test "cheri-bound-allocas: Don't know how to handle intrinsic. Assuming bounds needed.*\n" -> ""
 
 use std::sync::Mutex;
 
