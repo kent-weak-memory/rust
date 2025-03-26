@@ -36,20 +36,18 @@ fn test_bool() {
 }
 
 fn test_ptr() {
-    unsafe {
-        let p1: *const u8 = ::std::mem::transmute(0_usize);
-        let p2: *const u8 = ::std::mem::transmute(0_usize);
-        let p3: *const u8 = ::std::mem::transmute(1_usize);
+    let p1: *const u8 = 0_usize as *const u8;
+    let p2: *const u8 = 0_usize as *const u8;
+    let p3: *const u8 = 1_usize as *const u8;
 
-        assert_eq!(p1, p2);
-        assert!(p1 != p3);
-        assert!(p1 < p3);
-        assert!(p1 <= p3);
-        assert!(p3 > p1);
-        assert!(p3 >= p3);
-        assert!(p1 <= p2);
-        assert!(p1 >= p2);
-    }
+    assert_eq!(p1, p2);
+    assert!(p1 != p3);
+    assert!(p1 < p3);
+    assert!(p1 <= p3);
+    assert!(p3 > p1);
+    assert!(p3 >= p3);
+    assert!(p1 <= p2);
+    assert!(p1 >= p2);
 }
 
 #[derive(PartialEq, Debug)]
@@ -69,11 +67,7 @@ fn test_class() {
   let q = p(1, 2);
   let mut r = p(1, 2);
 
-  unsafe {
-  println!("q = {:x}, r = {:x}",
-         (::std::mem::transmute::<*const p, usize>(&q)),
-         (::std::mem::transmute::<*const p, usize>(&r)));
-  }
+  println!("q = {:x}, r = {:x}", (&q) as *const p as usize, (&r) as *const p as usize);
   assert_eq!(q, r);
   r.y = 17;
   assert!((r.y != q.y));
