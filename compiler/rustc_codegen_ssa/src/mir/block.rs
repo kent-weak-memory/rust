@@ -436,9 +436,27 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     }
                     ZeroSized => bug!("ZST return value shouldn't be in PassMode::Cast"),
                 };
+                // Copy to another allocation in case the destination type is
+                // larger than the source type.
+                // It would be tidier to just cast the pointer and load the
+                // destination type, but that causes crashes on CHERI targets.
+                // This is because loading a larger destination type will cause
+                // an access beyond the bounds of the source pointer, which
+                // will trigger a CHERI fault.
                 let ty = bx.cast_backend_type(cast_ty);
-                let addr = bx.pointercast(llslot, bx.type_ptr_to(ty));
-                bx.load(ty, addr, self.fn_abi.ret.layout.align.abi)
+                let align = cast_ty.align(bx);
+                let scratch = bx.alloca(ty, align);
+                let size = cast_ty.size(bx).min(self.fn_abi.ret.layout.memory_size);
+                bx.memcpy(
+                    scratch,
+                    align,
+                    llslot,
+                    op.layout.align.abi,
+                    bx.cx().const_usize(size.bytes()),
+                    MemFlags::empty(),
+                    PreserveCheriTags::Unknown,
+                );
+                bx.load(ty, scratch, align)
             }
         };
         bx.ret(llval);
