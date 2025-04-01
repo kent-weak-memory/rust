@@ -1890,6 +1890,18 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
             _ => return_error!(InvalidMonomorphization::ExpectedUsize { span, name, ty: out_elem }),
         }
 
+        let target_spec = bx.target_spec();
+        if target_spec.pointer_data_size != target_spec.pointer_memory_size {
+            return_error!(InvalidMonomorphization::MismatchedSizesCHERI {
+                span,
+                name,
+                in_ty: in_elem,
+                ret_ty: out_elem,
+                in_size: target_spec.pointer_memory_size,
+                ret_size: target_spec.pointer_data_size,
+            });
+        }
+
         return Ok(bx.ptrtoint(args[0].immediate(), llret_ty));
     }
 
@@ -1917,6 +1929,18 @@ fn generic_simd_intrinsic<'ll, 'tcx>(
             _ => {
                 return_error!(InvalidMonomorphization::ExpectedPointer { span, name, ty: out_elem })
             }
+        }
+
+        let target_spec = bx.target_spec();
+        if target_spec.pointer_data_size != target_spec.pointer_memory_size {
+            return_error!(InvalidMonomorphization::MismatchedSizesCHERI {
+                span,
+                name,
+                in_ty: in_elem,
+                ret_ty: out_elem,
+                in_size: target_spec.pointer_data_size,
+                ret_size: target_spec.pointer_memory_size,
+            });
         }
 
         return Ok(bx.inttoptr(args[0].immediate(), llret_ty));

@@ -117,6 +117,8 @@ codegen_ssa_invalid_monomorphization_third_arg_element_type = invalid monomorphi
 
 codegen_ssa_invalid_monomorphization_third_argument_length = invalid monomorphization of `{$name}` intrinsic: expected third argument with length {$in_len} (same as input type `{$in_ty}`), found `{$arg_ty}` with length {$out_len}
 
+codegen_ssa_invalid_monomorphization_simd_mismatched_sizes_cheri = invalid monomorphization of `{$name}` intrinsic: input type `{$in_ty}` and return type `{$ret_ty}` have different sizes {$in_size} bits and {$ret_size} bits, likely due to this being a CHERI target
+
 codegen_ssa_invalid_monomorphization_unrecognized_intrinsic = invalid monomorphization of `{$name}` intrinsic: unrecognized intrinsic `{$name}`
 
 codegen_ssa_invalid_monomorphization_unsupported_cast = invalid monomorphization of `{$name}` intrinsic: unsupported cast from `{$in_ty}` with element `{$in_elem}` to `{$ret_ty}` with element `{$out_elem}`

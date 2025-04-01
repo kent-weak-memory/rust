@@ -1,4 +1,5 @@
 // run-pass
+// ignore-purecap this operation is disabled on CHERI due to differing input and output widths
 
 #![feature(repr_simd, platform_intrinsics)]
 

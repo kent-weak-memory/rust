@@ -946,6 +946,17 @@ pub enum InvalidMonomorphization<'tcx> {
         ty: Ty<'tcx>,
     },
 
+    #[diag(codegen_ssa_invalid_monomorphization_simd_mismatched_sizes_cheri, code = "E0511")]
+    MismatchedSizesCHERI {
+        #[primary_span]
+        span: Span,
+        name: Symbol,
+        in_ty: Ty<'tcx>,
+        ret_ty: Ty<'tcx>,
+        in_size: u32,
+        ret_size: u32,
+    },
+
     #[diag(codegen_ssa_invalid_monomorphization_unsupported_cast, code = "E0511")]
     UnsupportedCast {
         #[primary_span]
