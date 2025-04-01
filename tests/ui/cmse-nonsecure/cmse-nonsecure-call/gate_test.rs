@@ -1,4 +1,5 @@
 // gate-test-abi_c_cmse_nonsecure_call
+// ignore-aarch64-unknown-freebsd-purecap this feature isn't relevant to this target
 fn main() {
     let non_secure_function = unsafe {
         core::mem::transmute::<usize, extern "C-cmse-nonsecure-call" fn(i32, i32, i32, i32) -> i32>(
