@@ -9,7 +9,7 @@ pub fn main() {
     // When we capture by reference we can use any of the
     // captures as the discriminant since they're all
     // behind a pointer.
-    assert_eq!(mem::size_of_val(&b), mem::size_of::<usize>());
+    assert_eq!(mem::size_of_val(&b), mem::size_of::<*const ()>());
 
     // By Value Capture
     let a = Box::new(12i32);
