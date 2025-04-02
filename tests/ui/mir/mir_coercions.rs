@@ -1,4 +1,5 @@
 // run-pass
+// normalize-stderr-test "DON'T know how to handle.*\n" -> ""
 #![feature(coerce_unsized, unsize)]
 
 use std::ops::CoerceUnsized;
