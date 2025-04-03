@@ -6,7 +6,7 @@ error[E0080]: could not evaluate static initializer
 note: inside `std::slice::from_raw_parts::<'_, u32>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `S0`
-  --> $DIR/forbidden_slices.rs:19:34
+  --> $DIR/forbidden_slices.rs:20:34
    |
 LL | pub static S0: &[u32] = unsafe { from_raw_parts(ptr::null(), 0) };
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -19,7 +19,7 @@ error[E0080]: could not evaluate static initializer
 note: inside `std::slice::from_raw_parts::<'_, ()>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `S1`
-  --> $DIR/forbidden_slices.rs:20:33
+  --> $DIR/forbidden_slices.rs:21:33
    |
 LL | pub static S1: &[()] = unsafe { from_raw_parts(ptr::null(), 0) };
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -32,13 +32,13 @@ error[E0080]: could not evaluate static initializer
 note: inside `std::slice::from_raw_parts::<'_, u32>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `S2`
-  --> $DIR/forbidden_slices.rs:23:34
+  --> $DIR/forbidden_slices.rs:24:34
    |
 LL | pub static S2: &[u32] = unsafe { from_raw_parts(&D0, 2) };
    |                                  ^^^^^^^^^^^^^^^^^^^^^^
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:26:1
+  --> $DIR/forbidden_slices.rs:27:1
    |
 LL | pub static S4: &[u8] = unsafe { from_raw_parts((&D1) as *const _ as _, 1) };
    | ^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .<deref>[0]: encountered uninitialized bytes
@@ -49,7 +49,7 @@ LL | pub static S4: &[u8] = unsafe { from_raw_parts((&D1) as *const _ as _, 1) }
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:28:1
+  --> $DIR/forbidden_slices.rs:29:1
    |
 LL | pub static S5: &[u8] = unsafe { from_raw_parts((&D3) as *const _ as _, size_of::<&u32>()) };
    | ^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
@@ -61,7 +61,7 @@ LL | pub static S5: &[u8] = unsafe { from_raw_parts((&D3) as *const _ as _, size
    = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:30:1
+  --> $DIR/forbidden_slices.rs:31:1
    |
 LL | pub static S6: &[bool] = unsafe { from_raw_parts((&D0) as *const _ as _, 4) };
    | ^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .<deref>[0]: encountered 0x11, but expected a boolean
@@ -72,7 +72,7 @@ LL | pub static S6: &[bool] = unsafe { from_raw_parts((&D0) as *const _ as _, 4)
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:33:1
+  --> $DIR/forbidden_slices.rs:34:1
    |
 LL | pub static S7: &[u16] = unsafe {
    | ^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .<deref>[1]: encountered uninitialized bytes
@@ -90,7 +90,7 @@ error[E0080]: could not evaluate static initializer
 note: inside `std::slice::from_raw_parts::<'_, u64>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `S8`
-  --> $DIR/forbidden_slices.rs:44:5
+  --> $DIR/forbidden_slices.rs:45:5
    |
 LL |     from_raw_parts(ptr, 1)
    |     ^^^^^^^^^^^^^^^^^^^^^^
@@ -105,7 +105,7 @@ note: inside `ptr::const_ptr::<impl *const u32>::sub_ptr`
 note: inside `from_ptr_range::<'_, u32>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `R0`
-  --> $DIR/forbidden_slices.rs:47:34
+  --> $DIR/forbidden_slices.rs:48:34
    |
 LL | pub static R0: &[u32] = unsafe { from_ptr_range(ptr::null()..ptr::null()) };
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -120,7 +120,7 @@ note: inside `ptr::const_ptr::<impl *const ()>::sub_ptr`
 note: inside `from_ptr_range::<'_, ()>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `R1`
-  --> $DIR/forbidden_slices.rs:48:33
+  --> $DIR/forbidden_slices.rs:49:33
    |
 LL | pub static R1: &[()] = unsafe { from_ptr_range(ptr::null()..ptr::null()) };
    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -134,13 +134,13 @@ error[E0080]: could not evaluate static initializer
 note: inside `ptr::const_ptr::<impl *const u32>::add`
   --> $SRC_DIR/core/src/ptr/const_ptr.rs:LL:COL
 note: inside `R2`
-  --> $DIR/forbidden_slices.rs:51:25
+  --> $DIR/forbidden_slices.rs:52:25
    |
 LL |     from_ptr_range(ptr..ptr.add(2))
    |                         ^^^^^^^^^^
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:53:1
+  --> $DIR/forbidden_slices.rs:54:1
    |
 LL | pub static R4: &[u8] = unsafe {
    | ^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .<deref>[0]: encountered uninitialized bytes
@@ -151,7 +151,7 @@ LL | pub static R4: &[u8] = unsafe {
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:58:1
+  --> $DIR/forbidden_slices.rs:59:1
    |
 LL | pub static R5: &[u8] = unsafe {
    | ^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
@@ -163,7 +163,7 @@ LL | pub static R5: &[u8] = unsafe {
    = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/forbidden_slices.rs:63:1
+  --> $DIR/forbidden_slices.rs:64:1
    |
 LL | pub static R6: &[bool] = unsafe {
    | ^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .<deref>[0]: encountered 0x11, but expected a boolean
@@ -183,7 +183,7 @@ note: inside `std::slice::from_raw_parts::<'_, u16>`
 note: inside `from_ptr_range::<'_, u16>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `R7`
-  --> $DIR/forbidden_slices.rs:70:5
+  --> $DIR/forbidden_slices.rs:71:5
    |
 LL |     from_ptr_range(ptr..ptr.add(4))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -196,7 +196,7 @@ error[E0080]: could not evaluate static initializer
 note: inside `ptr::const_ptr::<impl *const u64>::add`
   --> $SRC_DIR/core/src/ptr/const_ptr.rs:LL:COL
 note: inside `R8`
-  --> $DIR/forbidden_slices.rs:74:25
+  --> $DIR/forbidden_slices.rs:75:25
    |
 LL |     from_ptr_range(ptr..ptr.add(1))
    |                         ^^^^^^^^^^
@@ -211,7 +211,7 @@ note: inside `ptr::const_ptr::<impl *const u32>::sub_ptr`
 note: inside `from_ptr_range::<'_, u32>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `R9`
-  --> $DIR/forbidden_slices.rs:79:34
+  --> $DIR/forbidden_slices.rs:80:34
    |
 LL | pub static R9: &[u32] = unsafe { from_ptr_range(&D0..(&D0 as *const u32).add(1)) };
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -226,7 +226,7 @@ note: inside `ptr::const_ptr::<impl *const u32>::sub_ptr`
 note: inside `from_ptr_range::<'_, u32>`
   --> $SRC_DIR/core/src/slice/raw.rs:LL:COL
 note: inside `R10`
-  --> $DIR/forbidden_slices.rs:80:35
+  --> $DIR/forbidden_slices.rs:81:35
    |
 LL | pub static R10: &[u32] = unsafe { from_ptr_range(&D0..&D0) };
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^

@@ -449,17 +449,20 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
         cx: &impl HasDataLayout,
         range: AllocRange,
     ) -> AllocResult<&[u8]> {
+        // Check this first so that on CHERI targets we complain about being
+        // "unable to turn pointer into raw bytes" instead of the fact that
+        // capabilities contain uninitialised bytes.
+        if !Prov::OFFSET_IS_ADDR {
+            if !self.provenance.range_empty(range, cx) {
+                return Err(AllocError::ReadPointerAsBytes);
+            }
+        }
         self.init_mask.is_range_initialized(range).map_err(|uninit_range| {
             AllocError::InvalidUninitBytes(Some(UninitBytesAccess {
                 access: range,
                 uninit: uninit_range,
             }))
         })?;
-        if !Prov::OFFSET_IS_ADDR {
-            if !self.provenance.range_empty(range, cx) {
-                return Err(AllocError::ReadPointerAsBytes);
-            }
-        }
         Ok(self.get_bytes_unchecked(range))
     }
 
