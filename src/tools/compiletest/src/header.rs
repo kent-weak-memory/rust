@@ -174,6 +174,8 @@ pub struct TestProps {
     pub should_ice: bool,
     // If true, the stderr is expected to be different across bit-widths.
     pub stderr_per_bitwidth: bool,
+    // If true, the stderr is expected to be different on CHERI and non-CHERI CPUs.
+    pub stderr_per_cheri: bool,
     // The MIR opt to unit test, if any
     pub mir_unit_test: Option<String>,
     // Whether to tell `rustc` to remap the "src base" directory to a fake
@@ -212,6 +214,7 @@ mod directives {
     pub const RUSTFIX_ONLY_MACHINE_APPLICABLE: &'static str = "rustfix-only-machine-applicable";
     pub const ASSEMBLY_OUTPUT: &'static str = "assembly-output";
     pub const STDERR_PER_BITWIDTH: &'static str = "stderr-per-bitwidth";
+    pub const STDERR_PER_CHERI: &'static str = "stderr-per-cheri";
     pub const INCREMENTAL: &'static str = "incremental";
     pub const KNOWN_BUG: &'static str = "known-bug";
     pub const MIR_UNIT_TEST: &'static str = "unit-test";
@@ -264,6 +267,7 @@ impl TestProps {
             assembly_output: None,
             should_ice: false,
             stderr_per_bitwidth: false,
+            stderr_per_cheri: false,
             mir_unit_test: None,
             remap_src_base: false,
         }
@@ -450,6 +454,7 @@ impl TestProps {
                     |r| r.trim().to_string(),
                 );
                 config.set_name_directive(ln, STDERR_PER_BITWIDTH, &mut self.stderr_per_bitwidth);
+                config.set_name_directive(ln, STDERR_PER_CHERI, &mut self.stderr_per_cheri);
                 config.set_name_directive(ln, INCREMENTAL, &mut self.incremental);
 
                 // Unlike the other `name_value_directive`s this needs to be handled manually,

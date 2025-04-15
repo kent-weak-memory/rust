@@ -652,6 +652,9 @@ pub const UI_EXTENSIONS: &[&str] = &[
     UI_STDERR_64,
     UI_STDERR_32,
     UI_STDERR_16,
+    UI_STDERR_64_CHERI,
+    UI_STDERR_32_CHERI,
+    UI_STDERR_16_CHERI,
     UI_COVERAGE,
 ];
 pub const UI_STDERR: &str = "stderr";
@@ -662,6 +665,9 @@ pub const UI_RUN_STDOUT: &str = "run.stdout";
 pub const UI_STDERR_64: &str = "64bit.stderr";
 pub const UI_STDERR_32: &str = "32bit.stderr";
 pub const UI_STDERR_16: &str = "16bit.stderr";
+pub const UI_STDERR_64_CHERI: &str = "64bit.cheri.stderr";
+pub const UI_STDERR_32_CHERI: &str = "32bit.cheri.stderr";
+pub const UI_STDERR_16_CHERI: &str = "16bit.cheri.stderr";
 pub const UI_COVERAGE: &str = "coverage";
 
 /// Absolute path to the directory where all output for all tests in the given

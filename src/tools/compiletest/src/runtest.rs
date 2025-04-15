@@ -1,6 +1,6 @@
 // ignore-tidy-filelength
 
-use crate::common::{expected_output_path, UI_EXTENSIONS, UI_FIXED, UI_STDERR, UI_STDOUT};
+use crate::common::{expected_output_path, UI_EXTENSIONS, UI_FIXED, UI_STDOUT};
 use crate::common::{incremental_dir, output_base_dir, output_base_name, output_testname_unique};
 use crate::common::{Assembly, Incremental, JsDocTest, MirOpt, RunMake, RustdocJson, Ui};
 use crate::common::{Codegen, CodegenUnits, DebugInfo, Debugger, Rustdoc};
@@ -3581,14 +3581,13 @@ impl<'test> TestCx<'test> {
         output_kind: TestOutput,
         explicit_format: bool,
     ) -> usize {
-        let stderr_bits = format!("{}bit.stderr", self.config.get_pointer_data_size());
+        let stderr_bits = format!("{}bit.", self.config.get_pointer_data_size());
+        let is_cheri = self.config.is_cheri();
+        let stderr_extension = format!("{}{}stderr",
+            if self.props.stderr_per_bitwidth { &stderr_bits } else { "" },
+            if self.props.stderr_per_cheri && is_cheri { "cheri." } else { "" });
         let (stderr_kind, stdout_kind) = match output_kind {
-            TestOutput::Compile => (
-                {
-                    if self.props.stderr_per_bitwidth { &stderr_bits } else { UI_STDERR }
-                },
-                UI_STDOUT,
-            ),
+            TestOutput::Compile => (stderr_extension.as_str(), UI_STDOUT),
             TestOutput::Run => (UI_RUN_STDERR, UI_RUN_STDOUT),
         };
 
