@@ -10,6 +10,9 @@ Expect things to break.
 This fork is not built or maintained by the Rust project proper, please don't complain to them if you have issues with it, they will not be able to help.
 We can be contacted via email or GitHub issues but don't really have the capacity to offer much support.
 
+## Known Issues
+* backtraces cause an error message to be printed by libunwind (`libunwind: evaluated out-of-bounds/invalid CFA expression for pc <address>: 0xc0`), but otherwise work correctly
+
 ## Setup
 
 This fork is intended to be used as a cross compiler.
