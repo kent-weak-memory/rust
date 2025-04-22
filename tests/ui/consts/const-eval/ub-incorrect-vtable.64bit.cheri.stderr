@@ -17,8 +17,9 @@ LL | const INVALID_VTABLE_ALIGNMENT_UB: W<&dyn Trait> =
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .0: encountered allocN, but expected a vtable pointer
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 8, align: 4) {
-               ╾─allocN─╼ ╾─allocN─╼                         │ ╾──╼╾──╼
+   = note: the raw bytes of the constant (size: 32, align: 16) {
+               0x00 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
+               0x10 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
            }
 
 error[E0080]: it is undefined behavior to use this value
@@ -28,8 +29,9 @@ LL | const INVALID_VTABLE_SIZE_UB: W<&dyn Trait> =
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .0: encountered allocN, but expected a vtable pointer
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 8, align: 4) {
-               ╾─allocN─╼ ╾─allocN─╼                         │ ╾──╼╾──╼
+   = note: the raw bytes of the constant (size: 32, align: 16) {
+               0x00 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
+               0x10 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
            }
 
 error[E0080]: it is undefined behavior to use this value
@@ -39,8 +41,9 @@ LL | const INVALID_VTABLE_UB: W<&dyn Trait> =
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .0: encountered allocN, but expected a vtable pointer
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 8, align: 4) {
-               ╾─allocN─╼ ╾─allocN─╼                         │ ╾──╼╾──╼
+   = note: the raw bytes of the constant (size: 32, align: 16) {
+               0x00 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
+               0x10 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
            }
 
 error[E0080]: it is undefined behavior to use this value
@@ -50,8 +53,9 @@ LL | const G: Wide = unsafe { Transmute { t: FOO }.u };
    | ^^^^^^^^^^^^^ constructing invalid value at .1: encountered a dangling reference (going beyond the bounds of its allocation)
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 8, align: 4) {
-               ╾─allocN─╼ ╾─allocN─╼                         │ ╾──╼╾──╼
+   = note: the raw bytes of the constant (size: 32, align: 16) {
+               0x00 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
+               0x10 │ ╾───────────────────allocN───────────────────╼ │ ╾──────────────╼
            }
 
 error: aborting due to 6 previous errors

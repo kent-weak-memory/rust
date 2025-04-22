@@ -11,6 +11,7 @@
 // errors are emitted instead of ICEs.
 
 // stderr-per-bitwidth
+// stderr-per-cheri
 // normalize-stderr-test "alloc\d+" -> "allocN"
 
 trait Trait {}

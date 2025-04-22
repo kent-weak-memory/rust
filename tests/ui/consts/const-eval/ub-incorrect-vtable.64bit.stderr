@@ -1,17 +1,17 @@
 error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-incorrect-vtable.rs:19:14
+  --> $DIR/ub-incorrect-vtable.rs:20:14
    |
 LL |     unsafe { std::mem::transmute((&92u8, &[0usize, 1usize, 1000usize])) };
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using allocN as vtable pointer but it does not point to a vtable
 
 error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-incorrect-vtable.rs:24:14
+  --> $DIR/ub-incorrect-vtable.rs:25:14
    |
 LL |     unsafe { std::mem::transmute((&92u8, &[1usize, usize::MAX, 1usize])) };
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using allocN as vtable pointer but it does not point to a vtable
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-incorrect-vtable.rs:33:1
+  --> $DIR/ub-incorrect-vtable.rs:34:1
    |
 LL | const INVALID_VTABLE_ALIGNMENT_UB: W<&dyn Trait> =
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .0: encountered allocN, but expected a vtable pointer
@@ -22,7 +22,7 @@ LL | const INVALID_VTABLE_ALIGNMENT_UB: W<&dyn Trait> =
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-incorrect-vtable.rs:38:1
+  --> $DIR/ub-incorrect-vtable.rs:39:1
    |
 LL | const INVALID_VTABLE_SIZE_UB: W<&dyn Trait> =
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .0: encountered allocN, but expected a vtable pointer
@@ -33,7 +33,7 @@ LL | const INVALID_VTABLE_SIZE_UB: W<&dyn Trait> =
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-incorrect-vtable.rs:44:1
+  --> $DIR/ub-incorrect-vtable.rs:45:1
    |
 LL | const INVALID_VTABLE_UB: W<&dyn Trait> =
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .0: encountered allocN, but expected a vtable pointer
@@ -44,7 +44,7 @@ LL | const INVALID_VTABLE_UB: W<&dyn Trait> =
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-incorrect-vtable.rs:91:1
+  --> $DIR/ub-incorrect-vtable.rs:92:1
    |
 LL | const G: Wide = unsafe { Transmute { t: FOO }.u };
    | ^^^^^^^^^^^^^ constructing invalid value at .1: encountered a dangling reference (going beyond the bounds of its allocation)
