@@ -1,4 +1,5 @@
 // stderr-per-bitwidth
+// stderr-per-cheri
 // ignore-endian-big
 // ignore-tidy-linelength
 // normalize-stderr-test "╾─*a(lloc)?[0-9]+(\+[a-z0-9]+)?─*╼" -> "╾ALLOC_ID$2╼"
@@ -51,7 +52,7 @@ const BAD_OPTION_CHAR: Option<(char, char)> = Some(('x', unsafe { mem::transmute
 //~^ ERROR is undefined behavior
 
 
-const NULL_PTR: NonNull<u8> = unsafe { mem::transmute(0usize) };
+const NULL_PTR: NonNull<u8> = unsafe { mem::transmute(0usize as *const u8) };
 //~^ ERROR it is undefined behavior to use this value
 
 const NULL_U8: NonZeroU8 = unsafe { mem::transmute(0u8) };
@@ -87,21 +88,21 @@ const UNALIGNED_BOX: Box<u16> = unsafe { mem::transmute(&[0u8; 4]) };
 //~^ ERROR it is undefined behavior to use this value
 //~| constructing invalid value: encountered an unaligned box (required 2 byte alignment but found 1)
 
-const NULL: &u16 = unsafe { mem::transmute(0usize) };
+const NULL: &u16 = unsafe { mem::transmute(0usize as *const u16) };
 //~^ ERROR it is undefined behavior to use this value
 
-const NULL_BOX: Box<u16> = unsafe { mem::transmute(0usize) };
+const NULL_BOX: Box<u16> = unsafe { mem::transmute(0usize as *const u16) };
 //~^ ERROR it is undefined behavior to use this value
 
-const USIZE_AS_REF: &'static u8 = unsafe { mem::transmute(1337usize) };
+const USIZE_AS_REF: &'static u8 = unsafe { mem::transmute(1337usize as *const u8) };
 //~^ ERROR it is undefined behavior to use this value
 
-const USIZE_AS_BOX: Box<u8> = unsafe { mem::transmute(1337usize) };
+const USIZE_AS_BOX: Box<u8> = unsafe { mem::transmute(1337usize as *const u8) };
 //~^ ERROR it is undefined behavior to use this value
 
-const NULL_FN_PTR: fn() = unsafe { mem::transmute(0usize) };
+const NULL_FN_PTR: fn() = unsafe { mem::transmute(0usize as *const ()) };
 //~^ ERROR it is undefined behavior to use this value
-const DANGLING_FN_PTR: fn() = unsafe { mem::transmute(13usize) };
+const DANGLING_FN_PTR: fn() = unsafe { mem::transmute(13usize as *const ()) };
 //~^ ERROR it is undefined behavior to use this value
 const DATA_FN_PTR: fn() = unsafe { mem::transmute(&13) };
 //~^ ERROR it is undefined behavior to use this value
@@ -109,7 +110,7 @@ const DATA_FN_PTR: fn() = unsafe { mem::transmute(&13) };
 #[derive(Copy, Clone)]
 enum Bar {}
 
-const BAD_BAD_REF: &Bar = unsafe { mem::transmute(1usize) };
+const BAD_BAD_REF: &Bar = unsafe { mem::transmute(1usize as *const Bar) };
 //~^ ERROR it is undefined behavior to use this value
 
 
