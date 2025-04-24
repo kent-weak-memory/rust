@@ -1,5 +1,6 @@
 // compile-flags: -Zunleash-the-miri-inside-of-you
 // stderr-per-bitwidth
+// stderr-per-cheri
 
 #![allow(dead_code)]
 

@@ -5,8 +5,8 @@ LL | const TEST: &u8 = &MY_STATIC;
    | ^^^^^^^^^^^^^^^ constructing invalid value: encountered a reference pointing to a static variable in a constant
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 4, align: 4) {
-               ╾─alloc1──╼                                     │ ╾──╼
+   = note: the raw bytes of the constant (size: 16, align: 16) {
+               ╾───────────────────alloc1────────────────────╼ │ ╾──────────────╼
            }
 
 warning: skipping const checks
