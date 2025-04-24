@@ -2,8 +2,8 @@
 
 const FOO: isize = 10;
 const BAR: isize = 3;
-const ZST: &() = unsafe { std::mem::transmute(1usize) };
-const ZST_ARR: &[u8; 0] = unsafe { std::mem::transmute(1usize) };
+const ZST: &() = unsafe { std::mem::transmute(1usize as *const ()) };
+const ZST_ARR: &[u8; 0] = unsafe { std::mem::transmute(1usize as *const [u8; 0]) };
 
 const fn foo() -> isize { 4 }
 const BOO: isize = foo();
