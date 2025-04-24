@@ -23,7 +23,7 @@ LL | const UNALIGNED_BOX: Box<u16> = unsafe { mem::transmute(&[0u8; 4]) };
 error[E0080]: it is undefined behavior to use this value
   --> $DIR/ub-ref-ptr.rs:23:1
    |
-LL | const NULL: &u16 = unsafe { mem::transmute(0usize) };
+LL | const NULL: &u16 = unsafe { mem::transmute(0usize as *const u16) };
    | ^^^^^^^^^^^^^^^^ constructing invalid value: encountered a null reference
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
@@ -34,7 +34,7 @@ LL | const NULL: &u16 = unsafe { mem::transmute(0usize) };
 error[E0080]: it is undefined behavior to use this value
   --> $DIR/ub-ref-ptr.rs:26:1
    |
-LL | const NULL_BOX: Box<u16> = unsafe { mem::transmute(0usize) };
+LL | const NULL_BOX: Box<u16> = unsafe { mem::transmute(0usize as *const u16) };
    | ^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered a null box
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
@@ -42,49 +42,10 @@ LL | const NULL_BOX: Box<u16> = unsafe { mem::transmute(0usize) };
                HEX_DUMP
            }
 
-error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-ref-ptr.rs:33:1
-   |
-LL | const REF_AS_USIZE: usize = unsafe { mem::transmute(&0) };
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
-   |
-   = help: this code performed an operation that depends on the underlying bytes representing a pointer
-   = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
-
-error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-ref-ptr.rs:36:39
-   |
-LL | const REF_AS_USIZE_SLICE: &[usize] = &[unsafe { mem::transmute(&0) }];
-   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
-   |
-   = help: this code performed an operation that depends on the underlying bytes representing a pointer
-   = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
-
-note: erroneous constant used
-  --> $DIR/ub-ref-ptr.rs:36:38
-   |
-LL | const REF_AS_USIZE_SLICE: &[usize] = &[unsafe { mem::transmute(&0) }];
-   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-ref-ptr.rs:39:86
-   |
-LL | const REF_AS_USIZE_BOX_SLICE: Box<[usize]> = unsafe { mem::transmute::<&[usize], _>(&[mem::transmute(&0)]) };
-   |                                                                                      ^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
-   |
-   = help: this code performed an operation that depends on the underlying bytes representing a pointer
-   = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
-
-note: erroneous constant used
-  --> $DIR/ub-ref-ptr.rs:39:85
-   |
-LL | const REF_AS_USIZE_BOX_SLICE: Box<[usize]> = unsafe { mem::transmute::<&[usize], _>(&[mem::transmute(&0)]) };
-   |                                                                                     ^^^^^^^^^^^^^^^^^^^^^
-
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-ref-ptr.rs:42:1
+  --> $DIR/ub-ref-ptr.rs:30:1
    |
-LL | const USIZE_AS_REF: &'static u8 = unsafe { mem::transmute(1337usize) };
+LL | const USIZE_AS_REF: &'static u8 = unsafe { mem::transmute(1337usize as *const u8) };
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered a dangling reference (0x539[noalloc] has no provenance)
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
@@ -93,9 +54,9 @@ LL | const USIZE_AS_REF: &'static u8 = unsafe { mem::transmute(1337usize) };
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-ref-ptr.rs:45:1
+  --> $DIR/ub-ref-ptr.rs:33:1
    |
-LL | const USIZE_AS_BOX: Box<u8> = unsafe { mem::transmute(1337usize) };
+LL | const USIZE_AS_BOX: Box<u8> = unsafe { mem::transmute(1337usize as *const u8) };
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered a dangling box (0x539[noalloc] has no provenance)
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
@@ -104,15 +65,15 @@ LL | const USIZE_AS_BOX: Box<u8> = unsafe { mem::transmute(1337usize) };
            }
 
 error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-ref-ptr.rs:48:41
+  --> $DIR/ub-ref-ptr.rs:36:41
    |
 LL | const UNINIT_PTR: *const i32 = unsafe { MaybeUninit { uninit: () }.init };
    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-ref-ptr.rs:52:1
+  --> $DIR/ub-ref-ptr.rs:40:1
    |
-LL | const NULL_FN_PTR: fn() = unsafe { mem::transmute(0usize) };
+LL | const NULL_FN_PTR: fn() = unsafe { mem::transmute(0usize as *const ()) };
    | ^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered null pointer, but expected a function pointer
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
@@ -121,15 +82,15 @@ LL | const NULL_FN_PTR: fn() = unsafe { mem::transmute(0usize) };
            }
 
 error[E0080]: evaluation of constant value failed
-  --> $DIR/ub-ref-ptr.rs:54:38
+  --> $DIR/ub-ref-ptr.rs:42:38
    |
 LL | const UNINIT_FN_PTR: fn() = unsafe { MaybeUninit { uninit: () }.init };
    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-ref-ptr.rs:57:1
+  --> $DIR/ub-ref-ptr.rs:45:1
    |
-LL | const DANGLING_FN_PTR: fn() = unsafe { mem::transmute(13usize) };
+LL | const DANGLING_FN_PTR: fn() = unsafe { mem::transmute(13usize as *const ()) };
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered 0xd[noalloc], but expected a function pointer
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
@@ -138,10 +99,10 @@ LL | const DANGLING_FN_PTR: fn() = unsafe { mem::transmute(13usize) };
            }
 
 error[E0080]: it is undefined behavior to use this value
-  --> $DIR/ub-ref-ptr.rs:59:1
+  --> $DIR/ub-ref-ptr.rs:47:1
    |
 LL | const DATA_FN_PTR: fn() = unsafe { mem::transmute(&13) };
-   | ^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered alloc41, but expected a function pointer
+   | ^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered alloc27, but expected a function pointer
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
    = note: the raw bytes of the constant (size: $SIZE, align: $ALIGN) {
@@ -158,11 +119,11 @@ note: inside `std::ptr::read::<u32>`
 note: inside `ptr::const_ptr::<impl *const u32>::read`
   --> $SRC_DIR/core/src/ptr/const_ptr.rs:LL:COL
 note: inside `UNALIGNED_READ`
-  --> $DIR/ub-ref-ptr.rs:66:5
+  --> $DIR/ub-ref-ptr.rs:54:5
    |
 LL |     ptr.read();
    |     ^^^^^^^^^^
 
-error: aborting due to 15 previous errors
+error: aborting due to 12 previous errors
 
 For more information about this error, try `rustc --explain E0080`.
