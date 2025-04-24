@@ -1,5 +1,5 @@
 error[E0015]: cannot call non-const fn `random` in constant functions
-  --> $DIR/const-fn-not-safe-for-const.rs:14:5
+  --> $DIR/const-fn-not-safe-for-const.rs:17:5
    |
 LL |     random()
    |     ^^^^^^^^
@@ -7,7 +7,7 @@ LL |     random()
    = note: calls in constant functions are limited to constant functions, tuple structs and tuple variants
 
 error[E0013]: constant functions cannot refer to statics
-  --> $DIR/const-fn-not-safe-for-const.rs:20:5
+  --> $DIR/const-fn-not-safe-for-const.rs:23:5
    |
 LL |     Y
    |     ^
@@ -15,7 +15,7 @@ LL |     Y
    = help: consider extracting the value of the `static` to a `const`, and referring to that
 
 error[E0013]: constant functions cannot refer to statics
-  --> $DIR/const-fn-not-safe-for-const.rs:25:6
+  --> $DIR/const-fn-not-safe-for-const.rs:28:6
    |
 LL |     &Y
    |      ^

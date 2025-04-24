@@ -1,11 +1,14 @@
 // Test that we can't call random fns in a const fn or do other bad things.
 
+#![feature(cfg_target_abi)]
+
 use std::mem::transmute;
 
 fn random() -> u32 {
     0
 }
 
+#[cfg(not(target_abi = "purecap"))]
 const fn sub(x: &u32) -> usize {
     unsafe { transmute(x) }
 }
