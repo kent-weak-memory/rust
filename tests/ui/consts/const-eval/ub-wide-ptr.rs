@@ -5,7 +5,8 @@ use std::mem;
 
 // Strip out raw byte dumps to make comparison platform-independent:
 // normalize-stderr-test "(the raw bytes of the constant) \(size: [0-9]*, align: [0-9]*\)" -> "$1 (size: $$SIZE, align: $$ALIGN)"
-// normalize-stderr-test "([0-9a-f][0-9a-f] |╾─*a(lloc)?[0-9]+(\+[a-z0-9]+)?─*╼ )+ *│.*" -> "HEX_DUMP"
+// normalize-stderr-test "(0x[0-9][0-9] │ )?([0-9a-f][0-9a-f] |╾─*a(lloc)?[0-9]+(\+[a-z0-9]+)?─*╼ )+(__ )* *│.*" -> "HEX_DUMP"
+// normalize-stderr-test "HEX_DUMP(\n[ \t]+HEX_DUMP)+" -> "HEX_DUMP"
 // normalize-stderr-test "offset \d+" -> "offset N"
 // normalize-stderr-test "alloc\d+" -> "allocN"
 // normalize-stderr-test "size \d+" -> "size N"
@@ -63,7 +64,7 @@ const SLICE_LENGTH_UNINIT: &[u8] = unsafe {
 //~^ ERROR evaluation of constant value failed
 //~| uninitialized
     let uninit_len = MaybeUninit::<usize> { uninit: () };
-    mem::transmute((42, uninit_len))
+    mem::transmute((42 as *const u8, uninit_len))
 };
 // bad slice: length too big
 const SLICE_TOO_LONG: &[u8] = unsafe { mem::transmute((&42u8, 999usize)) };
@@ -105,7 +106,7 @@ const RAW_SLICE_LENGTH_UNINIT: *const [u8] = unsafe {
 //~^ ERROR evaluation of constant value failed
 //~| uninitialized
     let uninit_len = MaybeUninit::<usize> { uninit: () };
-    mem::transmute((42, uninit_len))
+    mem::transmute((42 as *const u8, uninit_len))
 };
 
 // # trait object
