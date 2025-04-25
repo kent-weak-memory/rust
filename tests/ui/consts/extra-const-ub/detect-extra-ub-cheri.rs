@@ -1,4 +1,4 @@
-// ignore-purecap: see detect-extra-ub-cheri.rs for CHERI version of this test.
+// only-purecap: copy of detect-extra-ub.rs tweaked to work on CHERI targets.
 // revisions: no_flag with_flag
 // [no_flag] check-pass
 // [with_flag] compile-flags: -Zextra-const-ub-checks
@@ -12,13 +12,13 @@ const INVALID_BOOL: () = unsafe {
 };
 
 const INVALID_PTR_IN_INT: () = unsafe {
-    let _x: usize = transmute(&3u8);
+    let _x: (usize, usize) = transmute(&3u8);
     //[with_flag]~^ ERROR: evaluation of constant value failed
 };
 
 const INVALID_SLICE_TO_USIZE_TRANSMUTE: () = unsafe {
     let x: &[u8] = &[0; 32];
-    let _x: (usize, usize) = transmute(x);
+    let _x: (usize, usize, usize, usize) = transmute(x);
     //[with_flag]~^ ERROR: evaluation of constant value failed
 };
 
