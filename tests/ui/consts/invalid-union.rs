@@ -8,6 +8,7 @@
 //
 // build-fail
 // stderr-per-bitwidth
+// stderr-per-cheri
 #![feature(const_mut_refs)]
 
 use std::cell::Cell;
