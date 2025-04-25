@@ -1,5 +1,6 @@
 // Regression test for #63952, shouldn't hang.
 // stderr-per-bitwidth
+// stderr-per-cheri
 
 #[repr(C)]
 #[derive(Copy, Clone)]
