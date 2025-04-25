@@ -1,4 +1,5 @@
 // run-pass
+// normalize-stderr-test "cheri-bound-allocas: Don't know how to handle intrinsic. Assuming bounds needed.*\n" -> ""
 #![allow(dead_code)]
 // aux-build:issue-17718-aux.rs
 
