@@ -5,8 +5,8 @@ LL | const MUH: Meh = Meh {
    | ^^^^^^^^^^^^^^ constructing invalid value at .x.<deref>: encountered `UnsafeCell` in a `const`
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 4, align: 4) {
-               ╾─alloc3──╼                                     │ ╾──╼
+   = note: the raw bytes of the constant (size: 16, align: 16) {
+               ╾───────────────────alloc3────────────────────╼ │ ╾──────────────╼
            }
 
 error[E0080]: it is undefined behavior to use this value
@@ -16,8 +16,9 @@ LL | const SNEAKY: &dyn Sync = &Synced { x: UnsafeCell::new(42) };
    | ^^^^^^^^^^^^^^^^^^^^^^^ constructing invalid value at .<deref>.<dyn-downcast>.x: encountered `UnsafeCell` in a `const`
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 8, align: 4) {
-               ╾─alloc7──╼ ╾─alloc8──╼                         │ ╾──╼╾──╼
+   = note: the raw bytes of the constant (size: 32, align: 16) {
+               0x00 │ ╾───────────────────alloc7────────────────────╼ │ ╾──────────────╼
+               0x10 │ ╾───────────────────alloc8────────────────────╼ │ ╾──────────────╼
            }
 
 error[E0080]: it is undefined behavior to use this value
@@ -27,8 +28,8 @@ LL | const BLUNT: &mut i32 = &mut 42;
    | ^^^^^^^^^^^^^^^^^^^^^ constructing invalid value: encountered mutable reference in a `const`
    |
    = note: The rules on what exactly is undefined behavior aren't clear, so this check might be overzealous. Please open an issue on the rustc repository if you believe it should not be considered undefined behavior.
-   = note: the raw bytes of the constant (size: 4, align: 4) {
-               ╾─alloc10─╼                                     │ ╾──╼
+   = note: the raw bytes of the constant (size: 16, align: 16) {
+               ╾───────────────────alloc10───────────────────╼ │ ╾──────────────╼
            }
 
 warning: skipping const checks
