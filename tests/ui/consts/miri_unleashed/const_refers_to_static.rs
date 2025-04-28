@@ -1,5 +1,6 @@
 // compile-flags: -Zunleash-the-miri-inside-of-you
 // stderr-per-bitwidth
+// stderr-per-cheri
 
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
