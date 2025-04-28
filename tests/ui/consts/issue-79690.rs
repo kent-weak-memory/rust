@@ -1,6 +1,7 @@
 // ignore-32bit
 // This test gives a different error on 32-bit architectures.
 // stderr-per-bitwidth
+// stderr-per-cheri
 
 union Transmute<T: Copy, U: Copy> {
     t: T,
