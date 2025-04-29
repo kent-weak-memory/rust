@@ -54,10 +54,5 @@ const _: *const u8 =
 //~^ ERROR evaluation of constant value failed
 //~| out-of-bounds
 
-const _: usize = unsafe { std::mem::transmute::<*const usize, usize>(FOO) + 4 };
-//~^ ERROR evaluation of constant value failed
-//~| unable to turn pointer into raw bytes
-
-const _: usize = unsafe { *std::mem::transmute::<&&usize, &usize>(&FOO) + 4 };
-//~^ ERROR evaluation of constant value failed
-//~| unable to turn pointer into raw bytes
+// See `ptr_comparisons_non_cheri.rs` for tests cases that don't work on CHERI
+// targets.

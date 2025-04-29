@@ -1,0 +1,21 @@
+error[E0080]: evaluation of constant value failed
+  --> $DIR/ptr_comparisons_non_cheri.rs:10:27
+   |
+LL | const _: usize = unsafe { std::mem::transmute::<*const usize, usize>(FOO) + 4 };
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
+   |
+   = help: this code performed an operation that depends on the underlying bytes representing a pointer
+   = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
+
+error[E0080]: evaluation of constant value failed
+  --> $DIR/ptr_comparisons_non_cheri.rs:14:27
+   |
+LL | const _: usize = unsafe { *std::mem::transmute::<&&usize, &usize>(&FOO) + 4 };
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unable to turn pointer into raw bytes
+   |
+   = help: this code performed an operation that depends on the underlying bytes representing a pointer
+   = help: the absolute address of a pointer is not known at compile-time, so such operations are not supported
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0080`.
