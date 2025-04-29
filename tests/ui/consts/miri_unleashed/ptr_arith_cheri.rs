@@ -1,5 +1,5 @@
 // compile-flags: -Zunleash-the-miri-inside-of-you
-// ignore-purecap: see ptr_arith_cheri.rs for CHERI targets
+// only-purecap: see ptr_arith.rs for non-CHERI targets.
 #![feature(core_intrinsics)]
 
 // During CTFE, we prevent pointer-to-int casts.
@@ -12,11 +12,15 @@ static PTR_INT_CAST: () = {
     let _v = x == x;
 };
 
-static PTR_INT_TRANSMUTE: () = unsafe {
-    let x: usize = std::mem::transmute(&0);
-    let _v = x + 0;
+// `transmute::<*const _, usize>()` doesn't work on CHERI due to the size
+// difference between pointer and `usize`.
+// This is still here just in case it covers any more arithmetic checks, but
+// it likely doesn't.
+static PTR_INT_CAST_1: () = unsafe {
+    let x = &0 as *const _ as usize;
     //~^ ERROR could not evaluate static initializer
-    //~| unable to turn pointer into raw bytes
+    //~| exposing pointers
+    let _v = x + 0;
 };
 
 // I'd love to test pointer comparison, but that is not possible since
