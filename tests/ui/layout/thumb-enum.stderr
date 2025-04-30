@@ -1,5 +1,7 @@
 error: layout_of(A) = Layout {
-           data_size: Some(Size(1 bytes)),
+           data_size: Some(
+               Size(1 bytes),
+           ),
            memory_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
@@ -51,6 +53,7 @@ error: layout_of(A) = Layout {
                            pref: Align(4 bytes),
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -71,7 +74,9 @@ LL | enum A { Apple }
    | ^^^^^^
 
 error: layout_of(B) = Layout {
-           data_size: Some(Size(1 bytes)),
+           data_size: Some(
+               Size(1 bytes),
+           ),
            memory_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
@@ -123,6 +128,7 @@ error: layout_of(B) = Layout {
                            pref: Align(4 bytes),
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -143,7 +149,9 @@ LL | enum B { Banana = 255, }
    | ^^^^^^
 
 error: layout_of(C) = Layout {
-           data_size: Some(Size(2 bytes)),
+           data_size: Some(
+               Size(2 bytes),
+           ),
            memory_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(2 bytes),
@@ -195,6 +203,7 @@ error: layout_of(C) = Layout {
                            pref: Align(4 bytes),
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -215,7 +224,9 @@ LL | enum C { Chaenomeles = 256, }
    | ^^^^^^
 
 error: layout_of(P) = Layout {
-           data_size: Some(Size(4 bytes)),
+           data_size: Some(
+               Size(4 bytes),
+           ),
            memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
@@ -267,6 +278,7 @@ error: layout_of(P) = Layout {
                            pref: Align(4 bytes),
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -287,7 +299,9 @@ LL | enum P { Peach = 0x1000_0000isize, }
    | ^^^^^^
 
 error: layout_of(T) = Layout {
-           data_size: Some(Size(4 bytes)),
+           data_size: Some(
+               Size(4 bytes),
+           ),
            memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
@@ -339,6 +353,7 @@ error: layout_of(T) = Layout {
                            pref: Align(4 bytes),
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
