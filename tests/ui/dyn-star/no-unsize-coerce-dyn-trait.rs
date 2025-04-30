@@ -1,3 +1,5 @@
+// ignore-purecap: `usize` is not compatible with this use on CHERI targets
+
 #![feature(dyn_star, trait_upcasting)]
 //~^ WARN the feature `dyn_star` is incomplete and may not be safe to use and/or cause compiler crashes
 

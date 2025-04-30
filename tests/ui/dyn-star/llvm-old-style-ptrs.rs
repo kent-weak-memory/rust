@@ -1,5 +1,6 @@
 // run-pass
 // compile-flags: -Copt-level=0 -Cllvm-args=-opaque-pointers=0
+// ignore-purecap: `usize` is not compatible with this use on CHERI targets
 
 // (opaque-pointers flag is called force-opaque-pointers in LLVM 13...)
 // min-llvm-version: 14.0

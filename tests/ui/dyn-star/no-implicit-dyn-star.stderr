@@ -1,5 +1,5 @@
 error[E0308]: mismatched types
-  --> $DIR/no-implicit-dyn-star.rs:6:48
+  --> $DIR/no-implicit-dyn-star.rs:7:48
    |
 LL |     dyn_star_foreign::require_dyn_star_display(1usize);
    |     ------------------------------------------ ^^^^^^ expected `dyn Display`, found `usize`

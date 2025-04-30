@@ -1,4 +1,5 @@
 // aux-build:dyn-star-foreign.rs
+// ignore-purecap: `usize` is not compatible with this use on CHERI targets
 
 extern crate dyn_star_foreign;
 

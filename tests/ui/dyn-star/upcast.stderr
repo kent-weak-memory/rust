@@ -1,5 +1,5 @@
 warning: the feature `dyn_star` is incomplete and may not be safe to use and/or cause compiler crashes
-  --> $DIR/upcast.rs:3:12
+  --> $DIR/upcast.rs:4:12
    |
 LL | #![feature(dyn_star, trait_upcasting)]
    |            ^^^^^^^^
@@ -8,7 +8,7 @@ LL | #![feature(dyn_star, trait_upcasting)]
    = note: `#[warn(incomplete_features)]` on by default
 
 error[E0277]: `dyn* Foo` needs to have the same ABI as a pointer
-  --> $DIR/upcast.rs:30:23
+  --> $DIR/upcast.rs:31:23
    |
 LL |     let w: dyn* Bar = w;
    |                       ^ `dyn* Foo` needs to be a pointer-like type

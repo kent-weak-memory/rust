@@ -1,5 +1,5 @@
 // known-bug: #104800
-// ignore-aarch64-unknown-freebsd-purecap Not worth the effort to support for the time being (seharris 2025-03-26)
+// ignore-purecap: `usize` is not compatible with this use on CHERI targets
 
 #![feature(dyn_star, trait_upcasting)]
 

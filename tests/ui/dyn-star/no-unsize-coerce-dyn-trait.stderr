@@ -1,5 +1,5 @@
 warning: the feature `dyn_star` is incomplete and may not be safe to use and/or cause compiler crashes
-  --> $DIR/no-unsize-coerce-dyn-trait.rs:1:12
+  --> $DIR/no-unsize-coerce-dyn-trait.rs:3:12
    |
 LL | #![feature(dyn_star, trait_upcasting)]
    |            ^^^^^^^^
@@ -8,7 +8,7 @@ LL | #![feature(dyn_star, trait_upcasting)]
    = note: `#[warn(incomplete_features)]` on by default
 
 error[E0308]: mismatched types
-  --> $DIR/no-unsize-coerce-dyn-trait.rs:11:26
+  --> $DIR/no-unsize-coerce-dyn-trait.rs:13:26
    |
 LL |     let y: Box<dyn* B> = x;
    |            -----------   ^ expected trait `B`, found trait `A`

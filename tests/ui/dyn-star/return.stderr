@@ -1,5 +1,5 @@
 warning: the feature `dyn_star` is incomplete and may not be safe to use and/or cause compiler crashes
-  --> $DIR/return.rs:3:12
+  --> $DIR/return.rs:4:12
    |
 LL | #![feature(dyn_star)]
    |            ^^^^^^^^

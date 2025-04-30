@@ -1,5 +1,5 @@
 error[E0606]: casting `usize` as `dyn* std::fmt::Display` is invalid
-  --> $DIR/no-explicit-dyn-star.rs:6:48
+  --> $DIR/no-explicit-dyn-star.rs:7:48
    |
 LL |     dyn_star_foreign::require_dyn_star_display(1usize as _);
    |                                                ^^^^^^^^^^^
