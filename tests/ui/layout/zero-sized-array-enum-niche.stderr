@@ -1,10 +1,12 @@
 error: layout_of(std::result::Result<[u32; 0], bool>) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Arbitrary {
@@ -37,12 +39,14 @@ error: layout_of(std::result::Result<[u32; 0], bool>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memory_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -59,12 +63,14 @@ error: layout_of(std::result::Result<[u32; 0], bool>) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -98,12 +104,14 @@ LL | type AlignedResult = Result<[u32; 0], bool>;
    | ^^^^^^^^^^^^^^^^^^
 
 error: layout_of(MultipleAlignments) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Arbitrary {
@@ -136,12 +144,14 @@ error: layout_of(MultipleAlignments) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(2 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -158,12 +168,14 @@ error: layout_of(MultipleAlignments) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memory_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -180,12 +192,14 @@ error: layout_of(MultipleAlignments) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -219,12 +233,14 @@ LL | enum MultipleAlignments {
    | ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(std::result::Result<[u32; 0], Packed<std::num::NonZeroU16>>) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Arbitrary {
@@ -257,12 +273,14 @@ error: layout_of(std::result::Result<[u32; 0], Packed<std::num::NonZeroU16>>) = 
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memory_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -279,12 +297,14 @@ error: layout_of(std::result::Result<[u32; 0], Packed<std::num::NonZeroU16>>) = 
                        },
                    },
                    Layout {
-                       size: Size(3 bytes),
+                       data_size: None,
+                       memory_size: Size(3 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -318,12 +338,14 @@ LL | type NicheLosesToTagged = Result<[u32; 0], Packed<std::num::NonZeroU16>>;
    | ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(std::result::Result<[u32; 0], Packed<U16IsZero>>) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Arbitrary {
@@ -360,12 +382,16 @@ error: layout_of(std::result::Result<[u32; 0], Packed<U16IsZero>>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memory_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -382,12 +408,14 @@ error: layout_of(std::result::Result<[u32; 0], Packed<U16IsZero>>) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
