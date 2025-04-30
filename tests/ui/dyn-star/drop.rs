@@ -1,5 +1,6 @@
 // run-pass
 // check-run-results
+// ignore-purecap: `usize` is not compatible with this use on CHERI targets
 #![feature(dyn_star)]
 #![allow(incomplete_features)]
 
