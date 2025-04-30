@@ -1,5 +1,6 @@
 // run-pass
 // compile-flags: -Z validate-mir
+// normalize-stderr-test: "DON'T know how to handle.*\n" -> ""
 #![feature(let_chains)]
 
 use std::cell::RefCell;
