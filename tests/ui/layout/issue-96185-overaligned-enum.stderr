@@ -1,10 +1,12 @@
 error: layout_of(Aligned1) = Layout {
-           size: Size(8 bytes),
+           data_size: None,
+           memory_size: Size(8 bytes),
            align: AbiAndPrefAlign {
                abi: Align(8 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Arbitrary {
@@ -37,12 +39,14 @@ error: layout_of(Aligned1) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(8 bytes),
+                       data_size: None,
+                       memory_size: Size(8 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(8 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -55,12 +59,14 @@ error: layout_of(Aligned1) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(8 bytes),
+                       data_size: None,
+                       memory_size: Size(8 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(8 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -81,7 +87,10 @@ LL | pub enum Aligned1 {
    | ^^^^^^^^^^^^^^^^^
 
 error: layout_of(Aligned2) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memory_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
@@ -125,12 +134,14 @@ error: layout_of(Aligned2) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(1 bytes),
+                       data_size: None,
+                       memory_size: Size(1 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -143,12 +154,14 @@ error: layout_of(Aligned2) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(1 bytes),
+                       data_size: None,
+                       memory_size: Size(1 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
