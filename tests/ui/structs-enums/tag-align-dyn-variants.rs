@@ -3,8 +3,6 @@
 #![allow(deprecated)]
 #![allow(non_snake_case)]
 
-use std::mem;
-
 enum Tag<A,B> {
     VarA(A),
     VarB(B),
@@ -22,7 +20,7 @@ fn mk_rec<A,B>(a: A, b: B) -> Rec<A,B> {
 }
 
 fn is_aligned<A>(amnt: usize, u: &A) -> bool {
-    let p: usize = unsafe { mem::transmute(u) };
+    let p: usize = u as *const A as usize;
     return (p & (amnt-1)) == 0;
 }
 
