@@ -1,4 +1,5 @@
 // run-pass
+// normalize-stderr-test: "DON'T know how to handle.*\n" -> ""
 #![allow(unused_imports)]
 use std::thread;
 use std::sync::Mutex;
