@@ -31,7 +31,7 @@ unsafe fn bar() {
 
 
     // No error if a coercion would otherwise occur.
-    mem::transmute::<fn(), usize>(main);
+    mem::transmute::<fn(), *const ()>(main);
 }
 
 unsafe fn baz() {
@@ -48,7 +48,7 @@ unsafe fn baz() {
 
 
     // No error if a coercion would otherwise occur.
-    mem::transmute::<Option<fn()>, usize>(Some(main));
+    mem::transmute::<Option<fn()>, *const ()>(Some(main));
 }
 
 fn main() {
