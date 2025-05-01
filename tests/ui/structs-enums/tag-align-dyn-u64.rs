@@ -2,8 +2,6 @@
 #![allow(dead_code)]
 #![allow(deprecated)]
 
-use std::mem;
-
 enum Tag<A> {
     Tag2(A)
 }
@@ -18,7 +16,7 @@ fn mk_rec() -> Rec {
 }
 
 fn is_u64_aligned(u: &Tag<u64>) -> bool {
-    let p: usize = unsafe { mem::transmute(u) };
+    let p: usize = u as *const Tag<u64> as usize;
     let u64_align = std::mem::min_align_of::<u64>();
     return (p & (u64_align - 1)) == 0;
 }
