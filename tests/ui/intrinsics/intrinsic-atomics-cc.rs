@@ -1,5 +1,6 @@
 // run-pass
 // aux-build:cci_intrinsic.rs
+// normalize-stderr-test: "cheri-bound-allocas: Don't know how to handle intrinsic.*\n" -> ""
 
 
 extern crate cci_intrinsic;
