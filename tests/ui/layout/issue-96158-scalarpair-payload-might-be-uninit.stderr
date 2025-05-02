@@ -1,5 +1,6 @@
 error: layout_of(MissingPayloadField) = Layout {
-           size: Size(2 bytes),
+           data_size: None,
+           memory_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
@@ -49,7 +50,8 @@ error: layout_of(MissingPayloadField) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -83,12 +85,14 @@ error: layout_of(MissingPayloadField) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(1 bytes),
+                       data_size: None,
+                       memory_size: Size(1 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -109,7 +113,8 @@ LL | pub enum MissingPayloadField {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(CommonPayloadField) = Layout {
-           size: Size(2 bytes),
+           data_size: None,
+           memory_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
@@ -160,7 +165,8 @@ error: layout_of(CommonPayloadField) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -195,7 +201,8 @@ error: layout_of(CommonPayloadField) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -238,7 +245,8 @@ LL | pub enum CommonPayloadField {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(CommonPayloadFieldIsMaybeUninit) = Layout {
-           size: Size(2 bytes),
+           data_size: None,
+           memory_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
@@ -288,7 +296,8 @@ error: layout_of(CommonPayloadFieldIsMaybeUninit) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -322,7 +331,8 @@ error: layout_of(CommonPayloadFieldIsMaybeUninit) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -364,7 +374,8 @@ LL | pub enum CommonPayloadFieldIsMaybeUninit {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(NicheFirst) = Layout {
-           size: Size(2 bytes),
+           data_size: None,
+           memory_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
@@ -418,7 +429,8 @@ error: layout_of(NicheFirst) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -464,12 +476,16 @@ error: layout_of(NicheFirst) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memory_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -482,12 +498,16 @@ error: layout_of(NicheFirst) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memory_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -508,7 +528,8 @@ LL | pub enum NicheFirst {
    | ^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(NicheSecond) = Layout {
-           size: Size(2 bytes),
+           data_size: None,
+           memory_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
@@ -562,7 +583,8 @@ error: layout_of(NicheSecond) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memory_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -608,12 +630,16 @@ error: layout_of(NicheSecond) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memory_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -626,12 +652,16 @@ error: layout_of(NicheSecond) = Layout {
                        },
                    },
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memory_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
