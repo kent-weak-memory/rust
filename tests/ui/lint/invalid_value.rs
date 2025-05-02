@@ -149,8 +149,7 @@ fn main() {
         let _val: OneFruit = mem::uninitialized();
 
         // Transmute-from-0
-        let _val: &'static i32 = mem::transmute(0usize); //~ ERROR: does not permit zero-initialization
-        let _val: &'static [i32] = mem::transmute((0usize, 0usize)); //~ ERROR: does not permit zero-initialization
+        // See tests/ui/lint/invalid_value_non_cheri.rs for more tests.
         let _val: NonZeroU32 = mem::transmute(0); //~ ERROR: does not permit zero-initialization
 
         // `MaybeUninit` cases

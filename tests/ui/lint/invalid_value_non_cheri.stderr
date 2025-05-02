@@ -1,0 +1,29 @@
+error: the type `&i32` does not permit zero-initialization
+  --> $DIR/invalid_value_non_cheri.rs:12:34
+   |
+LL |         let _val: &'static i32 = mem::transmute(0usize);
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^
+   |                                  |
+   |                                  this code causes undefined behavior when executed
+   |                                  help: use `MaybeUninit<T>` instead, and only call `assume_init` after initialization is done
+   |
+   = note: references must be non-null
+note: the lint level is defined here
+  --> $DIR/invalid_value_non_cheri.rs:5:9
+   |
+LL | #![deny(invalid_value)]
+   |         ^^^^^^^^^^^^^
+
+error: the type `&[i32]` does not permit zero-initialization
+  --> $DIR/invalid_value_non_cheri.rs:13:36
+   |
+LL |         let _val: &'static [i32] = mem::transmute((0usize, 0usize));
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |                                    |
+   |                                    this code causes undefined behavior when executed
+   |                                    help: use `MaybeUninit<T>` instead, and only call `assume_init` after initialization is done
+   |
+   = note: references must be non-null
+
+error: aborting due to 2 previous errors
+

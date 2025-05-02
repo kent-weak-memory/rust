@@ -581,30 +581,8 @@ LL |         let _val: Result<i32, i32> = mem::uninitialized();
 note: enums with multiple inhabited variants have to be initialized to a variant
   --> $SRC_DIR/core/src/result.rs:LL:COL
 
-error: the type `&i32` does not permit zero-initialization
-  --> $DIR/invalid_value.rs:152:34
-   |
-LL |         let _val: &'static i32 = mem::transmute(0usize);
-   |                                  ^^^^^^^^^^^^^^^^^^^^^^
-   |                                  |
-   |                                  this code causes undefined behavior when executed
-   |                                  help: use `MaybeUninit<T>` instead, and only call `assume_init` after initialization is done
-   |
-   = note: references must be non-null
-
-error: the type `&[i32]` does not permit zero-initialization
-  --> $DIR/invalid_value.rs:153:36
-   |
-LL |         let _val: &'static [i32] = mem::transmute((0usize, 0usize));
-   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |                                    |
-   |                                    this code causes undefined behavior when executed
-   |                                    help: use `MaybeUninit<T>` instead, and only call `assume_init` after initialization is done
-   |
-   = note: references must be non-null
-
 error: the type `NonZeroU32` does not permit zero-initialization
-  --> $DIR/invalid_value.rs:154:32
+  --> $DIR/invalid_value.rs:153:32
    |
 LL |         let _val: NonZeroU32 = mem::transmute(0);
    |                                ^^^^^^^^^^^^^^^^^
@@ -615,7 +593,7 @@ LL |         let _val: NonZeroU32 = mem::transmute(0);
    = note: `std::num::NonZeroU32` must be non-null
 
 error: the type `NonNull<i32>` does not permit zero-initialization
-  --> $DIR/invalid_value.rs:157:34
+  --> $DIR/invalid_value.rs:156:34
    |
 LL |         let _val: NonNull<i32> = MaybeUninit::zeroed().assume_init();
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -626,7 +604,7 @@ LL |         let _val: NonNull<i32> = MaybeUninit::zeroed().assume_init();
    = note: `std::ptr::NonNull<i32>` must be non-null
 
 error: the type `NonNull<i32>` does not permit being left uninitialized
-  --> $DIR/invalid_value.rs:158:34
+  --> $DIR/invalid_value.rs:157:34
    |
 LL |         let _val: NonNull<i32> = MaybeUninit::uninit().assume_init();
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -638,7 +616,7 @@ LL |         let _val: NonNull<i32> = MaybeUninit::uninit().assume_init();
    = note: raw pointers must be initialized
 
 error: the type `bool` does not permit being left uninitialized
-  --> $DIR/invalid_value.rs:159:26
+  --> $DIR/invalid_value.rs:158:26
    |
 LL |         let _val: bool = MaybeUninit::uninit().assume_init();
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -648,5 +626,5 @@ LL |         let _val: bool = MaybeUninit::uninit().assume_init();
    |
    = note: booleans must be either `true` or `false`
 
-error: aborting due to 51 previous errors
+error: aborting due to 49 previous errors
 
