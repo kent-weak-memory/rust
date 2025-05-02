@@ -139,17 +139,17 @@ fn main() {
 
     unsafe {
         //potential ways to incorrectly try transmuting function pointers
-        std::mem::transmute::<_, usize>(&foo);
+        std::mem::transmute::<_, *const ()>(&foo);
         //~^ WARNING taking a reference to a function item does not give a function pointer
-        std::mem::transmute::<_, (usize, usize)>((&foo, &bar));
+        std::mem::transmute::<_, (*const (), *const ())>((&foo, &bar));
         //~^ WARNING taking a reference to a function item does not give a function pointer
         //~^^ WARNING taking a reference to a function item does not give a function pointer
-        std::mem::transmute::<_, usize>(&take_generic_ref::<u32>);
+        std::mem::transmute::<_, *const ()>(&take_generic_ref::<u32>);
         //~^ WARNING taking a reference to a function item does not give a function pointer
 
         //the correct way to transmute function pointers
-        std::mem::transmute::<_, usize>(foo as fn() -> u32);
-        std::mem::transmute::<_, (usize, usize)>((foo as fn() -> u32, bar as fn(u32) -> u32));
+        std::mem::transmute::<_, *const ()>(foo as fn() -> u32);
+        std::mem::transmute::<_, (*const (), *const ())>((foo as fn() -> u32, bar as fn(u32) -> u32));
     }
 
     //function references as arguments required to be bound by std::fmt::Pointer should lint
