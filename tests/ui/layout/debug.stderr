@@ -6,6 +6,7 @@ error: layout_of(E) = Layout {
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Arbitrary {
@@ -38,13 +39,14 @@ error: layout_of(E) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       data_size: Some(Size(4 bytes)),
+                       data_size: None,
                        memory_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
                        },
                        abi: Aggregate {
+                           metadata: false,
                            sized: true,
                        },
                        fields: Arbitrary {
@@ -142,6 +144,7 @@ error: layout_of(U) = Layout {
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -290,7 +293,9 @@ LL | type Test = Result<i32, i32>;
    | ^^^^^^^^^
 
 error: layout_of(i32) = Layout {
-           data_size: Some(Size(4 bytes)),
+           data_size: Some(
+               Size(4 bytes),
+           ),
            memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
@@ -324,6 +329,7 @@ error: layout_of(V) = Layout {
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -347,6 +353,7 @@ error: layout_of(W) = Layout {
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -363,13 +370,16 @@ LL | pub union W {
    | ^^^^^^^^^^^
 
 error: layout_of(Y) = Layout {
-           data_size: None,
+           data_size: Some(
+               Size(0 bytes),
+           ),
            memory_size: Size(0 bytes),
            align: AbiAndPrefAlign {
                abi: Align(2 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -386,13 +396,14 @@ LL | pub union Y {
    | ^^^^^^^^^^^
 
 error: layout_of(P1) = Layout {
-           data_size: Some(Size(4 bytes)),
+           data_size: None,
            memory_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -416,6 +427,7 @@ error: layout_of(P2) = Layout {
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -432,13 +444,14 @@ LL | union P2 { x: (u32, u32) }
    | ^^^^^^^^
 
 error: layout_of(P3) = Layout {
-           data_size: Some(Size(16 bytes)),
+           data_size: None,
            memory_size: Size(16 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -462,6 +475,7 @@ error: layout_of(P4) = Layout {
                pref: $PREF_ALIGN,
            },
            abi: Aggregate {
+               metadata: false,
                sized: true,
            },
            fields: Union(
@@ -478,7 +492,9 @@ LL | union P4 { x: E }
    | ^^^^^^^^
 
 error: layout_of(P5) = Layout {
-           data_size: Some(Size(1 bytes)),
+           data_size: Some(
+               Size(1 bytes),
+           ),
            memory_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
@@ -506,7 +522,9 @@ LL | union P5 { zst: [u16; 0], byte: u8 }
    | ^^^^^^^^
 
 error: layout_of(std::mem::MaybeUninit<u8>) = Layout {
-           data_size: Some(Size(1 bytes)),
+           data_size: Some(
+               Size(1 bytes),
+           ),
            memory_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
