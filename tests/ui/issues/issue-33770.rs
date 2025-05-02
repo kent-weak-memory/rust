@@ -1,6 +1,7 @@
 // run-pass
 // ignore-emscripten no processes
 // ignore-sgx no processes
+// normalize-stderr-test: "cheri-bound-allocas: Don't know how to handle intrinsic.*\n" -> ""
 
 use std::process::{Command, Stdio};
 use std::env;
