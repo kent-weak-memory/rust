@@ -10,6 +10,9 @@
 // ignore-fuchsia Backtraces not symbolized
 // ignore-msvc the `__rust_{begin,end}_short_backtrace` symbols aren't reliable.
 
+// TODO(seharris): remove when and if we fix libunwind problems
+// normalize-stderr-test "libunwind: evaluated out-of-bounds/invalid CFA expression for pc.*\n\n" -> ""
+
 
 #[inline(never)]
 fn __rust_begin_short_backtrace<T, F: FnOnce() -> T>(f: F) -> T {
