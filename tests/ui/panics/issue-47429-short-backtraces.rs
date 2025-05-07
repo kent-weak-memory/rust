@@ -19,6 +19,9 @@
 // [legacy] compile-flags: -Zunstable-options -Csymbol-mangling-version=legacy
 //     [v0] compile-flags: -Csymbol-mangling-version=v0
 
+// TODO(seharris): remove when and if we fix libunwind problems
+// normalize-stderr-test "libunwind: evaluated out-of-bounds/invalid CFA expression for pc.*\n\n" -> ""
+
 fn main() {
     panic!()
 }
