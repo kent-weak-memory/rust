@@ -9,7 +9,7 @@ use std::mem;
 
 fn null<T>() -> *const T {
     unsafe {
-        mem::transmute(0_usize)
+        mem::transmute(&0)
     }
 }
 
