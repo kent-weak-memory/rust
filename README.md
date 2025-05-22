@@ -12,6 +12,7 @@ We can be contacted via email or GitHub issues but don't really have the capacit
 
 ## Known Issues
 * backtraces cause an error message to be printed by libunwind (`libunwind: evaluated out-of-bounds/invalid CFA expression for pc <address>: 0xc0`), but otherwise work correctly
+* allocating large zeroed values can overflow the stack if the stack size is small, `Box::new(std::mem::zeroed::<[u8; STACK_SIZE*2]>()` will fail, `Box::new([0 as u8; STACK_SIZE*2])` and `vec![0 as u8; STACK_SIZE*2]` should work (see `tests/ui/codegen/issue-28950.rs`)
 
 ## Setup
 
