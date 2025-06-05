@@ -1,4 +1,5 @@
 // run-pass
+// ignore-purecap: this relies on an unaligned reference, which is not possible on CHERI
 #![feature(generators)]
 #![feature(generator_trait)]
 use std::cell::Cell;
