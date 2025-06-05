@@ -186,9 +186,9 @@ const_eval_invalid_transmute =
     transmuting from {$src_bytes}-byte type to {$dest_bytes}-byte type: `{$src}` -> `{$dest}`
 
 const_eval_invalid_uninit_bytes =
-    reading memory at {$alloc}{$access}, but memory is uninitialized at {$uninit}, and this operation requires initialized memory
+    reading memory at {$alloc}{$access}, but memory is uninitialized at {$uninit} (is this CHERI metadata?), and this operation requires initialized memory
 const_eval_invalid_uninit_bytes_unknown =
-    using uninitialized data, but this operation requires initialized memory
+    using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 const_eval_invalid_value = constructing invalid value
 const_eval_invalid_value_with_path = constructing invalid value at {$path}
 ## The `front_matter`s here refer to either `middle_invalid_value` or `middle_invalid_value_with_path`.
@@ -408,17 +408,17 @@ const_eval_undefined_behavior_note =
 const_eval_uninhabited_enum_variant_written =
     writing discriminant of an uninhabited enum
 const_eval_uninhabited_val = {$front_matter}: encountered a value of uninhabited type `{$ty}`
-const_eval_uninit = {$front_matter}: encountered uninitialized bytes
-const_eval_uninit_bool = {$front_matter}: encountered uninitialized memory, but expected a boolean
-const_eval_uninit_box = {$front_matter}: encountered uninitialized memory, but expected a box
-const_eval_uninit_char = {$front_matter}: encountered uninitialized memory, but expected a unicode scalar value
-const_eval_uninit_enum_tag = {$front_matter}: encountered uninitialized bytes, but expected a valid enum tag
-const_eval_uninit_float = {$front_matter}: encountered uninitialized memory, but expected a floating point number
-const_eval_uninit_fn_ptr = {$front_matter}: encountered uninitialized memory, but expected a function pointer
-const_eval_uninit_init_scalar = {$front_matter}: encountered uninitialized memory, but expected initialized scalar value
-const_eval_uninit_int = {$front_matter}: encountered uninitialized memory, but expected an integer
-const_eval_uninit_raw_ptr = {$front_matter}: encountered uninitialized memory, but expected a raw pointer
-const_eval_uninit_ref = {$front_matter}: encountered uninitialized memory, but expected a reference
+const_eval_uninit = {$front_matter}: encountered uninitialized bytes (is this CHERI metadata?)
+const_eval_uninit_bool = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a boolean
+const_eval_uninit_box = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a box
+const_eval_uninit_char = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a unicode scalar value
+const_eval_uninit_enum_tag = {$front_matter}: encountered uninitialized bytes (is this CHERI metadata?), but expected a valid enum tag
+const_eval_uninit_float = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a floating point number
+const_eval_uninit_fn_ptr = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a function pointer
+const_eval_uninit_init_scalar = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected initialized scalar value
+const_eval_uninit_int = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected an integer
+const_eval_uninit_raw_ptr = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a raw pointer
+const_eval_uninit_ref = {$front_matter}: encountered uninitialized memory (is this CHERI metadata?), but expected a reference
 const_eval_uninit_str = {$front_matter}: encountered uninitialized data in `str`
 const_eval_uninit_unsized_local =
     unsized local is used while uninitialized
