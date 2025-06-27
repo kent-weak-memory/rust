@@ -132,9 +132,9 @@ impl<'tcx> MoveCheckVisitor<'tcx> {
         else {
             return None;
         };
-        if layout.size.bytes_usize() > limit.0 {
+        if layout.memrepr_size.bytes_usize() > limit.0 {
             debug!(?layout);
-            Some(layout.size)
+            Some(layout.memrepr_size)
         } else {
             None
         }

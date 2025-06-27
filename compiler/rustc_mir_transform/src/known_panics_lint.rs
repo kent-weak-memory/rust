@@ -348,16 +348,16 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             // We need the type of the LHS. We cannot use `place_layout` as that is the type
             // of the result, which for checked binops is not the same!
             let left_ty = left.ty(self.local_decls(), self.tcx);
-            let left_size = self.ecx.layout_of(left_ty).ok()?.size;
-            let right_size = r.layout.size;
-            let r_bits = r.to_scalar().to_bits(right_size).discard_err();
+            let left_size = self.ecx.layout_of(left_ty).ok()?.memrepr_size;
+            let right_size = r.layout.memrepr_size;
+            let r_bits = r.to_scalar().to_bits(right_size, right_size).discard_err();
             if r_bits.is_some_and(|b| b >= left_size.bits() as u128) {
                 debug!("check_binary_op: reporting assert for {:?}", location);
                 let panic = AssertKind::Overflow(
                     op,
                     // Invent a dummy value, the diagnostic ignores it anyway
                     ConstInt::new(
-                        ScalarInt::try_from_uint(1_u8, left_size).unwrap(),
+                        ScalarInt::try_from_uint(1_u8, left_size, left_size).unwrap(),
                         left_ty.is_signed(),
                         left_ty.is_ptr_sized_integral(),
                     ),
@@ -623,7 +623,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
             NullaryOp(ref null_op, ty) => {
                 let op_layout = self.ecx.layout_of(ty).ok()?;
                 let val = match null_op {
-                    NullOp::SizeOf => op_layout.size.bytes(),
+                    NullOp::SizeOf => op_layout.memrepr_size.bytes(),
                     NullOp::AlignOf => op_layout.align.abi.bytes(),
                     NullOp::OffsetOf(fields) => self
                         .tcx
@@ -788,7 +788,9 @@ impl<'tcx> Visitor<'tcx> for ConstPropagator<'_, 'tcx> {
             TerminatorKind::SwitchInt { discr, targets } => {
                 if let Some(ref value) = self.eval_operand(discr)
                     && let Some(value_const) = self.use_ecx(|this| this.ecx.read_scalar(value))
-                    && let Some(constant) = value_const.to_bits(value_const.size()).discard_err()
+                    && let Some(constant) = value_const
+                        .to_bits(value_const.data_size(), value_const.memrepr_size())
+                        .discard_err()
                 {
                     // We managed to evaluate the discriminant, so we know we only need to visit
                     // one target.
@@ -902,7 +904,7 @@ impl CanConstProp {
                 *val = ConstPropMode::NoPropagation;
             } else {
                 match tcx.layout_of(typing_env.as_query_input(ty)) {
-                    Ok(layout) if layout.size < Size::from_bytes(MAX_ALLOC_LIMIT) => {}
+                    Ok(layout) if layout.memrepr_size < Size::from_bytes(MAX_ALLOC_LIMIT) => {}
                     // Either the layout fails to compute, then we can't use this local anyway
                     // or the local is too large, then we don't want to.
                     _ => {

@@ -1,7 +1,7 @@
 use rustc_abi::{Align, Endian, HasDataLayout, Size};
 use rustc_codegen_ssa::common::IntPredicate;
 use rustc_codegen_ssa::mir::operand::OperandRef;
-use rustc_codegen_ssa::traits::{BaseTypeCodegenMethods, BuilderMethods, ConstCodegenMethods};
+use rustc_codegen_ssa::traits::{BaseTypeCodegenMethods, BuilderMethods, ConstCodegenMethods, LayoutTypeCodegenMethods};
 use rustc_middle::ty::Ty;
 use rustc_middle::ty::layout::{HasTyCtxt, LayoutOf};
 
@@ -75,11 +75,11 @@ fn emit_ptr_va_arg<'ll, 'tcx>(
     let (llty, size, align) = if indirect {
         (
             bx.cx.layout_of(Ty::new_imm_ptr(bx.cx.tcx, target_ty)).llvm_type(bx.cx),
-            bx.cx.data_layout().pointer_size,
+            bx.cx.data_layout().pointer_memrepr_size,
             bx.cx.data_layout().pointer_align,
         )
     } else {
-        (layout.llvm_type(bx.cx), layout.size, layout.align)
+        (layout.llvm_type(bx.cx), layout.memrepr_size, layout.align)
     };
     let (addr, addr_align) =
         emit_direct_ptr_va_arg(bx, list, size, align.abi, slot_size, allow_higher_align);
@@ -132,10 +132,10 @@ fn emit_aapcs_va_arg<'ll, 'tcx>(
 
     let gr_type = target_ty.is_any_ptr() || target_ty.is_integral();
     let (reg_off, reg_top, slot_size) = if gr_type {
-        let nreg = (layout.size.bytes() + 7) / 8;
+        let nreg = (layout.memrepr_size.bytes() + 7) / 8;
         (gr_offs, gr_top, nreg * 8)
     } else {
-        let nreg = (layout.size.bytes() + 15) / 16;
+        let nreg = (layout.memrepr_size.bytes() + 15) / 16;
         (vr_offs, vr_top, nreg * 16)
     };
 
@@ -168,9 +168,9 @@ fn emit_aapcs_va_arg<'ll, 'tcx>(
 
     // reg_value = *(@top + reg_off_v);
     let mut reg_addr = bx.ptradd(top, reg_off_v);
-    if bx.tcx().sess.target.endian == Endian::Big && layout.size.bytes() != slot_size {
+    if bx.tcx().sess.target.endian == Endian::Big && layout.memrepr_size.bytes() != slot_size {
         // On big-endian systems the value is right-aligned in its slot.
-        let offset = bx.const_i32((slot_size - layout.size.bytes()) as i32);
+        let offset = bx.const_i32((slot_size - layout.memrepr_size.bytes()) as i32);
         reg_addr = bx.ptradd(reg_addr, offset);
     }
     let reg_type = layout.llvm_type(bx);
@@ -315,7 +315,7 @@ fn emit_xtensa_va_arg<'ll, 'tcx>(
     let offset = bx.load(bx.type_i32(), offset_ptr, bx.tcx().data_layout.i32_align.abi);
     let offset = round_up_to_alignment(bx, offset, layout.align.abi);
 
-    let slot_size = layout.size.align_to(Align::from_bytes(4).unwrap()).bytes() as i32;
+    let slot_size = layout.memrepr_size.align_to(Align::from_bytes(4).unwrap()).bytes() as i32;
 
     // Update the offset in va_list, by adding the slot's size.
     let offset_next = bx.add(offset, bx.const_i32(slot_size));

@@ -208,14 +208,24 @@ impl<'a, 'tcx> TOFinder<'a, 'tcx> {
         let mut state = State::new_reachable();
 
         let conds = if let Some((value, then, else_)) = targets.as_static_if() {
-            let Some(value) = ScalarInt::try_from_uint(value, discr_layout.size) else { return };
+            let Some(value) = ScalarInt::try_from_uint(
+                value,
+                discr_layout.data_size.unwrap(),
+                discr_layout.memrepr_size,
+            ) else {
+                return;
+            };
             self.arena.alloc_from_iter([
                 Condition { value, polarity: Polarity::Eq, target: then },
                 Condition { value, polarity: Polarity::Ne, target: else_ },
             ])
         } else {
             self.arena.alloc_from_iter(targets.iter().filter_map(|(value, target)| {
-                let value = ScalarInt::try_from_uint(value, discr_layout.size)?;
+                let value = ScalarInt::try_from_uint(
+                    value,
+                    discr_layout.data_size.unwrap(),
+                    discr_layout.memrepr_size,
+                )?;
                 Some(Condition { value, polarity: Polarity::Eq, target })
             }))
         };
@@ -656,7 +666,13 @@ impl<'a, 'tcx> TOFinder<'a, 'tcx> {
         let Some(conditions) = state.try_get(discr.as_ref(), &self.map) else { return };
 
         if let Some((value, _)) = targets.iter().find(|&(_, target)| target == target_bb) {
-            let Some(value) = ScalarInt::try_from_uint(value, discr_layout.size) else { return };
+            let Some(value) = ScalarInt::try_from_uint(
+                value,
+                discr_layout.data_size.unwrap(),
+                discr_layout.memrepr_size,
+            ) else {
+                return;
+            };
             debug_assert_eq!(targets.iter().filter(|&(_, target)| target == target_bb).count(), 1);
 
             // We are inside `target_bb`. Since we have a single predecessor, we know we passed
@@ -670,7 +686,13 @@ impl<'a, 'tcx> TOFinder<'a, 'tcx> {
         } else if let Some((value, _, else_bb)) = targets.as_static_if()
             && target_bb == else_bb
         {
-            let Some(value) = ScalarInt::try_from_uint(value, discr_layout.size) else { return };
+            let Some(value) = ScalarInt::try_from_uint(
+                value,
+                discr_layout.data_size.unwrap(),
+                discr_layout.memrepr_size,
+            ) else {
+                return;
+            };
 
             // We only know that `discr != value`. That's much weaker information than
             // the equality we had in the previous arm. All we can conclude is that

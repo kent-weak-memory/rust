@@ -13,7 +13,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: Some(true),
         },
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memrepr_size: 32,
         data_layout: "e-m:o-p:32:32-p270:32:32-p271:32:32-p272:64:64-\
             i128:128-f64:32:64-f80:128-n8:16:32-S128"
             .into(),

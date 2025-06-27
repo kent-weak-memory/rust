@@ -289,7 +289,7 @@ impl<'tcx, Prov: Provenance> Projectable<'tcx, Prov> for PlaceTy<'tcx, Prov> {
                 // `Place::Local` are always in-bounds of their surrounding local, so we can just
                 // check directly if this remains in-bounds. This cannot actually be violated since
                 // projections are type-checked and bounds-checked.
-                assert!(offset + layout.size <= self.layout.size);
+                assert!(offset + layout.memrepr_size <= self.layout.memrepr_size);
 
                 // Size `+`, ensures no overflow.
                 let new_offset = old_offset.unwrap_or(Size::ZERO) + offset;
@@ -469,12 +469,12 @@ where
         mplace: &MPlaceTy<'tcx, M::Provenance>,
     ) -> InterpResult<'tcx, Option<AllocRef<'_, 'tcx, M::Provenance, M::AllocExtra, M::Bytes>>>
     {
-        let (size, _align) = self
+        let (memrepr_size, _align) = self
             .size_and_align_of_mplace(mplace)?
-            .unwrap_or((mplace.layout.size, mplace.layout.align.abi));
+            .unwrap_or((mplace.layout.memrepr_size, mplace.layout.align.abi));
         // We check alignment separately, and *after* checking everything else.
         // If an access is both OOB and misaligned, we want to see the bounds error.
-        let a = self.get_ptr_alloc(mplace.ptr(), size)?;
+        let a = self.get_ptr_alloc(mplace.ptr(), mplace.layout.data_size, memrepr_size)?;
         self.check_misalign(mplace.mplace.misaligned, CheckAlignMsg::BasedOn)?;
         interp_ok(a)
     }
@@ -485,15 +485,17 @@ where
         mplace: &MPlaceTy<'tcx, M::Provenance>,
     ) -> InterpResult<'tcx, Option<AllocRefMut<'_, 'tcx, M::Provenance, M::AllocExtra, M::Bytes>>>
     {
-        let (size, _align) = self
+        let (memrepr_size, _align) = self
             .size_and_align_of_mplace(mplace)?
-            .unwrap_or((mplace.layout.size, mplace.layout.align.abi));
+            .unwrap_or((mplace.layout.memrepr_size, mplace.layout.align.abi));
         // We check alignment separately, and raise that error *after* checking everything else.
         // If an access is both OOB and misaligned, we want to see the bounds error.
         // However we have to call `check_misalign` first to make the borrow checker happy.
         let misalign_res = self.check_misalign(mplace.mplace.misaligned, CheckAlignMsg::BasedOn);
         // An error from get_ptr_alloc_mut takes precedence.
-        let (a, ()) = self.get_ptr_alloc_mut(mplace.ptr(), size).and(misalign_res)?;
+        let (a, ()) = self
+            .get_ptr_alloc_mut(mplace.ptr(), mplace.layout.data_size, memrepr_size)
+            .and(misalign_res)?;
         interp_ok(a)
     }
 
@@ -699,9 +701,10 @@ where
         };
 
         match value {
-            Immediate::Scalar(scalar) => {
-                alloc.write_scalar(alloc_range(Size::ZERO, scalar.size()), scalar)
-            }
+            Immediate::Scalar(scalar) => alloc.write_scalar(
+                alloc_range(Size::ZERO, Some(scalar.data_size()), scalar.memrepr_size()),
+                scalar,
+            ),
             Immediate::ScalarPair(a_val, b_val) => {
                 let BackendRepr::ScalarPair(a, b) = layout.backend_repr else {
                     span_bug!(
@@ -710,15 +713,21 @@ where
                         layout
                     )
                 };
-                let b_offset = a.size(&tcx).align_to(b.align(&tcx).abi);
+                let b_offset = a.memrepr_size(&tcx).align_to(b.align(&tcx).abi);
                 assert!(b_offset.bytes() > 0); // in `operand_field` we use the offset to tell apart the fields
 
                 // It is tempting to verify `b_offset` against `layout.fields.offset(1)`,
                 // but that does not work: We could be a newtype around a pair, then the
                 // fields do not match the `ScalarPair` components.
 
-                alloc.write_scalar(alloc_range(Size::ZERO, a_val.size()), a_val)?;
-                alloc.write_scalar(alloc_range(b_offset, b_val.size()), b_val)?;
+                alloc.write_scalar(
+                    alloc_range(Size::ZERO, Some(a_val.data_size()), a_val.memrepr_size()),
+                    a_val,
+                )?;
+                alloc.write_scalar(
+                    alloc_range(b_offset, Some(b_val.data_size()), b_val.memrepr_size()),
+                    b_val,
+                )?;
                 // We don't have to reset padding here, `write_immediate` will anyway do a validation run.
                 interp_ok(())
             }
@@ -865,7 +874,7 @@ where
             Right(src_val) => {
                 assert!(!src.layout().is_unsized());
                 assert!(!dest.layout().is_unsized());
-                assert_eq!(src.layout().size, dest.layout().size);
+                assert_eq!(src.layout().memrepr_size, dest.layout().memrepr_size);
                 // Yay, we got a value that we can write directly.
                 return if layout_compat {
                     self.write_immediate_no_validate(*src_val, dest)
@@ -896,7 +905,7 @@ where
             assert_eq!(src_size, dest_size, "Cannot copy differently-sized data");
         } else {
             // As a cheap approximation, we compare the fixed parts of the size.
-            assert_eq!(src.layout.size, dest.layout.size);
+            assert_eq!(src.layout.memrepr_size, dest.layout.memrepr_size);
         }
 
         // Setting `nonoverlapping` here only has an effect when we don't hit the fast-path above,

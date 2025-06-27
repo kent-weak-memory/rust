@@ -104,26 +104,28 @@ impl<'tcx> TypeFolder<TyCtxt<'tcx>> for TransformTy<'tcx> {
                     //
                     // (See https://rust-lang.github.io/unsafe-code-guidelines/layout/scalars.html#isize-and-usize.)
                     match t.kind() {
-                        ty::Int(IntTy::Isize) => match self.tcx.sess.target.pointer_width {
+                        ty::Int(IntTy::Isize) => match self.tcx.sess.target.pointer_memrepr_size {
                             16 => self.tcx.types.i16,
                             32 => self.tcx.types.i32,
                             64 => self.tcx.types.i64,
                             128 => self.tcx.types.i128,
                             _ => bug!(
                                 "fold_ty: unexpected pointer width `{}`",
-                                self.tcx.sess.target.pointer_width
+                                self.tcx.sess.target.pointer_memrepr_size
                             ),
                         },
-                        ty::Uint(UintTy::Usize) => match self.tcx.sess.target.pointer_width {
-                            16 => self.tcx.types.u16,
-                            32 => self.tcx.types.u32,
-                            64 => self.tcx.types.u64,
-                            128 => self.tcx.types.u128,
-                            _ => bug!(
-                                "fold_ty: unexpected pointer width `{}`",
-                                self.tcx.sess.target.pointer_width
-                            ),
-                        },
+                        ty::Uint(UintTy::Usize) => {
+                            match self.tcx.sess.target.pointer_memrepr_size {
+                                16 => self.tcx.types.u16,
+                                32 => self.tcx.types.u32,
+                                64 => self.tcx.types.u64,
+                                128 => self.tcx.types.u128,
+                                _ => bug!(
+                                    "fold_ty: unexpected pointer width `{}`",
+                                    self.tcx.sess.target.pointer_memrepr_size
+                                ),
+                            }
+                        }
                         _ => t,
                     }
                 } else {

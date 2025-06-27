@@ -537,9 +537,9 @@ impl<'tcx> Operand<'tcx> {
             let type_size = tcx
                 .layout_of(typing_env.as_query_input(ty))
                 .unwrap_or_else(|e| panic!("could not compute layout for {ty:?}: {e:?}"))
-                .size;
+                .memrepr_size;
             let scalar_size = match val {
-                Scalar::Int(int) => int.size(),
+                Scalar::Int(int) => int.memrepr_size(),
                 _ => panic!("Invalid scalar type {val:?}"),
             };
             scalar_size == type_size
@@ -611,13 +611,15 @@ impl<'tcx> Operand<'tcx> {
 impl<'tcx> ConstOperand<'tcx> {
     pub fn check_static_ptr(&self, tcx: TyCtxt<'_>) -> Option<DefId> {
         match self.const_.try_to_scalar() {
-            Some(Scalar::Ptr(ptr, _size)) => match tcx.global_alloc(ptr.provenance.alloc_id()) {
-                GlobalAlloc::Static(def_id) => {
-                    assert!(!tcx.is_thread_local_static(def_id));
-                    Some(def_id)
+            Some(Scalar::Ptr(ptr, _data_size, _memrepr_size)) => {
+                match tcx.global_alloc(ptr.provenance.alloc_id()) {
+                    GlobalAlloc::Static(def_id) => {
+                        assert!(!tcx.is_thread_local_static(def_id));
+                        Some(def_id)
+                    }
+                    _ => None,
                 }
-                _ => None,
-            },
+            }
             _ => None,
         }
     }

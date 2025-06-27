@@ -305,7 +305,7 @@ impl Primitive {
         match self {
             Primitive::Int { length, .. } => Size::from_bits(length.bits()),
             Primitive::Float { length } => Size::from_bits(length.bits()),
-            Primitive::Pointer(_) => target.pointer_width,
+            Primitive::Pointer(_) => target.pointer_memrepr_size,
         }
     }
 }

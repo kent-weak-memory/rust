@@ -337,47 +337,58 @@ impl AllocError {
 #[derive(Copy, Clone)]
 pub struct AllocRange {
     pub start: Size,
-    pub size: Size,
+    /// How much of the range contains actual data rather than metadata.
+    /// This must be less than or equal to `memory_size`.
+    /// This is useful for targets like CHERI where pointers contain extra
+    /// metadata at runtime that is managed by the target's hardware.
+    /// This value is set to `None` when the range being described contains
+    /// multiple fields and thus could contain multiple holes for metadata.
+    pub data_size: Option<Size>,
+    /// Overall size of the range including any gaps for metadata.
+    pub memrepr_size: Size,
 }
 
 impl fmt::Debug for AllocRange {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{:#x}..{:#x}]", self.start.bytes(), self.end().bytes())
+        write!(f, "[{:#x}..{:#x}]", self.start.bytes(), self.end_memrepr().bytes())
     }
 }
 
-/// Free-starting constructor for less syntactic overhead.
+/// Free-standing constructor for less syntactic overhead.
 #[inline(always)]
-pub fn alloc_range(start: Size, size: Size) -> AllocRange {
-    AllocRange { start, size }
-}
-
-impl From<Range<Size>> for AllocRange {
-    #[inline]
-    fn from(r: Range<Size>) -> Self {
-        alloc_range(r.start, r.end - r.start) // `Size` subtraction (overflow-checked)
-    }
-}
-
-impl From<Range<usize>> for AllocRange {
-    #[inline]
-    fn from(r: Range<usize>) -> Self {
-        AllocRange::from(Size::from_bytes(r.start)..Size::from_bytes(r.end))
-    }
+pub fn alloc_range(start: Size, data_size: Option<Size>, memrepr_size: Size) -> AllocRange {
+    assert!(
+        data_size.is_none() || data_size.unwrap() <= memrepr_size,
+        "AllocRange valid data must be within overall size of range"
+    );
+    //let ret = AllocRange { start, data_size, memrepr_size };
+    //if ret.start == Size::from_bits(1) && ret.end_memory() == Size::from_bytes(3) {
+    //    println!("Custom backtrace: {}", std::backtrace::Backtrace::force_capture());
+    //}
+    //ret
+    AllocRange { start, data_size, memrepr_size }
 }
 
 impl AllocRange {
     #[inline(always)]
-    pub fn end(self) -> Size {
-        self.start + self.size // This does overflow checking.
+    pub fn end_data_or_memrepr(self) -> Size {
+        self.start + self.data_size.unwrap_or(self.memrepr_size) // This does overflow checking.
+    }
+
+    #[inline(always)]
+    pub fn end_memrepr(self) -> Size {
+        self.start + self.memrepr_size // This does overflow checking.
     }
 
     /// Returns the `subrange` within this range; panics if it is not a subrange.
     #[inline]
     pub fn subrange(self, subrange: AllocRange) -> AllocRange {
         let sub_start = self.start + subrange.start;
-        let range = alloc_range(sub_start, subrange.size);
-        assert!(range.end() <= self.end(), "access outside the bounds for given AllocRange");
+        let range = alloc_range(sub_start, subrange.data_size, subrange.memrepr_size);
+        assert!(
+            range.end_memrepr() <= self.end_memrepr(),
+            "access outside the bounds for given AllocRange"
+        );
         range
     }
 }
@@ -495,7 +506,7 @@ impl Allocation {
         let mut bytes = alloc_bytes(&*self.bytes, self.align)?;
         // Adjust provenance of pointers stored in this allocation.
         let mut new_provenance = Vec::with_capacity(self.provenance.ptrs().len());
-        let ptr_size = cx.data_layout().pointer_size.bytes_usize();
+        let ptr_size = cx.data_layout().pointer_data_size.bytes_usize();
         let endian = cx.data_layout().endian;
         for &(offset, alloc_id) in self.provenance.ptrs().iter() {
             let idx = offset.bytes_usize();
@@ -557,7 +568,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
     /// on that.
     #[inline]
     pub fn get_bytes_unchecked(&self, range: AllocRange) -> &[u8] {
-        &self.bytes[range.start.bytes_usize()..range.end().bytes_usize()]
+        &self.bytes[range.start.bytes_usize()..range.end_data_or_memrepr().bytes_usize()]
     }
 
     /// Checks that these bytes are initialized, and then strip provenance (if possible) and return
@@ -587,10 +598,10 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
                 .copied()
                 .expect("there must be provenance somewhere here");
             let start = offset.max(range.start); // the pointer might begin before `range`!
-            let end = (offset + cx.pointer_size()).min(range.end()); // the pointer might end after `range`!
+            let end = (offset + cx.pointer_data_size()).min(range.end_data_or_memrepr()); // the pointer might end after `range`!
             return Err(AllocError::ReadPointerAsInt(Some(BadBytesAccess {
                 access: range,
-                bad: AllocRange::from(start..end),
+                bad: AllocRange { start, data_size: None, memrepr_size: end - start },
             })));
         }
         Ok(self.get_bytes_unchecked(range))
@@ -611,7 +622,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
         self.mark_init(range, true);
         self.provenance.clear(range, cx)?;
 
-        Ok(&mut self.bytes[range.start.bytes_usize()..range.end().bytes_usize()])
+        Ok(&mut self.bytes[range.start.bytes_usize()..range.end_data_or_memrepr().bytes_usize()])
     }
 
     /// A raw pointer variant of `get_bytes_unchecked_for_overwrite` that avoids invalidating existing immutable aliases
@@ -624,10 +635,10 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
         self.mark_init(range, true);
         self.provenance.clear(range, cx)?;
 
-        assert!(range.end().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
+        assert!(range.end_data_or_memrepr().bytes_usize() <= self.bytes.len()); // need to do our own bounds-check
         // Crucially, we go via `AllocBytes::as_mut_ptr`, not `AllocBytes::deref_mut`.
         let begin_ptr = self.bytes.as_mut_ptr().wrapping_add(range.start.bytes_usize());
-        let len = range.end().bytes_usize() - range.start.bytes_usize();
+        let len = range.end_data_or_memrepr().bytes_usize() - range.start.bytes_usize();
         Ok(ptr::slice_from_raw_parts_mut(begin_ptr, len))
     }
 
@@ -652,7 +663,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> {
     /// Sets the init bit for the given range.
     fn mark_init(&mut self, range: AllocRange, is_init: bool) {
-        if range.size.bytes() == 0 {
+        if range.memrepr_size.bytes() == 0 {
             return;
         }
         assert!(self.mutability == Mutability::Mut);
@@ -682,10 +693,17 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 
         // Get the integer part of the result. We HAVE TO check provenance before returning this!
         let bytes = self.get_bytes_unchecked(range);
-        let bits = read_target_uint(cx.data_layout().endian, bytes).unwrap();
+        let dl = cx.data_layout();
+        let bits = read_target_uint(dl.endian, bytes).unwrap();
 
         if read_provenance {
-            assert_eq!(range.size, cx.data_layout().pointer_size);
+            assert_eq!(
+                range.data_size,
+                Some(dl.pointer_data_size),
+                "range: {range:#?}, range_ds: {:?}, dl: {dl:#?}",
+                range.data_size
+            );
+            assert_eq!(range.memrepr_size, dl.pointer_memrepr_size);
 
             // When reading data with provenance, the easy case is finding provenance exactly where we
             // are reading, then we can put data and provenance back together and return that.
@@ -698,7 +716,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
             // If we can work on pointers byte-wise, join the byte-wise provenances.
             if Prov::OFFSET_IS_ADDR {
                 let mut prov = self.provenance.get(range.start, cx);
-                for offset in Size::from_bytes(1)..range.size {
+                for offset in Size::from_bytes(1)..range.memrepr_size {
                     let this_prov = self.provenance.get(range.start + offset, cx);
                     prov = Prov::join(prov, this_prov);
                 }
@@ -709,7 +727,11 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
                 // Without OFFSET_IS_ADDR, the only remaining case we can handle is total absence of
                 // provenance.
                 if self.provenance.range_empty(range, cx) {
-                    return Ok(Scalar::from_uint(bits, range.size));
+                    return Ok(Scalar::from_uint(
+                        bits,
+                        range.data_size.unwrap(),
+                        range.memrepr_size,
+                    ));
                 }
                 // Else we have mixed provenance, that doesn't work.
                 return Err(AllocError::ReadPartialPointer(range.start));
@@ -719,7 +741,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
             // If we can just ignore provenance or there is none, that's easy.
             if Prov::OFFSET_IS_ADDR || self.provenance.range_empty(range, cx) {
                 // We just strip provenance.
-                return Ok(Scalar::from_uint(bits, range.size));
+                return Ok(Scalar::from_uint(bits, range.data_size.unwrap(), range.memrepr_size));
             }
             // There is some provenance and we don't have OFFSET_IS_ADDR. This doesn't work.
             return Err(AllocError::ReadPointerAsInt(None));
@@ -743,13 +765,14 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 
         // `to_bits_or_ptr_internal` is the right method because we just want to store this data
         // as-is into memory. This also double-checks that `val.size()` matches `range.size`.
-        let (bytes, provenance) = match val.to_bits_or_ptr_internal(range.size)? {
-            Right(ptr) => {
-                let (provenance, offset) = ptr.into_parts();
-                (u128::from(offset.bytes()), Some(provenance))
-            }
-            Left(data) => (data, None),
-        };
+        let (bytes, provenance) =
+            match val.to_bits_or_ptr_internal(range.data_size.unwrap(), range.memrepr_size)? {
+                Right(ptr) => {
+                    let (provenance, offset) = ptr.into_parts();
+                    (u128::from(offset.bytes()), Some(provenance))
+                }
+                Left(data) => (data, None),
+            };
 
         let endian = cx.data_layout().endian;
         // Yes we do overwrite all the bytes in `dst`.
@@ -758,7 +781,7 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
 
         // See if we have to also store some provenance.
         if let Some(provenance) = provenance {
-            assert_eq!(range.size, cx.data_layout().pointer_size);
+            assert_eq!(range.memrepr_size, cx.data_layout().pointer_memrepr_size);
             self.provenance.insert_ptr(range.start, provenance, cx);
         }
 
@@ -776,7 +799,11 @@ impl<Prov: Provenance, Extra, Bytes: AllocBytes> Allocation<Prov, Extra, Bytes> 
     /// provenance of everything to `Wildcard`. Before calling this, make sure all
     /// provenance in this allocation is exposed!
     pub fn prepare_for_native_write(&mut self) -> AllocResult {
-        let full_range = AllocRange { start: Size::ZERO, size: Size::from_bytes(self.len()) };
+        let full_range = AllocRange {
+            start: Size::ZERO,
+            data_size: None,
+            memrepr_size: Size::from_bytes(self.len()),
+        };
         // Overwrite uninitialized bytes with 0, to ensure we don't leak whatever their value happens to be.
         for chunk in self.init_mask.range_as_init_chunks(full_range) {
             if !chunk.is_init() {

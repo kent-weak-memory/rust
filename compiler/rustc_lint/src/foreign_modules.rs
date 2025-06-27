@@ -218,7 +218,7 @@ fn structurally_same_type<'tcx>(
         let a_layout = tcx.layout_of(typing_env.as_query_input(a)).unwrap();
         let b_layout = tcx.layout_of(typing_env.as_query_input(b)).unwrap();
         assert_eq!(a_layout.backend_repr, b_layout.backend_repr);
-        assert_eq!(a_layout.size, b_layout.size);
+        assert_eq!(a_layout.memrepr_size, b_layout.memrepr_size);
         assert_eq!(a_layout.align, b_layout.align);
     }
     result

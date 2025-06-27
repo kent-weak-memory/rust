@@ -42,7 +42,7 @@ fn do_check_simd_vector_abi<'tcx>(
             || codegen_attrs.target_features.iter().any(|x| x.name == feat)
     };
     for arg_abi in abi.args.iter().chain(std::iter::once(&abi.ret)) {
-        let size = arg_abi.layout.size;
+        let size = arg_abi.layout.memrepr_size;
         if uses_vector_registers(&arg_abi.mode, &arg_abi.layout.backend_repr) {
             // Find the first feature that provides at least this vector size.
             let feature = match feature_def.iter().find(|(bits, _)| size.bits() <= *bits) {
@@ -97,7 +97,7 @@ fn wasm_abi_safe<'tcx>(tcx: TyCtxt<'tcx>, arg: &ArgAbi<'tcx, Ty<'tcx>>) -> bool 
     if arg.layout.is_aggregate() {
         let cx = LayoutCx::new(tcx, TypingEnv::fully_monomorphized());
         if let Some(unit) = arg.layout.homogeneous_aggregate(&cx).ok().and_then(|ha| ha.unit()) {
-            let size = arg.layout.size;
+            let size = arg.layout.memrepr_size;
             // Ensure there's just a single `unit` element in `arg`.
             if unit.size == size {
                 return true;

@@ -21,14 +21,14 @@ pub(crate) unsafe fn codegen(
     kind: AllocatorKind,
     alloc_error_handler_kind: AllocatorKind,
 ) {
-    let usize = match tcx.sess.target.pointer_width {
+    let usize = match tcx.sess.target.pointer_memrepr_size {
         16 => cx.type_i16(),
         32 => cx.type_i32(),
         64 => cx.type_i64(),
         tws => bug!("Unsupported target word size for int: {}", tws),
     };
     let i8 = cx.type_i8();
-    let i8p = cx.type_ptr();
+    let i8p = cx.type_ptr_ext(tcx.data_layout.data_address_space);
 
     if kind == AllocatorKind::Default {
         for method in ALLOCATOR_METHODS {

@@ -16,7 +16,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: None, // ?
         },
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memrepr_size: 64,
         data_layout: "E-m:a-Fi64-i64:64-i128:128-n32:64-S128-v256:256:256-v512:512:512".into(),
         arch: "powerpc64".into(),
         options: base,

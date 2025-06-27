@@ -96,8 +96,10 @@ fn dump_layout_of(tcx: TyCtxt<'_>, item_def_id: LocalDefId, attr: &Attribute) {
                     }
 
                     Some(sym::size) => {
-                        tcx.dcx()
-                            .emit_err(LayoutSize { span, size: format!("{:?}", ty_layout.size) });
+                        tcx.dcx().emit_err(LayoutSize {
+                            span,
+                            size: format!("{:?}", ty_layout.memrepr_size),
+                        });
                     }
 
                     Some(sym::homogeneous_aggregate) => {

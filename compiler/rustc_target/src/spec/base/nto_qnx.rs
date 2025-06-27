@@ -27,7 +27,8 @@ pub(crate) fn aarch64() -> Target {
     Target {
         llvm_target: "aarch64-unknown-unknown".into(),
         metadata: meta(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memrepr_size: 64,
         // from: https://llvm.org/docs/LangRef.html#data-layout
         // e         = little endian
         // m:e       = ELF mangling: Private symbols get a .L prefix
@@ -51,7 +52,8 @@ pub(crate) fn x86_64() -> Target {
     Target {
         llvm_target: "x86_64-pc-unknown".into(),
         metadata: meta(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memrepr_size: 64,
         data_layout:
             "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128".into(),
         arch: "x86_64".into(),

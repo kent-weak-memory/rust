@@ -88,7 +88,7 @@ pub(super) fn add_data_and_relocation(
     let authenticated_pointer =
         kind == SymbolExportKind::Text && target.llvm_target.starts_with("arm64e");
 
-    let data: &[u8] = match target.pointer_width {
+    let data: &[u8] = match target.pointer_memrepr_size {
         _ if authenticated_pointer => &[0, 0, 0, 0, 0, 0, 0, 0x80],
         32 => &[0; 4],
         64 => &[0; 8],
@@ -100,7 +100,7 @@ pub(super) fn add_data_and_relocation(
         file.section_mut(section).append_data(&[], 16);
     } else {
         // Elsewhere, the section alignment is the same as the pointer width.
-        file.section_mut(section).append_data(&[], target.pointer_width as u64);
+        file.section_mut(section).append_data(&[], target.pointer_memrepr_size as u64);
     }
 
     let offset = file.section_mut(section).append_data(data, data.len() as u64);
@@ -123,7 +123,7 @@ pub(super) fn add_data_and_relocation(
         object::write::RelocationFlags::Generic {
             kind: object::RelocationKind::Absolute,
             encoding: object::RelocationEncoding::Generic,
-            size: target.pointer_width as u8,
+            size: target.pointer_memrepr_size as u8,
         }
     };
 

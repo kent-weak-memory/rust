@@ -504,7 +504,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
             // for the purpose of validity, consider foreign types to have
             // alignment and size determined by the layout (size will be 0,
             // alignment should take attributes into account).
-            .unwrap_or_else(|| (place.layout.size, place.layout.align.abi));
+            .unwrap_or_else(|| (place.layout.memrepr_size, place.layout.align.abi));
         // Direct call to `check_ptr_access_align` checks alignment even on CTFE machines.
         try_validation!(
             self.ecx.check_ptr_access(
@@ -798,7 +798,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
         scalar: Scalar<M::Provenance>,
         scalar_layout: ScalarAbi,
     ) -> InterpResult<'tcx> {
-        let size = scalar_layout.size(self.ecx);
+        let size = scalar_layout.data_size(self.ecx);
         let valid_range = scalar_layout.valid_range(self.ecx);
         let WrappingRange { start, end } = valid_range;
         let max_value = size.unsigned_int_max();
@@ -880,7 +880,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
         debug_assert!(place.layout.is_sized());
         if let Some(data_bytes) = self.data_bytes.as_mut() {
             let offset = Self::data_range_offset(self.ecx, place);
-            data_bytes.add_range(offset, place.layout.size);
+            data_bytes.add_range(offset, place.layout.memrepr_size);
         }
     }
 
@@ -904,25 +904,27 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
         let mplace = self.ecx.force_allocation(place)?;
         // Determine starting offset and size.
         let (_prov, start_offset) = mplace.ptr().into_parts();
-        let (size, _align) = self
+        let (memrepr_size, _align) = self
             .ecx
             .size_and_align_of_mplace(&mplace)?
-            .unwrap_or((mplace.layout.size, mplace.layout.align.abi));
+            .unwrap_or((mplace.layout.memrepr_size, mplace.layout.align.abi));
         // If there is no padding at all, we can skip the rest: check for
         // a single data range covering the entire value.
-        if data_bytes.0 == &[(start_offset, size)] {
+        if data_bytes.0 == &[(start_offset, memrepr_size)] {
             return interp_ok(());
         }
         // Get a handle for the allocation. Do this only once, to avoid looking up the same
         // allocation over and over again. (Though to be fair, iterating the value already does
         // exactly that.)
-        let Some(mut alloc) = self.ecx.get_ptr_alloc_mut(mplace.ptr(), size)? else {
+        let Some(mut alloc) =
+            self.ecx.get_ptr_alloc_mut(mplace.ptr(), mplace.layout.data_size, memrepr_size)?
+        else {
             // A ZST, no padding to clear.
             return interp_ok(());
         };
         // Add a "finalizer" data range at the end, so that the iteration below finds all gaps
         // between ranges.
-        data_bytes.0.push((start_offset + size, Size::ZERO));
+        data_bytes.0.push((start_offset + memrepr_size, Size::ZERO));
         // Iterate, and reset gaps.
         let mut padding_cleared_until = start_offset;
         for &(offset, size) in data_bytes.0.iter() {
@@ -938,13 +940,13 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
                 // We found padding. Adjust the range to be relative to `alloc`, and make it uninit.
                 let padding_start = padding_cleared_until - start_offset;
                 let padding_size = offset - padding_cleared_until;
-                let range = alloc_range(padding_start, padding_size);
+                let range = alloc_range(padding_start, None, padding_size);
                 trace!("reset_padding on {}: resetting padding range {range:?}", mplace.layout.ty);
                 alloc.write_uninit(range)?;
             }
             padding_cleared_until = offset + size;
         }
-        assert!(padding_cleared_until == start_offset + size);
+        assert!(padding_cleared_until == start_offset + memrepr_size);
         interp_ok(())
     }
 
@@ -978,7 +980,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
             // Just recursively add all the fields of everything to the output.
             match &layout.fields {
                 FieldsShape::Primitive => {
-                    out.add_range(base_offset, layout.size);
+                    out.add_range(base_offset, layout.memrepr_size);
                 }
                 &FieldsShape::Union(fields) => {
                     // Currently, all fields start at offset 0 (relative to `base_offset`).
@@ -992,7 +994,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValidityVisitor<'rt, 'tcx, M> {
 
                     // Fast-path for large arrays of simple types that do not contain any padding.
                     if elem.backend_repr.is_scalar() {
-                        out.add_range(base_offset, elem.size * count);
+                        out.add_range(base_offset, elem.memrepr_size * count);
                     } else {
                         for idx in 0..count {
                             // This repeats the same computation for every array element... but the alternative
@@ -1147,7 +1149,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValueVisitor<'tcx, M> for ValidityVisitor<'rt,
                 let mplace = val.assert_mem_place(); // strings are unsized and hence never immediate
                 let len = mplace.len(self.ecx)?;
                 try_validation!(
-                    self.ecx.read_bytes_ptr_strip_provenance(mplace.ptr(), Size::from_bytes(len)),
+                    self.ecx.read_bytes_ptr_strip_provenance(mplace.ptr(), None, Size::from_bytes(len)),
                     self.path,
                     Ub(InvalidUninitBytes(..)) => Uninit { expected: ExpectedKind::Str },
                     Unsup(ReadPointerAsInt(_)) => PointerAsInt { expected: ExpectedKind::Str }
@@ -1169,10 +1171,10 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValueVisitor<'tcx, M> for ValidityVisitor<'rt,
                 // This is the element type size.
                 let layout = self.ecx.layout_of(*tys)?;
                 // This is the size in bytes of the whole array. (This checks for overflow.)
-                let size = layout.size * len;
+                let memrepr_size = layout.memrepr_size * len;
                 // If the size is 0, there is nothing to check.
                 // (`size` can only be 0 if `len` is 0, and empty arrays are always valid.)
-                if size == Size::ZERO {
+                if memrepr_size == Size::ZERO {
                     return interp_ok(());
                 }
                 // Now that we definitely have a non-ZST array, we know it lives in memory -- except it may
@@ -1191,7 +1193,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValueVisitor<'tcx, M> for ValidityVisitor<'rt,
                 // NOTE: Keep this in sync with the handling of integer and float
                 // types above, in `visit_primitive`.
                 // No need for an alignment check here, this is not an actual memory access.
-                let alloc = self.ecx.get_ptr_alloc(mplace.ptr(), size)?.expect("we already excluded size 0");
+                let alloc = self.ecx.get_ptr_alloc(mplace.ptr(), layout.data_size, memrepr_size)?.expect("we already excluded size 0");
 
                 alloc.get_bytes_strip_provenance().map_err_kind(|kind| {
                     // Some error happened, try to provide a more detailed description.
@@ -1203,7 +1205,7 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValueVisitor<'tcx, M> for ValidityVisitor<'rt,
                             // element that byte belongs to so we can
                             // provide an index.
                             let i = usize::try_from(
-                                access.bad.start.bytes() / layout.size.bytes(),
+                                access.bad.start.bytes() / layout.memrepr_size.bytes(),
                             )
                             .unwrap();
                             self.path.push(PathElem::ArrayElem(i));
@@ -1224,10 +1226,10 @@ impl<'rt, 'tcx, M: Machine<'tcx>> ValueVisitor<'tcx, M> for ValidityVisitor<'rt,
                 // provenance.
                 if self.reset_provenance_and_padding {
                     // We can't share this with above as above, we might be looking at read-only memory.
-                    let mut alloc = self.ecx.get_ptr_alloc_mut(mplace.ptr(), size)?.expect("we already excluded size 0");
+                    let mut alloc = self.ecx.get_ptr_alloc_mut(mplace.ptr(), None, memrepr_size)?.expect("we already excluded size 0");
                     alloc.clear_provenance()?;
                     // Also, mark this as containing data, not padding.
-                    self.add_data_range(mplace.ptr(), size);
+                    self.add_data_range(mplace.ptr(), memrepr_size);
                 }
             }
             // Fast path for arrays and slices of ZSTs. We only need to check a single ZST element

@@ -14,7 +14,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: Some(false),
         },
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memrepr_size: 64,
 
         options: TargetOptions {
             os: "cuda".into(),

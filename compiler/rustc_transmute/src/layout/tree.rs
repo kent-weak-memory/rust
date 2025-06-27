@@ -291,7 +291,7 @@ pub(crate) mod rustc {
             }
 
             let target = cx.data_layout();
-            let pointer_size = target.pointer_size;
+            let pointer_size = target.pointer_memrepr_size;
 
             match ty.kind() {
                 ty::Bool => Ok(Self::bool()),
@@ -318,7 +318,7 @@ pub(crate) mod rustc {
                         return Err(Err::NotYetSupported);
                     };
                     let inner_layout = layout_of(cx, *inner_ty)?;
-                    assert_eq!(*stride, inner_layout.size);
+                    assert_eq!(*stride, inner_layout.memrepr_size);
                     let elt = Tree::from_ty(*inner_ty, cx)?;
                     Ok(std::iter::repeat(elt)
                         .take(*count as usize)
@@ -356,7 +356,8 @@ pub(crate) mod rustc {
                 ty::Ref(lifetime, ty, mutability) => {
                     let layout = layout_of(cx, *ty)?;
                     let align = layout.align.abi.bytes_usize();
-                    let size = layout.size.bytes_usize();
+                    let size = layout.memrepr_size.bytes_usize();
+
                     Ok(Tree::Ref(Ref {
                         lifetime: *lifetime,
                         ty: *ty,
@@ -386,7 +387,7 @@ pub(crate) mod rustc {
                 }
                 FieldsShape::Arbitrary { offsets, .. } => {
                     assert_eq!(offsets.len(), members.len());
-                    Self::from_variant(Def::Primitive, None, (ty, layout), layout.size, cx)
+                    Self::from_variant(Def::Primitive, None, (ty, layout), layout.memrepr_size, cx)
                 }
                 FieldsShape::Array { .. } | FieldsShape::Union(_) => Err(Err::NotYetSupported),
             }
@@ -404,7 +405,7 @@ pub(crate) mod rustc {
         ) -> Result<Self, Err> {
             assert!(def.is_struct());
             let def = Def::Adt(def);
-            Self::from_variant(def, None, (ty, layout), layout.size, cx)
+            Self::from_variant(def, None, (ty, layout), layout.memrepr_size, cx)
         }
 
         /// Constructs a `Tree` from an enum.
@@ -432,7 +433,7 @@ pub(crate) mod rustc {
                         variant_def,
                         tag.map(|tag| (tag, index, encoding.unwrap())),
                         (ty, variant_layout),
-                        layout.size,
+                        layout.memrepr_size,
                         cx,
                     )
                 };
@@ -491,7 +492,7 @@ pub(crate) mod rustc {
             // When this function is invoked with enum variants,
             // `ty_and_layout.size` does not encompass the entire size of the
             // enum. We rely on `total_size` for this.
-            assert!(layout.size <= total_size);
+            assert!(layout.memrepr_size <= total_size);
 
             let mut size = Size::ZERO;
             let mut struct_tree = Self::def(def);
@@ -500,11 +501,11 @@ pub(crate) mod rustc {
             if let Some((tag, index, encoding)) = &tag {
                 match encoding {
                     TagEncoding::Direct => {
-                        size += tag.size();
+                        size += tag.memrepr_size();
                     }
                     TagEncoding::Niche { niche_variants, .. } => {
                         if !niche_variants.contains(index) {
-                            size += tag.size();
+                            size += tag.memrepr_size();
                         }
                     }
                 }
@@ -524,7 +525,7 @@ pub(crate) mod rustc {
 
                 struct_tree = struct_tree.then(padding).then(field_tree);
 
-                size += padding_needed + field_layout.size;
+                size += padding_needed + field_layout.memrepr_size;
             }
 
             // Add trailing padding.
@@ -537,7 +538,7 @@ pub(crate) mod rustc {
         /// Constructs a `Tree` representing the value of a enum tag.
         fn from_tag(tag: ScalarInt, tcx: TyCtxt<'tcx>) -> Self {
             use rustc_abi::Endian;
-            let size = tag.size();
+            let size = tag.memrepr_size();
             let bits = tag.to_bits(size);
             let bytes: [u8; 16];
             let bytes = match tcx.data_layout.endian {
@@ -578,7 +579,7 @@ pub(crate) mod rustc {
                     let field_ty = ty_field(cx, (ty, layout), idx);
                     let field_layout = layout_of(cx, field_ty)?;
                     let field = Self::from_ty(field_ty, cx)?;
-                    let trailing_padding_needed = layout.size - field_layout.size;
+                    let trailing_padding_needed = layout.memrepr_size - field_layout.memrepr_size;
                     let trailing_padding = Self::padding(trailing_padding_needed.bytes_usize());
                     let field_and_padding = field.then(trailing_padding);
                     Result::<Self, Err>::Ok(fields.or(field_and_padding))

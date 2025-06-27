@@ -46,9 +46,9 @@ impl InitMask {
     /// indexes for the first contiguous span of the uninitialized access.
     #[inline]
     pub fn is_range_initialized(&self, range: AllocRange) -> Result<(), AllocRange> {
-        let end = range.end();
+        let end = range.end_data_or_memrepr();
         if end > self.len {
-            return Err(AllocRange::from(self.len..end));
+            return Err(super::alloc_range(self.len, None, end - self.len)); // `Size` subtraction (overflow-checked)
         }
 
         match self.blocks {
@@ -67,7 +67,7 @@ impl InitMask {
     /// accommodate it entirely.
     pub fn set_range(&mut self, range: AllocRange, new_state: bool) {
         let start = range.start;
-        let end = range.end();
+        let end = range.end_data_or_memrepr();
 
         let is_full_overwrite = start == Size::ZERO && end >= self.len;
 
@@ -279,7 +279,7 @@ impl InitMaskMaterialized {
         match uninit_start {
             Some(uninit_start) => {
                 let uninit_end = self.find_bit(uninit_start, end, true).unwrap_or(end);
-                Err(AllocRange::from(uninit_start..uninit_end))
+                Err(super::alloc_range(uninit_start, None, uninit_end - uninit_start))
             }
             None => Ok(()),
         }
@@ -584,7 +584,7 @@ impl InitMask {
     #[inline]
     pub fn range_as_init_chunks(&self, range: AllocRange) -> InitChunkIter<'_> {
         let start = range.start;
-        let end = range.end();
+        let end = range.end_memrepr();
         assert!(end <= self.len);
 
         let is_init = if start < end {
@@ -702,8 +702,8 @@ impl InitMask {
         // we won't need materialized blocks either.
         if defined.ranges.len() <= 1 {
             let start = range.start;
-            let end = range.start + range.size * repeat; // `Size` operations
-            self.set_range(AllocRange::from(start..end), defined.initial);
+            let end = range.start + range.memrepr_size * repeat; // `Size` operations
+            self.set_range(super::alloc_range(start, None, end), defined.initial);
             return;
         }
 
@@ -711,7 +711,7 @@ impl InitMask {
         let blocks = self.materialize_blocks();
 
         for mut j in 0..repeat {
-            j *= range.size.bytes();
+            j *= range.memrepr_size.bytes();
             j += range.start.bytes();
             let mut cur = defined.initial;
             for range in &defined.ranges {

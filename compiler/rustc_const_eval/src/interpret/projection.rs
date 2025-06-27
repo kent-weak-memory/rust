@@ -92,7 +92,7 @@ pub trait Projectable<'tcx, Prov: Provenance>: Sized + std::fmt::Debug {
         ecx: &InterpCx<'tcx, M>,
     ) -> InterpResult<'tcx, Self> {
         assert!(self.layout().is_sized() && layout.is_sized());
-        assert_eq!(self.layout().size, layout.size);
+        assert_eq!(self.layout().memrepr_size, layout.memrepr_size);
         self.offset_with_meta(Size::ZERO, OffsetMode::Wrapping, MemPlaceMeta::None, layout, ecx)
     }
 

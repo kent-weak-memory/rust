@@ -1,5 +1,6 @@
 error: layout_of(Result<[u32; 0], bool>) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
@@ -38,7 +39,8 @@ error: layout_of(Result<[u32; 0], bool>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
@@ -64,7 +66,8 @@ error: layout_of(Result<[u32; 0], bool>) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -110,7 +113,8 @@ LL | type AlignedResult = Result<[u32; 0], bool>;
    | ^^^^^^^^^^^^^^^^^^
 
 error: layout_of(MultipleAlignments) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
@@ -149,7 +153,8 @@ error: layout_of(MultipleAlignments) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(2 bytes),
                            pref: $PREF_ALIGN,
@@ -175,7 +180,8 @@ error: layout_of(MultipleAlignments) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
@@ -201,7 +207,8 @@ error: layout_of(MultipleAlignments) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -247,7 +254,8 @@ LL | enum MultipleAlignments {
    | ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(Result<[u32; 0], Packed<NonZero<u16>>>) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
@@ -286,7 +294,8 @@ error: layout_of(Result<[u32; 0], Packed<NonZero<u16>>>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
@@ -312,7 +321,8 @@ error: layout_of(Result<[u32; 0], Packed<NonZero<u16>>>) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(3 bytes),
+                       data_size: None,
+                       memrepr_size: Size(3 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,
@@ -358,7 +368,8 @@ LL | type NicheLosesToTagged = Result<[u32; 0], Packed<std::num::NonZero<u16>>>;
    | ^^^^^^^^^^^^^^^^^^^^^^^
 
 error: layout_of(Result<[u32; 0], Packed<U16IsZero>>) = Layout {
-           size: Size(4 bytes),
+           data_size: None,
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $PREF_ALIGN,
@@ -401,7 +412,10 @@ error: layout_of(Result<[u32; 0], Packed<U16IsZero>>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memrepr_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $PREF_ALIGN,
@@ -427,7 +441,8 @@ error: layout_of(Result<[u32; 0], Packed<U16IsZero>>) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $PREF_ALIGN,

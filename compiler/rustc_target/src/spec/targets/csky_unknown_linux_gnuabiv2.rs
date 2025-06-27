@@ -12,7 +12,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: Some(true)
         },
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memrepr_size: 32,
         data_layout: "e-m:e-S32-p:32:32-i32:32:32-i64:32:32-f32:32:32-f64:32:32-v64:32:32-v128:32:32-a:0:32-Fi32-n32".into(),
         arch: "csky".into(),
         options: TargetOptions {

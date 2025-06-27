@@ -144,11 +144,11 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 assert!(src.layout.is_sized());
                 assert!(dest.layout.is_sized());
                 assert_eq!(cast_ty, dest.layout.ty); // we otherwise ignore `cast_ty` enirely...
-                if src.layout.size != dest.layout.size {
+                if src.layout.memrepr_size != dest.layout.memrepr_size {
                     throw_ub_custom!(
                         fluent::const_eval_invalid_transmute,
-                        src_bytes = src.layout.size.bytes(),
-                        dest_bytes = dest.layout.size.bytes(),
+                        src_bytes = src.layout.memrepr_size.bytes(),
+                        dest_bytes = dest.layout.memrepr_size.bytes(),
                         src = src.layout.ty,
                         dest = dest.layout.ty,
                     );
@@ -202,13 +202,13 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         assert!(src.layout.ty.is_any_ptr());
         assert!(cast_to.ty.is_raw_ptr());
         // Handle casting any ptr to raw ptr (might be a wide ptr).
-        if cast_to.size == src.layout.size {
+        if cast_to.memrepr_size == src.layout.memrepr_size {
             // Thin or wide pointer that just has the ptr kind of target type changed.
             return interp_ok(ImmTy::from_immediate(**src, cast_to));
         } else {
             // Casting the metadata away from a wide ptr.
-            assert_eq!(src.layout.size, 2 * self.pointer_size());
-            assert_eq!(cast_to.size, self.pointer_size());
+            assert_eq!(src.layout.memrepr_size, 2 * self.pointer_memrepr_size());
+            assert_eq!(cast_to.memrepr_size, self.pointer_memrepr_size());
             assert!(src.layout.ty.is_raw_ptr());
             return match **src {
                 Immediate::ScalarPair(data, _) => interp_ok(ImmTy::from_scalar(data, cast_to)),
@@ -274,8 +274,10 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         let signed = src_layout.backend_repr.is_signed(); // Also asserts that abi is `Scalar`.
 
         let v = match src_layout.ty.kind() {
-            ty::Uint(_) | ty::RawPtr(..) | ty::FnPtr(..) => scalar.to_uint(src_layout.size)?,
-            ty::Int(_) => scalar.to_int(src_layout.size)? as u128, // we will cast back to `i128` below if the sign matters
+            ty::Uint(_) | ty::RawPtr(..) | ty::FnPtr(..) => {
+                scalar.to_uint(src_layout.memrepr_size)?
+            }
+            ty::Int(_) => scalar.to_int(src_layout.memrepr_size)? as u128, // we will cast back to `i128` below if the sign matters
             ty::Bool => scalar.to_bool()?.into(),
             ty::Char => scalar.to_char()?.into(),
             _ => span_bug!(self.cur_span(), "invalid int-like cast from {}", src_layout.ty),
@@ -290,7 +292,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                     _ => bug!(),
                 };
                 let v = size.truncate(v);
-                Scalar::from_uint(v, size)
+                Scalar::from_uint(v, size, size)
             }
 
             // signed int -> float
@@ -337,7 +339,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 // (https://doc.rust-lang.org/nightly/nightly-rustc/rustc_apfloat/trait.Float.html#method.to_i128_r).
                 let v = f.to_u128(size.bits_usize()).value;
                 // This should already fit the bit width
-                Scalar::from_uint(v, size)
+                Scalar::from_uint(v, size, size)
             }
             // float -> int
             ty::Int(t) => {
@@ -345,7 +347,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 // `to_i128` is a saturating cast, which is what we need
                 // (https://doc.rust-lang.org/nightly/nightly-rustc/rustc_apfloat/trait.Float.html#method.to_i128_r).
                 let v = f.to_i128(size.bits_usize()).value;
-                Scalar::from_int(v, size)
+                Scalar::from_int(v, size, size)
             }
             // float -> float
             ty::Float(fty) => match fty {

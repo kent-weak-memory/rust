@@ -4,7 +4,10 @@ error: fn_abi_of(pass_zst) = FnAbi {
                    layout: TyAndLayout {
                        ty: (),
                        layout: Layout {
-                           size: Size(0 bytes),
+                           data_size: Some(
+                               Size(0 bytes),
+                           ),
+                           memrepr_size: Size(0 bytes),
                            align: AbiAndPrefAlign {
                                abi: $SOME_ALIGN,
                                pref: $SOME_ALIGN,
@@ -44,7 +47,10 @@ error: fn_abi_of(pass_zst) = FnAbi {
                layout: TyAndLayout {
                    ty: (),
                    layout: Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memrepr_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: $SOME_ALIGN,
                            pref: $SOME_ALIGN,

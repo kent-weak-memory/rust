@@ -134,18 +134,22 @@ impl<'tcx> interpret::Machine<'tcx> for DummyMachine {
             Eq | Ne | Lt | Le | Gt | Ge => {
                 // Types can differ, e.g. fn ptrs with different `for`.
                 assert_eq!(left.layout.backend_repr, right.layout.backend_repr);
-                let size = ecx.pointer_size();
+                let size = ecx.pointer_memrepr_size();
                 // Just compare the bits. ScalarPairs are compared lexicographically.
                 // We thus always compare pairs and simply fill scalars up with 0.
                 // If the pointer has provenance, `to_bits` will return `Err` and we bail out.
                 let left = match **left {
-                    Immediate::Scalar(l) => (l.to_bits(size)?, 0),
-                    Immediate::ScalarPair(l1, l2) => (l1.to_bits(size)?, l2.to_bits(size)?),
+                    Immediate::Scalar(l) => (l.to_bits(size, size)?, 0),
+                    Immediate::ScalarPair(l1, l2) => {
+                        (l1.to_bits(size, size)?, l2.to_bits(size, size)?)
+                    }
                     Immediate::Uninit => panic!("we should never see uninit data here"),
                 };
                 let right = match **right {
-                    Immediate::Scalar(r) => (r.to_bits(size)?, 0),
-                    Immediate::ScalarPair(r1, r2) => (r1.to_bits(size)?, r2.to_bits(size)?),
+                    Immediate::Scalar(r) => (r.to_bits(size, size)?, 0),
+                    Immediate::ScalarPair(r1, r2) => {
+                        (r1.to_bits(size, size)?, r2.to_bits(size, size)?)
+                    }
                     Immediate::Uninit => panic!("we should never see uninit data here"),
                 };
                 let res = match bin_op {

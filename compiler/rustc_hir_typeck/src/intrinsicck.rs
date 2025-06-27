@@ -89,7 +89,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             // `Option<typeof(function)>` to present a clearer error.
             let from = unpack_option_like(tcx, from);
             if let (&ty::FnDef(..), SizeSkeleton::Known(size_to, _)) = (from.kind(), sk_to)
-                && size_to == Pointer(dl.instruction_address_space).size(&tcx)
+                && size_to == Pointer(dl.instruction_address_space).memrepr_size(&tcx)
             {
                 struct_span_code_err!(self.dcx(), span, E0591, "can't transmute zero-sized type")
                     .with_note(format!("source type: {from}"))

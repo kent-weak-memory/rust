@@ -1564,7 +1564,9 @@ pub fn write_allocations<'tcx>(
 
     fn alloc_id_from_const_val(val: ConstValue<'_>) -> Option<AllocId> {
         match val {
-            ConstValue::Scalar(interpret::Scalar::Ptr(ptr, _)) => Some(ptr.provenance.alloc_id()),
+            ConstValue::Scalar(interpret::Scalar::Ptr(ptr, _, _)) => {
+                Some(ptr.provenance.alloc_id())
+            }
             ConstValue::Scalar(interpret::Scalar::Int { .. }) => None,
             ConstValue::ZeroSized => None,
             ConstValue::Slice { .. } => {
@@ -1749,13 +1751,14 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
     let mut i = Size::ZERO;
     let mut line_start = Size::ZERO;
 
-    let ptr_size = tcx.data_layout.pointer_size;
+    let pointer_data_size = tcx.data_layout.pointer_data_size;
+    let pointer_memrepr_size = tcx.data_layout.pointer_memrepr_size;
 
     let mut ascii = String::new();
 
     let oversized_ptr = |target: &mut String, width| {
         if target.len() > width {
-            write!(target, " ({} ptr bytes)", ptr_size.bytes()).unwrap();
+            write!(target, " ({} ptr bytes)", pointer_memrepr_size.bytes()).unwrap();
         }
     };
 
@@ -1768,24 +1771,34 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
         }
         if let Some(prov) = alloc.provenance().get_ptr(i) {
             // Memory with provenance must be defined
-            assert!(alloc.init_mask().is_range_initialized(alloc_range(i, ptr_size)).is_ok());
+            assert!(
+                alloc
+                    .init_mask()
+                    .is_range_initialized(alloc_range(
+                        i,
+                        Some(pointer_data_size),
+                        pointer_memrepr_size
+                    ))
+                    .is_ok()
+            );
             let j = i.bytes_usize();
-            let offset = alloc
-                .inspect_with_uninit_and_ptr_outside_interpreter(j..j + ptr_size.bytes_usize());
+            let offset = alloc.inspect_with_uninit_and_ptr_outside_interpreter(
+                j..j + pointer_memrepr_size.bytes_usize(),
+            );
             let offset = read_target_uint(tcx.data_layout.endian, offset).unwrap();
             let offset = Size::from_bytes(offset);
             let provenance_width = |bytes| bytes * 3;
             let ptr = Pointer::new(prov, offset);
             let mut target = format!("{ptr:?}");
-            if target.len() > provenance_width(ptr_size.bytes_usize() - 1) {
+            if target.len() > provenance_width(pointer_memrepr_size.bytes_usize() - 1) {
                 // This is too long, try to save some space.
                 target = format!("{ptr:#?}");
             }
-            if ((i - line_start) + ptr_size).bytes_usize() > BYTES_PER_LINE {
+            if ((i - line_start) + pointer_memrepr_size).bytes_usize() > BYTES_PER_LINE {
                 // This branch handles the situation where a provenance starts in the current line
                 // but ends in the next one.
                 let remainder = Size::from_bytes(BYTES_PER_LINE) - (i - line_start);
-                let overflow = ptr_size - remainder;
+                let overflow = pointer_memrepr_size - remainder;
                 let remainder_width = provenance_width(remainder.bytes_usize()) - 2;
                 let overflow_width = provenance_width(overflow.bytes_usize() - 1) + 1;
                 ascii.push('╾'); // HEAVY LEFT AND LIGHT RIGHT
@@ -1811,24 +1824,31 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
                     ascii.push('─');
                 }
                 ascii.push('╼'); // LIGHT LEFT AND HEAVY RIGHT
-                i += ptr_size;
+                i += pointer_memrepr_size;
                 continue;
             } else {
                 // This branch handles a provenance that starts and ends in the current line.
-                let provenance_width = provenance_width(ptr_size.bytes_usize() - 1);
+                let provenance_width = provenance_width(pointer_memrepr_size.bytes_usize() - 1);
                 oversized_ptr(&mut target, provenance_width);
                 ascii.push('╾');
                 write!(w, "╾{target:─^provenance_width$}╼")?;
-                for _ in 0..ptr_size.bytes() - 2 {
+                for _ in 0..pointer_memrepr_size.bytes() - 2 {
                     ascii.push('─');
                 }
                 ascii.push('╼');
-                i += ptr_size;
+                i += pointer_memrepr_size;
             }
         } else if let Some(prov) = alloc.provenance().get(i, &tcx) {
             // Memory with provenance must be defined
             assert!(
-                alloc.init_mask().is_range_initialized(alloc_range(i, Size::from_bytes(1))).is_ok()
+                alloc
+                    .init_mask()
+                    .is_range_initialized(alloc_range(
+                        i,
+                        Some(Size::from_bytes(1)),
+                        Size::from_bytes(1)
+                    ))
+                    .is_ok()
             );
             ascii.push('━'); // HEAVY HORIZONTAL
             // We have two characters to display this, which is obviously not enough.
@@ -1839,7 +1859,7 @@ pub fn write_allocation_bytes<'tcx, Prov: Provenance, Extra, Bytes: AllocBytes>(
             i += Size::from_bytes(1);
         } else if alloc
             .init_mask()
-            .is_range_initialized(alloc_range(i, Size::from_bytes(1)))
+            .is_range_initialized(alloc_range(i, Some(Size::from_bytes(1)), Size::from_bytes(1)))
             .is_ok()
         {
             let j = i.bytes_usize();
@@ -1925,7 +1945,8 @@ fn pretty_print_const_value_tcx<'tcx>(
             let n = n.try_to_target_usize(tcx).unwrap();
             let alloc = tcx.global_alloc(alloc_id).unwrap_memory();
             // cast is ok because we already checked for pointer size (32 or 64 bit) above
-            let range = AllocRange { start: offset, size: Size::from_bytes(n) };
+            let size = Size::from_bytes(n);
+            let range = AllocRange { start: offset, data_size: Some(size), memrepr_size: size };
             let byte_str = alloc.inner().get_bytes_strip_provenance(&tcx, range).unwrap();
             fmt.write_str("*")?;
             pretty_print_byte_str(fmt, byte_str)?;

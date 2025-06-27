@@ -363,7 +363,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
             // This is performance-sensitive code for big static/const arrays! So we
             // avoid writing each operand individually and instead just make many copies
             // of the first element.
-            let elem_size = first.layout.size;
+            let elem_size = first.layout.memrepr_size;
             let first_ptr = first.ptr();
             let rest_ptr = first_ptr.wrapping_offset(elem_size, self);
             // No alignment requirement since `copy_op` above already checked it.

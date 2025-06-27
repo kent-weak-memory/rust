@@ -188,8 +188,8 @@ impl EnumSizeOpt {
             Variants::Multiple { variants, .. } if variants.len() <= 1 => return None,
             Variants::Multiple { variants, .. } => variants,
         };
-        let min = variants.iter().map(|v| v.size).min().unwrap();
-        let max = variants.iter().map(|v| v.size).max().unwrap();
+        let min = variants.iter().map(|v| v.memrepr_size).min().unwrap();
+        let max = variants.iter().map(|v| v.memrepr_size).max().unwrap();
         if max.bytes() - min.bytes() < self.discrepancy {
             return None;
         }
@@ -206,7 +206,7 @@ impl EnumSizeOpt {
         }
 
         let data_layout = tcx.data_layout();
-        let ptr_sized_int = data_layout.ptr_sized_integer();
+        let ptr_sized_int = data_layout.ptr_data_sized_integer();
         let target_bytes = ptr_sized_int.size().bytes() as usize;
         let mut data = vec![0; target_bytes * num_discrs];
 
@@ -226,7 +226,7 @@ impl EnumSizeOpt {
         for (var_idx, layout) in variants.iter_enumerated() {
             let curr_idx =
                 target_bytes * adt_def.discriminant_for_variant(tcx, var_idx).val as usize;
-            let sz = layout.size;
+            let sz = layout.memrepr_size;
             match ptr_sized_int {
                 rustc_abi::Integer::I32 => {
                     encode_store!(curr_idx, data_layout.endian, sz.bytes() as u32);
@@ -239,7 +239,7 @@ impl EnumSizeOpt {
         }
         let alloc = interpret::Allocation::from_bytes(
             data,
-            tcx.data_layout.ptr_sized_integer().align(&tcx.data_layout).abi,
+            tcx.data_layout.ptr_data_sized_integer().align(&tcx.data_layout).abi,
             Mutability::Not,
         );
         let alloc = tcx.reserve_and_set_memory_alloc(tcx.mk_const_alloc(alloc));

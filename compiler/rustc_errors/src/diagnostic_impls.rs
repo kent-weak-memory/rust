@@ -366,11 +366,16 @@ impl<G: EmissionGuarantee> Diagnostic<'_, G> for TargetDataLayoutErrors<'_> {
                     .with_arg("dl", dl)
                     .with_arg("target", target)
             }
-            TargetDataLayoutErrors::InconsistentTargetPointerWidth { pointer_size, target } => {
-                Diag::new(dcx, level, fluent::errors_target_inconsistent_pointer_width)
-                    .with_arg("pointer_size", pointer_size)
-                    .with_arg("target", target)
-            }
+            TargetDataLayoutErrors::InconsistentTargetPointerWidth {
+                pointer_data_size,
+                pointer_memrepr_size: pointer_memory_size,
+                target_pointer_data_size: target_data_size,
+                target_pointer_memrepr_size: target_memory_size,
+            } => Diag::new(dcx, level, fluent::errors_target_inconsistent_pointer_width)
+                .with_arg("pointer_data_size", pointer_data_size)
+                .with_arg("pointer_memory_size", pointer_memory_size)
+                .with_arg("target_data_size", target_data_size)
+                .with_arg("target_memory_size", target_memory_size),
             TargetDataLayoutErrors::InvalidBitsSize { err } => {
                 Diag::new(dcx, level, fluent::errors_target_invalid_bits_size).with_arg("err", err)
             }

@@ -31,9 +31,12 @@ impl Target {
         let mut base = Target {
             llvm_target: get_req_field("llvm-target")?.into(),
             metadata: Default::default(),
-            pointer_width: get_req_field("target-pointer-width")?
+            pointer_data_size: get_req_field("target-pointer-data-size")?
                 .parse::<u32>()
-                .map_err(|_| "target-pointer-width must be an integer".to_string())?,
+                .map_err(|_| "target-pointer-data-size must be an integer".to_string())?,
+            pointer_memrepr_size: get_req_field("target-pointer-memrepr-size")?
+                .parse::<u32>()
+                .map_err(|_| "target-pointer-memrepr-size must be an integer".to_string())?,
             data_layout: get_req_field("data-layout")?.into(),
             arch: get_req_field("arch")?.into(),
             options: Default::default(),
@@ -728,7 +731,14 @@ impl ToJson for Target {
 
         target_val!(llvm_target);
         target_val!(metadata);
-        d.insert("target-pointer-width".to_string(), self.pointer_width.to_string().to_json());
+        d.insert(
+            "target-pointer-data-size".to_string(),
+            self.pointer_data_size.to_string().to_json(),
+        );
+        d.insert(
+            "target-pointer-memrepr-size".to_string(),
+            self.pointer_memrepr_size.to_string().to_json(),
+        );
         target_val!(arch);
         target_val!(data_layout);
 

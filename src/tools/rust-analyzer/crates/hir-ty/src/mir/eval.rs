@@ -225,7 +225,7 @@ impl Interval {
     }
 
     fn get<'a>(&self, memory: &'a Evaluator<'a>) -> Result<&'a [u8]> {
-        memory.read_memory(self.addr, self.size)
+        memory.read_memory(self.addr, self.memrepr_size)
     }
 
     fn write_from_bytes(&self, memory: &mut Evaluator<'_>, bytes: &[u8]) -> Result<()> {
@@ -243,7 +243,7 @@ impl Interval {
 
 impl IntervalAndTy {
     fn get<'a>(&self, memory: &'a Evaluator<'a>) -> Result<&'a [u8]> {
-        memory.read_memory(self.interval.addr, self.interval.size)
+        memory.read_memory(self.interval.addr, self.interval.memrepr_size)
     }
 
     fn new(
@@ -1438,7 +1438,7 @@ impl Evaluator<'_> {
                     AggregateKind::Tuple(ty) => {
                         let layout = self.layout(ty)?;
                         Owned(self.construct_with_layout(
-                            layout.size.bytes_usize(),
+                            layout.memrepr_size.bytes_usize(),
                             &layout,
                             None,
                             values.iter().map(|&it| it.into()),
@@ -1452,7 +1452,7 @@ impl Evaluator<'_> {
                             .offset(u32::from(f.local_id.into_raw()) as usize)
                             .bytes_usize();
                         let op = values[0].get(self)?;
-                        let mut result = vec![0; layout.size.bytes_usize()];
+                        let mut result = vec![0; layout.memrepr_size.bytes_usize()];
                         result[offset..offset + op.len()].copy_from_slice(op);
                         Owned(result)
                     }
@@ -1469,7 +1469,7 @@ impl Evaluator<'_> {
                     AggregateKind::Closure(ty) => {
                         let layout = self.layout(ty)?;
                         Owned(self.construct_with_layout(
-                            layout.size.bytes_usize(),
+                            layout.memrepr_size.bytes_usize(),
                             &layout,
                             None,
                             values.iter().map(|&it| it.into()),
@@ -1635,7 +1635,7 @@ impl Evaluator<'_> {
                 Ok(r)
             }
             Variants::Multiple { tag, tag_encoding, variants, .. } => {
-                let size = tag.size(&*self.target_data_layout).bytes_usize();
+                let size = tag.memrepr_size(&*self.target_data_layout).bytes_usize();
                 let offset = layout.fields.offset(0).bytes_usize(); // The only field on enum variants is the tag field
                 let is_signed = tag.is_signed();
                 match tag_encoding {
@@ -1793,7 +1793,7 @@ impl Evaluator<'_> {
         }
         let layout = self.layout_adt(adt, subst)?;
         Ok(match &layout.variants {
-            Variants::Single { .. } | Variants::Empty => (layout.size.bytes_usize(), layout, None),
+            Variants::Single { .. } | Variants::Empty => (layout.memrepr_size.bytes_usize(), layout, None),
             Variants::Multiple { variants, tag, tag_encoding, .. } => {
                 let enum_variant_id = match it {
                     VariantId::EnumVariantId(it) => it,
@@ -1820,12 +1820,12 @@ impl Evaluator<'_> {
                     }
                 };
                 (
-                    layout.size.bytes_usize(),
+                    layout.memrepr_size.bytes_usize(),
                     Arc::new(variant_layout),
                     if have_tag {
                         Some((
                             layout.fields.offset(0).bytes_usize(),
-                            tag.size(&*self.target_data_layout).bytes_usize(),
+                            tag.memrepr_size(&*self.target_data_layout).bytes_usize(),
                             discriminant,
                         ))
                     } else {
@@ -1838,7 +1838,7 @@ impl Evaluator<'_> {
 
     fn construct_with_layout(
         &mut self,
-        size: usize, // Not necessarily equal to variant_layout.size
+        size: usize, // Not necessarily equal to variant_layout.memrepr_size
         variant_layout: &Layout,
         tag: Option<(usize, usize, i128)>,
         values: impl Iterator<Item = IntervalOrOwned>,
@@ -1930,7 +1930,7 @@ impl Evaluator<'_> {
             if size == 16 && v.len() < 16 {
                 Cow::Owned(pad16(v, false).to_vec())
             } else if size < 16 && v.len() == 16 {
-                Cow::Borrowed(&v[0..size])
+                Cow::Borrowed(&v[0.memrepr_size])
             } else {
                 return Err(MirEvalError::InvalidConst(konst.clone()));
             }

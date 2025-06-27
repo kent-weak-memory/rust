@@ -661,8 +661,10 @@ impl<'a> ReportErrorExt for UndefinedBehaviorInfo<'a> {
                 diag.arg("uninit", info.bad);
             }
             ScalarSizeMismatch(info) => {
-                diag.arg("target_size", info.target_size);
-                diag.arg("data_size", info.data_size);
+                diag.arg("target_data_size", info.target_data_size);
+                diag.arg("target_memory_size", info.target_memory_size);
+                diag.arg("data_size", info.data_data_size);
+                diag.arg("memory_size", info.data_memory_size);
             }
             InvalidNichedEnumVariantWritten { enum_ty } => {
                 diag.arg("ty", enum_ty.to_string());

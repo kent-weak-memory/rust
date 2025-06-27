@@ -107,7 +107,7 @@ impl<'a, 'tcx, V: CodegenObject> PlaceRef<'tcx, V> {
         bx: &mut Bx,
         layout: TyAndLayout<'tcx>,
     ) -> Self {
-        Self::alloca_size(bx, layout.size, layout)
+        Self::alloca_size(bx, layout.memrepr_size, layout)
     }
 
     pub fn alloca_size<Bx: BuilderMethods<'a, 'tcx, Value = V>>(
@@ -276,10 +276,15 @@ impl<'a, 'tcx, V: CodegenObject> PlaceRef<'tcx, V> {
                     // masking off any extra bits that occur because we did the arithmetic with too many bits.
                     let niche_value = variant_index.as_u32() - niche_variants.start().as_u32();
                     let niche_value = (niche_value as u128).wrapping_add(niche_start);
-                    let niche_value = niche_value & niche.layout.size.unsigned_int_max();
+                    let niche_value =
+                        niche_value & niche.layout.data_size.unwrap().unsigned_int_max();
 
                     let niche_llval = bx.cx().scalar_to_backend(
-                        Scalar::from_uint(niche_value, niche.layout.size),
+                        Scalar::from_uint(
+                            niche_value,
+                            niche.layout.data_size.unwrap(),
+                            niche.layout.memrepr_size,
+                        ),
                         scalar,
                         niche_llty,
                     );
@@ -298,9 +303,9 @@ impl<'a, 'tcx, V: CodegenObject> PlaceRef<'tcx, V> {
         // as this will yield the lowest alignment.
         let layout = self.layout.field(bx, 0);
         let offset = if let Some(llindex) = bx.const_to_opt_uint(llindex) {
-            layout.size.checked_mul(llindex, bx).unwrap_or(layout.size)
+            layout.memrepr_size.checked_mul(llindex, bx).unwrap_or(layout.memrepr_size)
         } else {
-            layout.size
+            layout.memrepr_size
         };
 
         let llval = bx.inbounds_nuw_gep(bx.cx().backend_type(layout), self.val.llval, &[llindex]);
@@ -329,11 +334,11 @@ impl<'a, 'tcx, V: CodegenObject> PlaceRef<'tcx, V> {
     }
 
     pub fn storage_live<Bx: BuilderMethods<'a, 'tcx, Value = V>>(&self, bx: &mut Bx) {
-        bx.lifetime_start(self.val.llval, self.layout.size);
+        bx.lifetime_start(self.val.llval, self.layout.memrepr_size);
     }
 
     pub fn storage_dead<Bx: BuilderMethods<'a, 'tcx, Value = V>>(&self, bx: &mut Bx) {
-        bx.lifetime_end(self.val.llval, self.layout.size);
+        bx.lifetime_end(self.val.llval, self.layout.memrepr_size);
     }
 }
 

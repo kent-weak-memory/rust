@@ -1360,7 +1360,7 @@ fn collect_const_value<'tcx>(
     output: &mut MonoItems<'tcx>,
 ) {
     match value {
-        mir::ConstValue::Scalar(Scalar::Ptr(ptr, _size)) => {
+        mir::ConstValue::Scalar(Scalar::Ptr(ptr, _data_size, _memrepr_size)) => {
             collect_alloc(tcx, ptr.provenance.alloc_id(), output)
         }
         mir::ConstValue::Indirect { alloc_id, .. } => collect_alloc(tcx, alloc_id, output),

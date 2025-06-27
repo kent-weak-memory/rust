@@ -82,9 +82,9 @@ impl<'tcx> LateLintPass<'tcx> for InvalidReferenceCasting {
                         orig_cast,
                         alloc: e_alloc.span,
                         from_ty: from_ty_layout.ty,
-                        from_size: from_ty_layout.layout.size().bytes(),
+                        from_size: from_ty_layout.layout.memrepr_size().bytes(),
                         to_ty: to_ty_layout.ty,
-                        to_size: to_ty_layout.layout.size().bytes(),
+                        to_size: to_ty_layout.layout.memrepr_size().bytes(),
                     },
                 );
             }
@@ -228,8 +228,8 @@ fn is_cast_to_bigger_memory_layout<'tcx>(
     let alloc_layout = cx.layout_of(alloc_ty).ok()?;
     let to_layout = cx.layout_of(*inner_end_ty).ok()?;
 
-    if to_layout.layout.size() > from_layout.layout.size()
-        && to_layout.layout.size() > alloc_layout.layout.size()
+    if to_layout.layout.memrepr_size() > from_layout.layout.memrepr_size()
+        && to_layout.layout.memrepr_size() > alloc_layout.layout.memrepr_size()
     {
         Some((from_layout, to_layout, *e_alloc))
     } else {

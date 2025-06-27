@@ -2,9 +2,9 @@ use std::ops::Bound;
 use std::{cmp, fmt};
 
 use rustc_abi::{
-    AddressSpace, Align, ExternAbi, FieldIdx, FieldsShape, HasDataLayout, LayoutData, PointeeInfo,
-    PointerKind, Primitive, ReprOptions, Scalar, Size, TagEncoding, TargetDataLayout,
-    TyAbiInterface, VariantIdx, Variants,
+    Align, ExternAbi, FieldIdx, FieldsShape, HasDataLayout, LayoutData, PointeeInfo, PointerKind,
+    Primitive, ReprOptions, Scalar, Size, TagEncoding, TargetDataLayout, TyAbiInterface,
+    VariantIdx, Variants,
 };
 use rustc_error_messages::DiagMessage;
 use rustc_errors::{
@@ -54,7 +54,7 @@ impl abi::Integer {
             ty::IntTy::I32 => I32,
             ty::IntTy::I64 => I64,
             ty::IntTy::I128 => I128,
-            ty::IntTy::Isize => cx.data_layout().ptr_sized_integer(),
+            ty::IntTy::Isize => cx.data_layout().ptr_data_sized_integer(),
         }
     }
     fn from_uint_ty<C: HasDataLayout>(cx: &C, ity: ty::UintTy) -> abi::Integer {
@@ -65,7 +65,7 @@ impl abi::Integer {
             ty::UintTy::U32 => I32,
             ty::UintTy::U64 => I64,
             ty::UintTy::U128 => I128,
-            ty::UintTy::Usize => cx.data_layout().ptr_sized_integer(),
+            ty::UintTy::Usize => cx.data_layout().ptr_data_sized_integer(),
         }
     }
 
@@ -163,7 +163,7 @@ impl Primitive {
             // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
             Primitive::Pointer(_) => {
                 let signed = false;
-                tcx.data_layout().ptr_sized_integer().to_ty(tcx, signed)
+                tcx.data_layout().ptr_data_sized_integer().to_ty(tcx, signed)
             }
             Primitive::Float(_) => bug!("floats do not have an int type"),
         }
@@ -363,7 +363,7 @@ impl<'tcx> SizeSkeleton<'tcx> {
         let err = match tcx.layout_of(typing_env.as_query_input(ty)) {
             Ok(layout) => {
                 if layout.is_sized() {
-                    return Ok(SizeSkeleton::Known(layout.size, Some(layout.align.abi)));
+                    return Ok(SizeSkeleton::Known(layout.memrepr_size, Some(layout.align.abi)));
                 } else {
                     // Just to be safe, don't claim a known layout for unsized types.
                     return Err(tcx.arena.alloc(LayoutError::Unknown(ty)));
@@ -1010,14 +1010,14 @@ where
         let pointee_info = match *this.ty.kind() {
             ty::RawPtr(p_ty, _) if offset.bytes() == 0 => {
                 tcx.layout_of(typing_env.as_query_input(p_ty)).ok().map(|layout| PointeeInfo {
-                    size: layout.size,
+                    size: layout.memrepr_size,
                     align: layout.align.abi,
                     safe: None,
                 })
             }
             ty::FnPtr(..) if offset.bytes() == 0 => {
                 tcx.layout_of(typing_env.as_query_input(this.ty)).ok().map(|layout| PointeeInfo {
-                    size: layout.size,
+                    size: layout.memrepr_size,
                     align: layout.align.abi,
                     safe: None,
                 })
@@ -1037,7 +1037,7 @@ where
                 };
 
                 tcx.layout_of(typing_env.as_query_input(ty)).ok().map(|layout| PointeeInfo {
-                    size: layout.size,
+                    size: layout.memrepr_size,
                     align: layout.align.abi,
                     safe: Some(kind),
                 })
@@ -1092,15 +1092,14 @@ where
                 let mut result = None;
 
                 if let Some(variant) = data_variant {
-                    // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
-                    // (requires passing in the expected address space from the caller)
-                    let ptr_end = offset + Primitive::Pointer(AddressSpace::DATA).size(cx);
+                    let ptr_end = offset
+                        + Primitive::Pointer(cx.data_layout().data_address_space).memrepr_size(cx);
                     for i in 0..variant.fields.count() {
                         let field_start = variant.fields.offset(i);
                         if field_start <= offset {
                             let field = variant.field(cx, i);
                             result = field.to_result().ok().and_then(|field| {
-                                if ptr_end <= field_start + field.size {
+                                if ptr_end <= field_start + field.memrepr_size {
                                     // We found the right field, look inside it.
                                     let field_info =
                                         field.pointee_info_at(cx, offset - field_start);

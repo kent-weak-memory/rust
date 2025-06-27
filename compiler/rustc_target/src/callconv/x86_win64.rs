@@ -10,7 +10,7 @@ pub(crate) fn compute_abi_info<Ty>(cx: &impl HasTargetSpec, fn_abi: &mut FnAbi<'
         match a.layout.backend_repr {
             BackendRepr::Memory { sized: false } => {}
             BackendRepr::ScalarPair(..) | BackendRepr::Memory { sized: true } => {
-                match a.layout.size.bits() {
+                match a.layout.memrepr_size.bits() {
                     8 => a.cast_to(Reg::i8()),
                     16 => a.cast_to(Reg::i16()),
                     32 => a.cast_to(Reg::i32()),
@@ -32,7 +32,7 @@ pub(crate) fn compute_abi_info<Ty>(cx: &impl HasTargetSpec, fn_abi: &mut FnAbi<'
                         let reg = Reg { kind: RegKind::Vector, size: Size::from_bits(128) };
                         a.cast_to(reg);
                     }
-                } else if a.layout.size.bytes() > 8
+                } else if a.layout.memrepr_size.bytes() > 8
                     && !matches!(scalar.primitive(), Primitive::Float(Float::F128))
                 {
                     // Match what LLVM does for `f128` so that `compiler-builtins` builtins match up

@@ -1,5 +1,8 @@
 error: layout_of(UnivariantU8) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $SOME_ALIGN,
@@ -44,7 +47,8 @@ error: layout_of(UnivariantU8) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(1 bytes),
+                       data_size: None,
+                       memrepr_size: Size(1 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $SOME_ALIGN,
@@ -87,7 +91,8 @@ LL | enum UnivariantU8 {
    | ^^^^^^^^^^^^^^^^^
 
 error: layout_of(TwoVariantsU8) = Layout {
-           size: Size(2 bytes),
+           data_size: None,
+           memrepr_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $SOME_ALIGN,
@@ -138,7 +143,8 @@ error: layout_of(TwoVariantsU8) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $SOME_ALIGN,
@@ -176,7 +182,8 @@ error: layout_of(TwoVariantsU8) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $SOME_ALIGN,
@@ -225,7 +232,8 @@ LL | enum TwoVariantsU8 {
    | ^^^^^^^^^^^^^^^^^^
 
 error: layout_of(DeadBranchHasOtherFieldU8) = Layout {
-           size: Size(16 bytes),
+           data_size: None,
+           memrepr_size: Size(16 bytes),
            align: AbiAndPrefAlign {
                abi: Align(8 bytes),
                pref: $SOME_ALIGN,
@@ -264,7 +272,8 @@ error: layout_of(DeadBranchHasOtherFieldU8) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(16 bytes),
+                       data_size: None,
+                       memrepr_size: Size(16 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(8 bytes),
                            pref: $SOME_ALIGN,
@@ -294,7 +303,8 @@ error: layout_of(DeadBranchHasOtherFieldU8) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(16 bytes),
+                       data_size: None,
+                       memrepr_size: Size(16 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(8 bytes),
                            pref: $SOME_ALIGN,

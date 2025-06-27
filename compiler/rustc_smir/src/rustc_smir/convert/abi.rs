@@ -59,7 +59,7 @@ impl<'tcx> Stable<'tcx> for rustc_abi::LayoutData<rustc_abi::FieldIdx, rustc_abi
             variants: self.variants.stable(tables),
             abi: self.backend_repr.stable(tables),
             abi_align: self.align.abi.stable(tables),
-            size: self.size.stable(tables),
+            size: self.memrepr_size.stable(tables),
         }
     }
 }

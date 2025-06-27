@@ -480,7 +480,7 @@ impl<'a, 'tcx> ConstAnalysis<'a, 'tcx> {
                     return ValueOrPlace::Value(FlatSet::Top);
                 };
                 let val = match null_op {
-                    NullOp::SizeOf if layout.is_sized() => layout.size.bytes(),
+                    NullOp::SizeOf if layout.is_sized() => layout.memrepr_size.bytes(),
                     NullOp::AlignOf if layout.is_sized() => layout.align.abi.bytes(),
                     NullOp::OffsetOf(fields) => self
                         .ecx
@@ -682,14 +682,17 @@ impl<'a, 'tcx> ConstAnalysis<'a, 'tcx> {
                 }
 
                 let arg_scalar = const_arg.to_scalar();
-                let Some(arg_value) = arg_scalar.to_bits(layout.size).discard_err() else {
+                let Some(arg_value) = arg_scalar
+                    .to_bits(layout.data_size.unwrap(), layout.memrepr_size)
+                    .discard_err()
+                else {
                     return (FlatSet::Top, FlatSet::Top);
                 };
 
                 match op {
                     BinOp::BitAnd if arg_value == 0 => (FlatSet::Elem(arg_scalar), FlatSet::Bottom),
                     BinOp::BitOr
-                        if arg_value == layout.size.truncate(u128::MAX)
+                        if arg_value == layout.memrepr_size.truncate(u128::MAX)
                             || (layout.ty.is_bool() && arg_value == 1) =>
                     {
                         (FlatSet::Elem(arg_scalar), FlatSet::Bottom)
@@ -910,7 +913,7 @@ fn try_write_constant<'tcx>(
                 let FlatSet::Elem(Scalar::Int(discr)) = state.get_idx(discr, map) else {
                     throw_machine_stop_str!("discriminant with provenance")
                 };
-                let discr_bits = discr.to_bits(discr.size());
+                let discr_bits = discr.to_bits(discr.memrepr_size());
                 let Some((variant, _)) = def.discriminants(*ecx.tcx).find(|(_, var)| discr_bits == var.val) else {
                     throw_machine_stop_str!("illegal discriminant for enum")
                 };

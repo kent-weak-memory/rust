@@ -14,7 +14,7 @@ fn classify_ret<Ty>(arg: &mut ArgAbi<'_, Ty>) {
     // For return type, aggregate which <= 2*XLen will be returned in registers.
     // Otherwise, aggregate will be returned indirectly.
     if arg.layout.is_aggregate() {
-        let total = arg.layout.size;
+        let total = arg.layout.memrepr_size;
         if total.bits() > 64 {
             arg.make_indirect();
         } else if total.bits() > 32 {
@@ -36,7 +36,7 @@ fn classify_arg<Ty>(arg: &mut ArgAbi<'_, Ty>) {
     // in registers, and the rest will be passed in stack.
     // So we can coerce to integers directly and let backend handle it correctly.
     if arg.layout.is_aggregate() {
-        let total = arg.layout.size;
+        let total = arg.layout.memrepr_size;
         if total.bits() > 32 {
             arg.cast_to(Uniform::new(Reg::i32(), total));
         } else {

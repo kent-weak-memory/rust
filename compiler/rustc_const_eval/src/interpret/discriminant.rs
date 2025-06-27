@@ -97,7 +97,11 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
 
         // Read tag and sanity-check `tag_layout`.
         let tag_val = self.read_immediate(&self.project_field(op, tag_field)?)?;
-        assert_eq!(tag_layout.size, tag_val.layout.size);
+        assert_eq!(tag_layout.data_size.unwrap(), tag_val.layout.data_size.unwrap());
+        assert!(
+            tag_layout.memrepr_size == tag_val.layout.data_size.unwrap()
+                || tag_layout.memrepr_size == tag_val.layout.memrepr_size
+        );
         assert_eq!(tag_layout.backend_repr.is_signed(), tag_val.layout.backend_repr.is_signed());
         trace!("tag value: {}", tag_val);
 
@@ -110,12 +114,14 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                     .to_scalar()
                     .try_to_scalar_int()
                     .map_err(|dbg_val| err_ub!(InvalidTag(dbg_val)))?
-                    .to_bits(tag_layout.size);
+                    .to_bits(tag_layout.memrepr_size);
                 // Cast bits from tag layout to discriminant layout.
                 // After the checks we did above, this cannot fail, as
                 // discriminants are int-like.
                 let discr_val = self.int_to_int_or_float(&tag_val, discr_layout).unwrap();
-                let discr_bits = discr_val.to_scalar().to_bits(discr_layout.size)?;
+                let discr_bits = discr_val
+                    .to_scalar()
+                    .to_bits(discr_layout.data_size.unwrap(), discr_layout.memrepr_size)?;
                 // Convert discriminant to variant index, and catch invalid discriminants.
                 let index = match *ty.kind() {
                     ty::Adt(adt, _) => {
@@ -127,7 +133,13 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                     }
                     _ => span_bug!(self.cur_span(), "tagged layout for non-adt non-coroutine"),
                 }
-                .ok_or_else(|| err_ub!(InvalidTag(Scalar::from_uint(tag_bits, tag_layout.size))))?;
+                .ok_or_else(|| {
+                    err_ub!(InvalidTag(Scalar::from_uint(
+                        tag_bits,
+                        tag_layout.data_size.unwrap(),
+                        tag_layout.memrepr_size
+                    )))
+                })?;
                 // Return the cast value, and the index.
                 index.0
             }
@@ -152,7 +164,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                         untagged_variant
                     }
                     Ok(tag_bits) => {
-                        let tag_bits = tag_bits.to_bits(tag_layout.size);
+                        let tag_bits = tag_bits.to_bits(tag_layout.memrepr_size);
                         // We need to use machine arithmetic to get the relative variant idx:
                         // variant_index_relative = tag_val - niche_start_val
                         let tag_val = ImmTy::from_uint(tag_bits, tag_layout);
@@ -160,7 +172,12 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                         let variant_index_relative_val =
                             self.binary_op(mir::BinOp::Sub, &tag_val, &niche_start_val)?;
                         let variant_index_relative =
-                            variant_index_relative_val.to_scalar().to_bits(tag_val.layout.size)?;
+                            variant_index_relative_val.to_scalar().to_bits(
+                                tag_val.layout.data_size.unwrap(),
+                                tag_val.layout.memrepr_size,
+                            )?;
+                        //
+
                         // Check if this is in the range that indicates an actual discriminant.
                         if variant_index_relative <= u128::from(variants_end - variants_start) {
                             let variant_index_relative = u32::try_from(variant_index_relative)
@@ -177,7 +194,11 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                             if variant_index == untagged_variant {
                                 // The untagged variant can be in the niche range, but even then it
                                 // is not a valid encoding.
-                                throw_ub!(InvalidTag(Scalar::from_uint(tag_bits, tag_layout.size)))
+                                throw_ub!(InvalidTag(Scalar::from_uint(
+                                    tag_bits,
+                                    tag_layout.data_size.unwrap(),
+                                    tag_layout.memrepr_size
+                                )))
                             }
                             variant_index
                         } else {
@@ -212,12 +233,20 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
             Some(discr) => {
                 // This type actually has discriminants.
                 assert_eq!(discr.ty, discr_layout.ty);
-                Scalar::from_uint(discr.val, discr_layout.size)
+                Scalar::from_uint(
+                    discr.val,
+                    discr_layout.data_size.unwrap(),
+                    discr_layout.memrepr_size,
+                )
             }
             None => {
                 // On a type without actual discriminants, variant is 0.
                 assert_eq!(variant.as_u32(), 0);
-                Scalar::from_uint(variant.as_u32(), discr_layout.size)
+                Scalar::from_uint(
+                    variant.as_u32(),
+                    discr_layout.data_size.unwrap(),
+                    discr_layout.memrepr_size,
+                )
             }
         };
         interp_ok(ImmTy::from_scalar(discr_value, discr_layout))
@@ -263,11 +292,14 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 // their computation, but the in-memory tag is the smallest possible
                 // representation
                 let discr = self.discriminant_for_variant(layout.ty, variant_index)?;
-                let discr_size = discr.layout.size;
-                let discr_val = discr.to_scalar().to_bits(discr_size)?;
-                let tag_size = tag_layout.size(self);
-                let tag_val = tag_size.truncate(discr_val);
-                let tag = ScalarInt::try_from_uint(tag_val, tag_size).unwrap();
+                let discr_val = discr
+                    .to_scalar()
+                    .to_bits(discr.layout.data_size.unwrap(), discr.layout.memrepr_size)?;
+                let tag_memrepr_size = tag_layout.memrepr_size(self);
+                let tag_data_size = tag_layout.data_size(self);
+                let tag_val = tag_memrepr_size.truncate(discr_val);
+                let tag =
+                    ScalarInt::try_from_uint(tag_val, tag_data_size, tag_memrepr_size).unwrap();
                 interp_ok(Some((tag, tag_field)))
             }
 

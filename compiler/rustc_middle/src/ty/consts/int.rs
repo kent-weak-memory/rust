@@ -1,5 +1,5 @@
 use std::fmt;
-use std::num::NonZero;
+use std::num::{NonZero, NonZeroU8};
 
 use rustc_abi::Size;
 use rustc_apfloat::Float;
@@ -29,7 +29,7 @@ impl ConstInt {
 impl std::fmt::Debug for ConstInt {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self { int, signed, is_ptr_sized_integral } = *self;
-        let size = int.size().bytes();
+        let size = int.data_size().bytes();
         let raw = int.data;
         if signed {
             let bit_size = size * 8;
@@ -130,10 +130,16 @@ impl IntoDiagArg for ConstInt {
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(packed)]
 pub struct ScalarInt {
-    /// The first `size` bytes of `data` are the value.
+    /// The first `data_size` bytes of `data` are the value.
     /// Do not try to read less or more bytes than that. The remaining bytes must be 0.
     data: u128,
-    size: NonZero<u8>,
+    /// Size of data component of value in bytes.
+    data_size: NonZeroU8,
+    /// Size of entire value in bytes, including any metadata that is only
+    /// present at run time.
+    /// This appears on targets like CHERI, which uses the extra space for
+    /// bounds information on pointers.
+    memrepr_size: NonZeroU8,
 }
 
 // Cannot derive these, as the derives take references to the fields, and we
@@ -145,38 +151,63 @@ impl<CTX> crate::ty::HashStable<CTX> for ScalarInt {
         // Since `Self` is a packed struct, that would create a possibly unaligned reference,
         // which is UB.
         { self.data }.hash_stable(hcx, hasher);
-        self.size.get().hash_stable(hcx, hasher);
+        self.data_size.get().hash_stable(hcx, hasher);
+        self.memrepr_size.get().hash_stable(hcx, hasher);
     }
 }
 
 impl<S: Encoder> Encodable<S> for ScalarInt {
     fn encode(&self, s: &mut S) {
-        let size = self.size.get();
-        s.emit_u8(size);
-        s.emit_raw_bytes(&self.data.to_le_bytes()[..size as usize]);
+        let data_size = self.data_size.get();
+        s.emit_u8(data_size);
+        s.emit_u8(self.memrepr_size.get());
+        s.emit_raw_bytes(&self.data.to_le_bytes()[..data_size as usize]);
     }
 }
 
 impl<D: Decoder> Decodable<D> for ScalarInt {
     fn decode(d: &mut D) -> ScalarInt {
         let mut data = [0u8; 16];
-        let size = d.read_u8();
-        data[..size as usize].copy_from_slice(d.read_raw_bytes(size as usize));
-        ScalarInt { data: u128::from_le_bytes(data), size: NonZero::new(size).unwrap() }
+        let data_size = d.read_u8();
+        let memrepr_size = d.read_u8();
+        data[..data_size as usize].copy_from_slice(d.read_raw_bytes(data_size as usize));
+        ScalarInt {
+            data: u128::from_le_bytes(data),
+            data_size: NonZeroU8::new(data_size).unwrap(),
+            memrepr_size: NonZeroU8::new(memrepr_size).unwrap(),
+        }
     }
 }
 
 impl ScalarInt {
-    pub const TRUE: ScalarInt = ScalarInt { data: 1_u128, size: NonZero::new(1).unwrap() };
-    pub const FALSE: ScalarInt = ScalarInt { data: 0_u128, size: NonZero::new(1).unwrap() };
+    pub const TRUE: ScalarInt = ScalarInt {
+        data: 1_u128,
+        data_size: NonZeroU8::new(1).unwrap(),
+        memrepr_size: NonZeroU8::new(1).unwrap(),
+    };
 
-    fn raw(data: u128, size: Size) -> Self {
-        Self { data, size: NonZero::new(size.bytes() as u8).unwrap() }
+    pub const FALSE: ScalarInt = ScalarInt {
+        data: 0_u128,
+        data_size: NonZeroU8::new(1).unwrap(),
+        memrepr_size: NonZeroU8::new(1).unwrap(),
+    };
+
+    fn raw(data: u128, data_size: Size, memrepr_size: Size) -> Self {
+        Self {
+            data,
+            data_size: NonZero::new(data_size.bytes() as u8).unwrap(),
+            memrepr_size: NonZero::new(memrepr_size.bytes() as u8).unwrap(),
+        }
     }
 
     #[inline]
-    pub fn size(self) -> Size {
-        Size::from_bytes(self.size.get())
+    pub fn data_size(self) -> Size {
+        Size::from_bytes(self.data_size.get())
+    }
+
+    #[inline]
+    pub fn memrepr_size(self) -> Size {
+        Size::from_bytes(self.memrepr_size.get())
     }
 
     /// Make sure the `data` fits in `size`.
@@ -190,17 +221,17 @@ impl ScalarInt {
         // is a packed struct, that would create a possibly unaligned reference, which
         // is UB.
         debug_assert_eq!(
-            self.size().truncate(self.data),
+            self.data_size().truncate(self.data),
             { self.data },
             "Scalar value {:#x} exceeds size of {} bytes",
             { self.data },
-            self.size
+            self.data_size
         );
     }
 
     #[inline]
-    pub fn null(size: Size) -> Self {
-        Self::raw(0, size)
+    pub fn null(data_size: Size, memrepr_size: Size) -> Self {
+        Self::raw(0, data_size, memrepr_size)
     }
 
     #[inline]
@@ -209,37 +240,45 @@ impl ScalarInt {
     }
 
     #[inline]
-    pub fn try_from_uint(i: impl Into<u128>, size: Size) -> Option<Self> {
-        let (r, overflow) = Self::truncate_from_uint(i, size);
+    pub fn try_from_uint(i: impl Into<u128>, data_size: Size, memrepr_size: Size) -> Option<Self> {
+        let (r, overflow) = Self::truncate_from_uint(i, data_size, memrepr_size);
         if overflow { None } else { Some(r) }
     }
 
     /// Returns the truncated result, and whether truncation changed the value.
     #[inline]
-    pub fn truncate_from_uint(i: impl Into<u128>, size: Size) -> (Self, bool) {
+    pub fn truncate_from_uint(
+        i: impl Into<u128>,
+        data_size: Size,
+        memrepr_size: Size,
+    ) -> (Self, bool) {
         let data = i.into();
-        let r = Self::raw(size.truncate(data), size);
+        let r = Self::raw(data_size.truncate(data), data_size, memrepr_size);
         (r, r.data != data)
     }
 
     #[inline]
-    pub fn try_from_int(i: impl Into<i128>, size: Size) -> Option<Self> {
-        let (r, overflow) = Self::truncate_from_int(i, size);
+    pub fn try_from_int(i: impl Into<i128>, data_size: Size, memrepr_size: Size) -> Option<Self> {
+        let (r, overflow) = Self::truncate_from_int(i, data_size, memrepr_size);
         if overflow { None } else { Some(r) }
     }
 
     /// Returns the truncated result, and whether truncation changed the value.
     #[inline]
-    pub fn truncate_from_int(i: impl Into<i128>, size: Size) -> (Self, bool) {
+    pub fn truncate_from_int(
+        i: impl Into<i128>,
+        data_size: Size,
+        memrepr_size: Size,
+    ) -> (Self, bool) {
         let data = i.into();
         // `into` performed sign extension, we have to truncate
-        let r = Self::raw(size.truncate(data as u128), size);
-        (r, size.sign_extend(r.data) != data)
+        let r = Self::raw(data_size.truncate(data as u128), data_size, memrepr_size);
+        (r, data_size.sign_extend(r.data) != data)
     }
 
     #[inline]
     pub fn try_from_target_usize(i: impl Into<u128>, tcx: TyCtxt<'_>) -> Option<Self> {
-        Self::try_from_uint(i, tcx.data_layout.pointer_size)
+        Self::try_from_uint(i, tcx.data_layout.pointer_data_size, tcx.data_layout.pointer_data_size)
     }
 
     /// Try to convert this ScalarInt to the raw underlying bits.
@@ -247,20 +286,25 @@ impl ScalarInt {
     /// but Miri sometimes wants to be resilient to size mismatches,
     /// so the interpreter will generally use this `try` method.
     #[inline]
-    pub fn try_to_bits(self, target_size: Size) -> Result<u128, Size> {
+    pub fn try_to_bits(self, target_size: Size) -> Result<u128, (Size, Size)> {
         assert_ne!(target_size.bytes(), 0, "you should never look at the bits of a ZST");
-        if target_size.bytes() == u64::from(self.size.get()) {
+        if target_size.bytes() == u64::from(self.data_size.get()) {
             self.check_data();
             Ok(self.data)
         } else {
-            Err(self.size())
+            Err((self.data_size(), self.memrepr_size()))
         }
     }
 
     #[inline]
     pub fn to_bits(self, target_size: Size) -> u128 {
-        self.try_to_bits(target_size).unwrap_or_else(|size| {
-            bug!("expected int of size {}, but got size {}", target_size.bytes(), size.bytes())
+        self.try_to_bits(target_size).unwrap_or_else(|(data_size, memory_size)| {
+            bug!(
+                "expected int of size {}, but got size {} ({} in memory)",
+                target_size.bytes(),
+                data_size.bytes(),
+                memory_size.bytes()
+            )
         })
     }
 
@@ -315,7 +359,7 @@ impl ScalarInt {
 
     #[inline]
     pub fn to_target_usize(&self, tcx: TyCtxt<'_>) -> u64 {
-        self.to_uint(tcx.data_layout.pointer_size).try_into().unwrap()
+        self.to_uint(tcx.data_layout.pointer_data_size).try_into().unwrap()
     }
 
     /// Converts the `ScalarInt` to `bool`.
@@ -370,7 +414,7 @@ impl ScalarInt {
 
     #[inline]
     pub fn to_target_isize(&self, tcx: TyCtxt<'_>) -> i64 {
-        self.to_int(tcx.data_layout.pointer_size).try_into().unwrap()
+        self.to_int(tcx.data_layout.pointer_data_size).try_into().unwrap()
     }
 
     #[inline]
@@ -406,9 +450,11 @@ macro_rules! from_x_for_scalar_int {
             impl From<$ty> for ScalarInt {
                 #[inline]
                 fn from(u: $ty) -> Self {
+                    let size = NonZero::new(size_of::<$ty>() as u8).unwrap();
                     Self {
                         data: u128::from(u),
-                        size: NonZero::new(size_of::<$ty>() as u8).unwrap(),
+                        data_size: size,
+                        memrepr_size: size,
                     }
                 }
             }
@@ -470,7 +516,8 @@ impl From<Half> for ScalarInt {
     #[inline]
     fn from(f: Half) -> Self {
         // We trust apfloat to give us properly truncated data.
-        Self { data: f.to_bits(), size: NonZero::new((Half::BITS / 8) as u8).unwrap() }
+        let size = NonZero::new((Half::BITS / 8) as u8).unwrap();
+        Self { data: f.to_bits(), data_size: size, memrepr_size: size }
     }
 }
 
@@ -485,7 +532,8 @@ impl From<Single> for ScalarInt {
     #[inline]
     fn from(f: Single) -> Self {
         // We trust apfloat to give us properly truncated data.
-        Self { data: f.to_bits(), size: NonZero::new((Single::BITS / 8) as u8).unwrap() }
+        let size = NonZero::new((Single::BITS / 8) as u8).unwrap();
+        Self { data: f.to_bits(), data_size: size, memrepr_size: size }
     }
 }
 
@@ -500,7 +548,8 @@ impl From<Double> for ScalarInt {
     #[inline]
     fn from(f: Double) -> Self {
         // We trust apfloat to give us properly truncated data.
-        Self { data: f.to_bits(), size: NonZero::new((Double::BITS / 8) as u8).unwrap() }
+        let size = NonZero::new((Double::BITS / 8) as u8).unwrap();
+        Self { data: f.to_bits(), data_size: size, memrepr_size: size }
     }
 }
 
@@ -515,7 +564,8 @@ impl From<Quad> for ScalarInt {
     #[inline]
     fn from(f: Quad) -> Self {
         // We trust apfloat to give us properly truncated data.
-        Self { data: f.to_bits(), size: NonZero::new((Quad::BITS / 8) as u8).unwrap() }
+        let size = NonZero::new((Quad::BITS / 8) as u8).unwrap();
+        Self { data: f.to_bits(), data_size: size, memrepr_size: size }
     }
 }
 
@@ -547,7 +597,7 @@ impl fmt::LowerHex for ScalarInt {
         // would thus borrow `self.data`. Since `Self`
         // is a packed struct, that would create a possibly unaligned reference, which
         // is UB.
-        write!(f, "{:01$x}", { self.data }, self.size.get() as usize * 2)
+        write!(f, "{:01$x}", { self.data }, self.data_size.get() as usize * 2)
     }
 }
 
@@ -561,7 +611,7 @@ impl fmt::UpperHex for ScalarInt {
         // would thus borrow `self.data`. Since `Self`
         // is a packed struct, that would create a possibly unaligned reference, which
         // is UB.
-        write!(f, "{:01$X}", { self.data }, self.size.get() as usize * 2)
+        write!(f, "{:01$X}", { self.data }, self.data_size.get() as usize * 2)
     }
 }
 

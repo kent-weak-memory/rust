@@ -19,7 +19,7 @@ pub fn size_and_align_of_dst<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
     let layout = bx.layout_of(t);
     trace!("size_and_align_of_dst(ty={}, info={:?}): layout: {:?}", t, info, layout);
     if layout.is_sized() {
-        let size = bx.const_usize(layout.size.bytes());
+        let size = bx.const_usize(layout.memrepr_size.bytes());
         let align = bx.const_usize(layout.align.abi.bytes());
         return (size, align);
     }
@@ -33,7 +33,7 @@ pub fn size_and_align_of_dst<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
                 .get_usize(bx, vtable, t);
 
             // Size is always <= isize::MAX.
-            let size_bound = bx.data_layout().ptr_sized_integer().signed_max() as u128;
+            let size_bound = bx.data_layout().ptr_data_sized_integer().signed_max() as u128;
             bx.range_metadata(size, WrappingRange { start: 0, end: size_bound });
             // Alignment is always nonzero.
             bx.range_metadata(align, WrappingRange { start: 1, end: !0 });
@@ -47,7 +47,7 @@ pub fn size_and_align_of_dst<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
             (
                 // All slice sizes must fit into `isize`, so this multiplication cannot
                 // wrap -- neither signed nor unsigned.
-                bx.unchecked_sumul(info.unwrap(), bx.const_usize(unit.size.bytes())),
+                bx.unchecked_sumul(info.unwrap(), bx.const_usize(unit.memrepr_size.bytes())),
                 bx.const_usize(unit.align.abi.bytes()),
             )
         }
@@ -80,7 +80,7 @@ pub fn size_and_align_of_dst<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
             );
 
             // This function does not return so we can now return whatever we want.
-            let size = bx.const_usize(layout.size.bytes());
+            let size = bx.const_usize(layout.memrepr_size.bytes());
             let align = bx.const_usize(layout.align.abi.bytes());
             (size, align)
         }

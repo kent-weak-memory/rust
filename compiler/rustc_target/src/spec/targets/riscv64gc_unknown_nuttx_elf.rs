@@ -13,7 +13,8 @@ pub(crate) fn target() -> Target {
             std: Some(true),
         },
         llvm_target: "riscv64".into(),
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memrepr_size: 64,
         arch: "riscv64".into(),
 
         options: TargetOptions {

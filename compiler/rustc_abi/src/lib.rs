@@ -235,13 +235,20 @@ pub struct TargetDataLayout {
     pub f32_align: AbiAndPrefAlign,
     pub f64_align: AbiAndPrefAlign,
     pub f128_align: AbiAndPrefAlign,
-    pub pointer_size: Size,
+    /// Size of the part of a pointer that stores just the address.
+    /// On targets like CHERI, pointers contain both an address, and additional
+    /// metadata maintained by hardware.
+    pub pointer_data_size: Size,
+    /// Size of a pointer as stored in memory.
+    /// This includes metadata (see `pointer_data_size`).
+    pub pointer_memrepr_size: Size,
     pub pointer_align: AbiAndPrefAlign,
     pub aggregate_align: AbiAndPrefAlign,
 
     /// Alignments for vector types.
     pub vector_align: Vec<(Size, AbiAndPrefAlign)>,
 
+    pub data_address_space: AddressSpace,
     pub instruction_address_space: AddressSpace,
 
     /// Minimum size of #[repr(C)] enums (default c_int::BITS, usually 32)
@@ -260,13 +267,14 @@ impl Default for TargetDataLayout {
             i8_align: AbiAndPrefAlign::new(align(8)),
             i16_align: AbiAndPrefAlign::new(align(16)),
             i32_align: AbiAndPrefAlign::new(align(32)),
-            i64_align: AbiAndPrefAlign { abi: align(32), pref: align(64) },
-            i128_align: AbiAndPrefAlign { abi: align(32), pref: align(64) },
+            i64_align: AbiAndPrefAlign::new(align(32)),
+            i128_align: AbiAndPrefAlign::new(align(32)),
             f16_align: AbiAndPrefAlign::new(align(16)),
             f32_align: AbiAndPrefAlign::new(align(32)),
             f64_align: AbiAndPrefAlign::new(align(64)),
             f128_align: AbiAndPrefAlign::new(align(128)),
-            pointer_size: Size::from_bits(64),
+            pointer_data_size: Size::from_bits(64),
+            pointer_memrepr_size: Size::from_bits(64),
             pointer_align: AbiAndPrefAlign::new(align(64)),
             aggregate_align: AbiAndPrefAlign { abi: align(0), pref: align(64) },
             vector_align: vec![
@@ -274,19 +282,44 @@ impl Default for TargetDataLayout {
                 (Size::from_bits(128), AbiAndPrefAlign::new(align(128))),
             ],
             instruction_address_space: AddressSpace::DATA,
+            data_address_space: AddressSpace::DATA,
             c_enum_min_size: Integer::I32,
         }
     }
 }
 
 pub enum TargetDataLayoutErrors<'a> {
-    InvalidAddressSpace { addr_space: &'a str, cause: &'a str, err: ParseIntError },
-    InvalidBits { kind: &'a str, bit: &'a str, cause: &'a str, err: ParseIntError },
-    MissingAlignment { cause: &'a str },
-    InvalidAlignment { cause: &'a str, err: AlignFromBytesError },
-    InconsistentTargetArchitecture { dl: &'a str, target: &'a str },
-    InconsistentTargetPointerWidth { pointer_size: u64, target: u32 },
-    InvalidBitsSize { err: String },
+    InvalidAddressSpace {
+        addr_space: &'a str,
+        cause: &'a str,
+        err: ParseIntError,
+    },
+    InvalidBits {
+        kind: &'a str,
+        bit: &'a str,
+        cause: &'a str,
+        err: ParseIntError,
+    },
+    MissingAlignment {
+        cause: &'a str,
+    },
+    InvalidAlignment {
+        cause: &'a str,
+        err: AlignFromBytesError,
+    },
+    InconsistentTargetArchitecture {
+        dl: &'a str,
+        target: &'a str,
+    },
+    InconsistentTargetPointerWidth {
+        pointer_data_size: u64,
+        pointer_memrepr_size: u64,
+        target_pointer_data_size: u32,
+        target_pointer_memrepr_size: u32,
+    },
+    InvalidBitsSize {
+        err: String,
+    },
 }
 
 impl TargetDataLayout {
@@ -335,6 +368,15 @@ impl TargetDataLayout {
 
         let mut dl = TargetDataLayout::default();
         let mut i128_align_src = 64;
+        // Layout for pointers can be specified for different address spaces.
+        // I'm (seharris) not aware of any defined order in the data layout string.
+        // As a result, we may not know the data adress space until after the pointer info.
+        // To get round this, `pointer_info` is used to keep all of the info we see.
+        // Once we're done parsing we can then find the relevant entry.
+        // Using a vector implies some O(n) searching, but data layouts are typically short.
+        // (n should be small enough it doesn't matter, and this is nice and simple)
+        // Contained data: (pointer addres space, width, range, alignment)
+        let mut pointer_info = Vec::new();
         for spec in input.split('-') {
             let spec_parts = spec.split(':').collect::<Vec<_>>();
 
@@ -344,6 +386,9 @@ impl TargetDataLayout {
                 [p] if p.starts_with('P') => {
                     dl.instruction_address_space = parse_address_space(&p[1..], "P")?
                 }
+                [p] if p.starts_with('A') => {
+                    dl.data_address_space = parse_address_space(&p[1..], "A")?
+                }
                 ["a", a @ ..] => dl.aggregate_align = parse_align(a, "a")?,
                 ["f16", a @ ..] => dl.f16_align = parse_align(a, "f16")?,
                 ["f32", a @ ..] => dl.f32_align = parse_align(a, "f32")?,
@@ -352,9 +397,19 @@ impl TargetDataLayout {
                 // FIXME(erikdesjardins): we should be parsing nonzero address spaces
                 // this will require replacing TargetDataLayout::{pointer_size,pointer_align}
                 // with e.g. `fn pointer_size_in(AddressSpace)`
-                [p @ "p", s, a @ ..] | [p @ "p0", s, a @ ..] => {
-                    dl.pointer_size = parse_size(s, p)?;
-                    dl.pointer_align = parse_align(a, p)?;
+                [p, s, a @ ..] if p.starts_with('p') => {
+                    let p = p.trim_start_matches(char::is_alphabetic);
+                    let address_space = if !p.is_empty() {
+                        parse_address_space(p, "p")?
+                    } else {
+                        AddressSpace::DATA
+                    };
+                    let memory_size = parse_size(s, p)?;
+                    let align = parse_align(a, p)?;
+                    let data_size = a.get(2).copied().map_or(Ok(memory_size), |bits| {
+                        parse_bits(bits, "data-size", p).map(Size::from_bits)
+                    })?;
+                    pointer_info.push((address_space, data_size, memory_size, align));
                 }
                 [s, a @ ..] if s.starts_with('i') => {
                     let Ok(bits) = s[1..].parse::<u64>() else {
@@ -390,6 +445,14 @@ impl TargetDataLayout {
                 _ => {} // Ignore everything else.
             }
         }
+        // Look for pointer layout information to match data address space.
+        for (address_space, data_size, memory_size, align) in pointer_info {
+            if address_space == dl.data_address_space {
+                dl.pointer_data_size = data_size;
+                dl.pointer_memrepr_size = memory_size;
+                dl.pointer_align = align;
+            }
+        }
         Ok(dl)
     }
 
@@ -404,7 +467,7 @@ impl TargetDataLayout {
     /// so we adopt such a more-constrained size bound due to its technical limitations.
     #[inline]
     pub fn obj_size_bound(&self) -> u64 {
-        match self.pointer_size.bits() {
+        match self.pointer_data_size.bits() {
             16 => 1 << 15,
             32 => 1 << 31,
             64 => 1 << 61,
@@ -413,13 +476,25 @@ impl TargetDataLayout {
     }
 
     #[inline]
-    pub fn ptr_sized_integer(&self) -> Integer {
+    pub fn ptr_data_sized_integer(&self) -> Integer {
         use Integer::*;
-        match self.pointer_size.bits() {
+        match self.pointer_data_size.bits() {
             16 => I16,
             32 => I32,
             64 => I64,
             bits => panic!("ptr_sized_integer: unknown pointer bit size {bits}"),
+        }
+    }
+
+    #[inline]
+    pub fn ptr_memrepr_sized_integer(&self) -> Integer {
+        use Integer::*;
+        match self.pointer_memrepr_size.bits() {
+            16 => I16,
+            32 => I32,
+            64 => I64,
+            128 => I128,
+            bits => panic!("ptr_memrepr_sized_integer: unknown pointer bit size {}", bits),
         }
     }
 
@@ -939,7 +1014,7 @@ impl Integer {
         let dl = cx.data_layout();
 
         match ity {
-            IntegerType::Pointer(_) => dl.ptr_sized_integer(),
+            IntegerType::Pointer(_) => dl.ptr_data_sized_integer(),
             IntegerType::Fixed(x, _) => x,
         }
     }
@@ -1087,7 +1162,7 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub fn size<C: HasDataLayout>(self, cx: &C) -> Size {
+    pub fn data_size<C: HasDataLayout>(self, cx: &C) -> Size {
         use Primitive::*;
         let dl = cx.data_layout();
 
@@ -1097,7 +1172,21 @@ impl Primitive {
             // FIXME(erikdesjardins): ignoring address space is technically wrong, pointers in
             // different address spaces can have different sizes
             // (but TargetDataLayout doesn't currently parse that part of the DL string)
-            Pointer(_) => dl.pointer_size,
+            Pointer(_) => dl.pointer_data_size,
+        }
+    }
+
+    pub fn memrepr_size<C: HasDataLayout>(self, cx: &C) -> Size {
+        use Primitive::*;
+        let dl = cx.data_layout();
+
+        match self {
+            Int(i, _) => i.size(),
+            Float(f) => f.size(),
+            // FIXME(erikdesjardins): ignoring address space is technically wrong, pointers in
+            // different address spaces can have different sizes
+            // (but TargetDataLayout doesn't currently parse that part of the DL string)
+            Pointer(_) => dl.pointer_memrepr_size,
         }
     }
 
@@ -1228,8 +1317,12 @@ impl Scalar {
         self.primitive().align(cx)
     }
 
-    pub fn size(self, cx: &impl HasDataLayout) -> Size {
-        self.primitive().size(cx)
+    pub fn data_size(self, cx: &impl HasDataLayout) -> Size {
+        self.primitive().data_size(cx)
+    }
+
+    pub fn memrepr_size(self, cx: &impl HasDataLayout) -> Size {
+        self.primitive().memrepr_size(cx)
     }
 
     #[inline]
@@ -1241,7 +1334,7 @@ impl Scalar {
     pub fn valid_range(&self, cx: &impl HasDataLayout) -> WrappingRange {
         match *self {
             Scalar::Initialized { valid_range, .. } => valid_range,
-            Scalar::Union { value } => WrappingRange::full(value.size(cx)),
+            Scalar::Union { value } => WrappingRange::full(value.data_size(cx)),
         }
     }
 
@@ -1260,7 +1353,7 @@ impl Scalar {
     #[inline]
     pub fn is_always_valid<C: HasDataLayout>(&self, cx: &C) -> bool {
         match *self {
-            Scalar::Initialized { valid_range, .. } => valid_range.is_full_for(self.size(cx)),
+            Scalar::Initialized { valid_range, .. } => valid_range.is_full_for(self.data_size(cx)),
             Scalar::Union { .. } => true,
         }
     }
@@ -1502,11 +1595,11 @@ impl BackendRepr {
     pub fn scalar_size<C: HasDataLayout>(&self, cx: &C) -> Option<Size> {
         match *self {
             // No padding in scalars.
-            BackendRepr::Scalar(s) => Some(s.size(cx)),
+            BackendRepr::Scalar(s) => Some(s.memrepr_size(cx)),
             // May have some padding between the pair.
             BackendRepr::ScalarPair(s1, s2) => {
-                let field2_offset = s1.size(cx).align_to(s2.align(cx).abi);
-                let size = (field2_offset + s2.size(cx)).align_to(
+                let field2_offset = s1.memrepr_size(cx).align_to(s2.align(cx).abi);
+                let size = (field2_offset + s2.memrepr_size(cx)).align_to(
                     self.scalar_align(cx)
                         // We absolutely must have an answer here or everything is FUBAR.
                         .unwrap(),
@@ -1627,7 +1720,7 @@ impl Niche {
 
     pub fn available<C: HasDataLayout>(&self, cx: &C) -> u128 {
         let Self { value, valid_range: v, .. } = *self;
-        let size = value.size(cx);
+        let size = value.data_size(cx);
         assert!(size.bits() <= 128);
         let max_value = size.unsigned_int_max();
 
@@ -1640,7 +1733,7 @@ impl Niche {
         assert!(count > 0);
 
         let Self { value, valid_range: v, .. } = *self;
-        let size = value.size(cx);
+        let size = value.data_size(cx);
         assert!(size.bits() <= 128);
         let max_value = size.unsigned_int_max();
 
@@ -1731,7 +1824,16 @@ pub struct LayoutData<FieldIdx: Idx, VariantIdx: Idx> {
     pub uninhabited: bool,
 
     pub align: AbiAndPrefAlign,
-    pub size: Size,
+
+    /// If the structure only contains a single scalar value, this should
+    /// contain the size of the data part of the value.
+    /// Any remaining space is taken up by padding or metadata.
+    /// Metadata is used by targets like CHERI to allow for additional data
+    /// managed by the hardware and, as a result, only known when a program
+    /// is running.
+    pub data_size: Option<Size>,
+    /// Total size of the layout.
+    pub memrepr_size: Size,
 
     /// The largest alignment explicitly requested with `repr(align)` on this type or any field.
     /// Only used on i686-windows, where the argument passing ABI is different when alignment is
@@ -1781,7 +1883,6 @@ where
         // `Interned<LayoutS>`. We print it like this to avoid having to update
         // expected output in a lot of tests.
         let LayoutData {
-            size,
             align,
             backend_repr,
             fields,
@@ -1791,9 +1892,12 @@ where
             max_repr_align,
             unadjusted_abi_align,
             randomization_seed,
+            data_size,
+            memrepr_size,
         } = self;
         f.debug_struct("Layout")
-            .field("size", size)
+            .field("data_size", data_size)
+            .field("memrepr_size", memrepr_size)
             .field("align", align)
             .field("backend_repr", backend_repr)
             .field("fields", fields)
@@ -1851,7 +1955,7 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
 
     /// Returns `true` if the type is sized and a 1-ZST (meaning it has size 0 and alignment 1).
     pub fn is_1zst(&self) -> bool {
-        self.is_sized() && self.size.bytes() == 0 && self.align.abi.bytes() == 1
+        self.is_sized() && self.memrepr_size.bytes() == 0 && self.align.abi.bytes() == 1
     }
 
     /// Returns `true` if the type is a ZST and not unsized.
@@ -1863,7 +1967,7 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             BackendRepr::Scalar(_)
             | BackendRepr::ScalarPair(..)
             | BackendRepr::SimdVector { .. } => false,
-            BackendRepr::Memory { sized } => sized && self.size.bytes() == 0,
+            BackendRepr::Memory { sized } => sized && self.memrepr_size.bytes() == 0,
         }
     }
 
@@ -1876,7 +1980,7 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
         // The one thing that we are not capturing here is that for unsized types, the metadata must
         // also have the same ABI, and moreover that the same metadata leads to the same size. The
         // 2nd point is quite hard to check though.
-        self.size == other.size
+        self.memrepr_size == other.memrepr_size
             && self.is_sized() == other.is_sized()
             && self.backend_repr.eq_up_to_validity(&other.backend_repr)
             && self.backend_repr.is_bool() == other.backend_repr.is_bool()

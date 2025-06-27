@@ -446,7 +446,7 @@ fn update_target_reliable_float_cfg(sess: &Session, cfg: &mut TargetConfig) {
     let target_os = sess.target.options.os.as_ref();
     let target_env = sess.target.options.env.as_ref();
     let target_abi = sess.target.options.abi.as_ref();
-    let target_pointer_width = sess.target.pointer_width;
+    let target_pointer_memrepr_size = sess.target.pointer_memrepr_size;
 
     cfg.has_reliable_f16 = match (target_arch, target_os) {
         // Selection failure <https://github.com/llvm/llvm-project/issues/50374>
@@ -503,7 +503,7 @@ fn update_target_reliable_float_cfg(sess: &Session, cfg: &mut TargetConfig) {
         // (ld is `f64`), anything other than Linux (Windows and MacOS use `f64`), and `x86`
         // (ld is 80-bit extended precision).
         ("x86_64", _) => false,
-        (_, "linux") if target_pointer_width == 64 => true,
+        (_, "linux") if target_pointer_memrepr_size == 64 => true,
         _ => false,
     } && cfg.has_reliable_f128;
 }

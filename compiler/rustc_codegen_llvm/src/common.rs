@@ -175,7 +175,7 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
     }
 
     fn const_usize(&self, i: u64) -> &'ll Value {
-        let bit_size = self.data_layout().pointer_size.bits();
+        let bit_size = self.data_layout().pointer_data_size.bits();
         if bit_size < 64 {
             // make sure it doesn't overflow
             assert!(i < (1 << bit_size));
@@ -256,10 +256,10 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
     }
 
     fn scalar_to_backend(&self, cv: Scalar, layout: abi::Scalar, llty: &'ll Type) -> &'ll Value {
-        let bitsize = if layout.is_bool() { 1 } else { layout.size(self).bits() };
+        let bitsize = if layout.is_bool() { 1 } else { layout.data_size(self).bits() };
         match cv {
             Scalar::Int(int) => {
-                let data = int.to_bits(layout.size(self));
+                let data = int.to_bits(layout.data_size(self));
                 let llval = self.const_uint_big(self.type_ix(bitsize), data);
                 if matches!(layout.primitive(), Pointer(_)) {
                     unsafe { llvm::LLVMConstIntToPtr(llval, llty) }
@@ -267,7 +267,7 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
                     self.const_bitcast(llval, llty)
                 }
             }
-            Scalar::Ptr(ptr, _size) => {
+            Scalar::Ptr(ptr, _data_size, _memrepr_size) => {
                 let (prov, offset) = ptr.into_parts();
                 let global_alloc = self.tcx.global_alloc(prov.alloc_id());
                 let base_addr = match global_alloc {

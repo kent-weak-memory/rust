@@ -161,11 +161,11 @@ pub fn intern_const_ref(
     let bytes = match value {
         LiteralConstRef::Int(i) => {
             // FIXME: We should handle failure of layout better.
-            let size = layout().map(|it| it.size.bytes_usize()).unwrap_or(16);
+            let size = layout().map(|it| it.memrepr_size.bytes_usize()).unwrap_or(16);
             ConstScalar::Bytes(i.to_le_bytes()[0..size].into(), MemoryMap::default())
         }
         LiteralConstRef::UInt(i) => {
-            let size = layout().map(|it| it.size.bytes_usize()).unwrap_or(16);
+            let size = layout().map(|it| it.memrepr_size.bytes_usize()).unwrap_or(16);
             ConstScalar::Bytes(i.to_le_bytes()[0..size].into(), MemoryMap::default())
         }
         LiteralConstRef::Bool(b) => ConstScalar::Bytes(Box::new([*b as u8]), MemoryMap::default()),

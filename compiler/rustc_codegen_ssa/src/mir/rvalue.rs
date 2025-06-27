@@ -1,7 +1,7 @@
 use std::assert_matches::assert_matches;
 
 use arrayvec::ArrayVec;
-use rustc_abi::{self as abi, FIRST_VARIANT, FieldIdx};
+use rustc_abi::{self as abi, FIRST_VARIANT, FieldIdx, HasDataLayout};
 use rustc_middle::ty::adjustment::PointerCoercion;
 use rustc_middle::ty::layout::{HasTyCtxt, HasTypingEnv, LayoutOf, TyAndLayout};
 use rustc_middle::ty::{self, Instance, Ty, TyCtxt};
@@ -96,7 +96,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 if let mir::Operand::Constant(const_op) = elem {
                     let val = self.eval_mir_constant(const_op);
                     if val.all_bytes_uninit(self.cx.tcx()) {
-                        let size = bx.const_usize(dest.layout.size.bytes());
+                        let size = bx.const_usize(dest.layout.memrepr_size.bytes());
                         bx.memset(
                             dest.val.llval,
                             bx.const_undef(bx.type_i8()),
@@ -112,11 +112,11 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
 
                 let try_init_all_same = |bx: &mut Bx, v| {
                     let start = dest.val.llval;
-                    let size = bx.const_usize(dest.layout.size.bytes());
+                    let size = bx.const_usize(dest.layout.memrepr_size.bytes());
 
                     // Use llvm.memset.p0i8.* to initialize all same byte arrays
                     if let Some(int) = bx.cx().const_to_opt_u128(v, false) {
-                        let bytes = &int.to_le_bytes()[..cg_elem.layout.size.bytes_usize()];
+                        let bytes = &int.to_le_bytes()[..cg_elem.layout.memrepr_size.bytes_usize()];
                         let first = bytes[0];
                         if bytes[1..].iter().all(|&b| b == first) {
                             let fill = bx.cx().const_u8(first);
@@ -233,7 +233,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
         cast: TyAndLayout<'tcx>,
     ) -> Option<OperandValue<Bx::Value>> {
         // Check for transmutes that are always UB.
-        if operand.layout.size != cast.size
+        if operand.layout.memrepr_size != cast.memrepr_size
             || operand.layout.is_uninhabited()
             || cast.is_uninhabited()
         {
@@ -274,7 +274,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     bug!("Found {operand_kind:?} for operand {operand:?}");
                 };
                 if let OperandValueKind::Immediate(to_scalar) = cast_kind
-                    && from_scalar.size(self.cx) == to_scalar.size(self.cx)
+                    && from_scalar.memrepr_size(self.cx) == to_scalar.memrepr_size(self.cx)
                 {
                     let from_backend_ty = bx.backend_type(operand.layout);
                     let to_backend_ty = bx.backend_type(cast);
@@ -295,8 +295,8 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     bug!("Found {operand_kind:?} for operand {operand:?}");
                 };
                 if let OperandValueKind::Pair(out_a, out_b) = cast_kind
-                    && in_a.size(self.cx) == out_a.size(self.cx)
-                    && in_b.size(self.cx) == out_b.size(self.cx)
+                    && in_a.memrepr_size(self.cx) == out_a.memrepr_size(self.cx)
+                    && in_b.memrepr_size(self.cx) == out_b.memrepr_size(self.cx)
                 {
                     let in_a_ibty = bx.scalar_pair_element_backend_type(operand.layout, 0, false);
                     let in_b_ibty = bx.scalar_pair_element_backend_type(operand.layout, 1, false);
@@ -379,7 +379,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
         to_scalar: abi::Scalar,
         to_backend_ty: Bx::Type,
     ) -> Bx::Value {
-        assert_eq!(from_scalar.size(self.cx), to_scalar.size(self.cx));
+        assert_eq!(from_scalar.memrepr_size(self.cx), to_scalar.memrepr_size(self.cx));
 
         // While optimizations will remove no-op transmutes, they might still be
         // there in debug or things that aren't no-op in MIR because they change
@@ -443,13 +443,15 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
             return;
         }
 
+        let default_addr_space = self.cx.data_layout().data_address_space;
+
         match scalar.primitive() {
             abi::Primitive::Int(..) => {
                 let range = scalar.valid_range(self.cx);
                 bx.assume_integer_range(imm, backend_ty, range);
             }
-            abi::Primitive::Pointer(abi::AddressSpace::DATA)
-                if !scalar.valid_range(self.cx).contains(0) =>
+            abi::Primitive::Pointer(a)
+                if a == default_addr_space && !scalar.valid_range(self.cx).contains(0) =>
             {
                 bx.assume_nonnull(imm);
             }
@@ -737,7 +739,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let val = match null_op {
                     mir::NullOp::SizeOf => {
                         assert!(bx.cx().type_is_sized(ty));
-                        let val = layout.size.bytes();
+                        let val = layout.memrepr_size.bytes();
                         bx.cx().const_usize(val)
                     }
                     mir::NullOp::AlignOf => {
@@ -1132,9 +1134,9 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     // When we have scalar immediates, we can only convert things
                     // where the sizes match, to avoid endianness questions.
                     (OperandValueKind::Immediate(a), OperandValueKind::Immediate(b)) =>
-                        a.size(self.cx) == b.size(self.cx),
+                        a.memrepr_size(self.cx) == b.memrepr_size(self.cx),
                     (OperandValueKind::Pair(a0, a1), OperandValueKind::Pair(b0, b1)) =>
-                        a0.size(self.cx) == b0.size(self.cx) && a1.size(self.cx) == b1.size(self.cx),
+                        a0.memrepr_size(self.cx) == b0.memrepr_size(self.cx) && a1.memrepr_size(self.cx) == b1.memrepr_size(self.cx),
 
                     // Send mixings between scalars and pairs through the memory route
                     // FIXME: Maybe this could use insertvalue/extractvalue instead?

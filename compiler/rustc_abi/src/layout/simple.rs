@@ -21,7 +21,8 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             largest_niche: None,
             uninhabited: false,
             align: dl.i8_align,
-            size: Size::ZERO,
+            memrepr_size: Size::ZERO,
+            data_size: None,
             max_repr_align: None,
             unadjusted_abi_align: dl.i8_align.abi,
             randomization_seed: Hash64::new(0),
@@ -38,7 +39,8 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             largest_niche: None,
             uninhabited: true,
             align: dl.i8_align,
-            size: Size::ZERO,
+            memrepr_size: Size::ZERO,
+            data_size: None,
             max_repr_align: None,
             unadjusted_abi_align: dl.i8_align.abi,
             randomization_seed: Hash64::ZERO,
@@ -47,7 +49,8 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
 
     pub fn scalar<C: HasDataLayout>(cx: &C, scalar: Scalar) -> Self {
         let largest_niche = Niche::from_scalar(cx, Size::ZERO, scalar);
-        let size = scalar.size(cx);
+        let data_size = Some(scalar.data_size(cx));
+        let memrepr_size = scalar.memrepr_size(cx);
         let align = scalar.align(cx);
 
         let range = scalar.valid_range(cx);
@@ -58,7 +61,7 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
         // Some type information is already lost at this point, so as an approximation we derive
         // the seed from what remains. For example on 64-bit targets usize and u64 can no longer
         // be distinguished.
-        let randomization_seed = size
+        let randomization_seed = memrepr_size
             .bytes()
             .wrapping_add(
                 match scalar.primitive() {
@@ -79,9 +82,10 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             backend_repr: BackendRepr::Scalar(scalar),
             largest_niche,
             uninhabited: false,
-            size,
             align,
             max_repr_align: None,
+            memrepr_size,
+            data_size,
             unadjusted_abi_align: align.abi,
             randomization_seed: Hash64::new(randomization_seed),
         }
@@ -91,8 +95,8 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
         let dl = cx.data_layout();
         let b_align = b.align(dl);
         let align = a.align(dl).max(b_align).max(dl.aggregate_align);
-        let b_offset = a.size(dl).align_to(b_align.abi);
-        let size = (b_offset + b.size(dl)).align_to(align.abi);
+        let b_offset = a.memrepr_size(dl).align_to(b_align.abi);
+        let memrepr_size = (b_offset + b.memrepr_size(dl)).align_to(align.abi);
 
         // HACK(nox): We iter on `b` and then `a` because `max_by_key`
         // returns the last maximum.
@@ -101,7 +105,7 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             .chain(Niche::from_scalar(dl, Size::ZERO, a))
             .max_by_key(|niche| niche.available(dl));
 
-        let combined_seed = a.size(dl).bytes().wrapping_add(b.size(dl).bytes());
+        let combined_seed = a.memrepr_size(dl).bytes().wrapping_add(b.memrepr_size(dl).bytes());
 
         LayoutData {
             variants: Variants::Single { index: VariantIdx::new(0) },
@@ -113,7 +117,8 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             largest_niche,
             uninhabited: false,
             align,
-            size,
+            memrepr_size,
+            data_size: None,
             max_repr_align: None,
             unadjusted_abi_align: align.abi,
             randomization_seed: Hash64::new(combined_seed),
@@ -139,10 +144,11 @@ impl<FieldIdx: Idx, VariantIdx: Idx> LayoutData<FieldIdx, VariantIdx> {
             largest_niche: None,
             uninhabited: true,
             align: dl.i8_align,
-            size: Size::ZERO,
             max_repr_align: None,
             unadjusted_abi_align: dl.i8_align.abi,
             randomization_seed: Hash64::ZERO,
+            data_size: None,
+            memrepr_size: Size::ZERO,
         }
     }
 }

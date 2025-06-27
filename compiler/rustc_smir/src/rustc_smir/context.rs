@@ -44,8 +44,11 @@ impl<'tcx> SmirCtxt<'tcx> {
         let mut tables = self.0.borrow_mut();
         MachineInfo {
             endian: tables.tcx.data_layout.endian.stable(&mut *tables),
-            pointer_width: MachineSize::from_bits(
-                tables.tcx.data_layout.pointer_size.bits().try_into().unwrap(),
+            pointer_data_size: MachineSize::from_bits(
+                tables.tcx.data_layout.pointer_data_size.bits().try_into().unwrap(),
+            ),
+            pointer_memrepr_size: MachineSize::from_bits(
+                tables.tcx.data_layout.pointer_memrepr_size.bits().try_into().unwrap(),
             ),
         }
     }
@@ -476,7 +479,7 @@ impl<'tcx> SmirCtxt<'tcx> {
         let mut tables = self.0.borrow_mut();
         let tcx = tables.tcx;
         let ty_internal = ty.internal(&mut *tables, tcx);
-        let size = tables
+        let memrepr_size = tables
             .tcx
             .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty_internal))
             .map_err(|err| {
@@ -484,12 +487,12 @@ impl<'tcx> SmirCtxt<'tcx> {
                     "Cannot create a zero-sized constant for type `{ty_internal}`: {err}"
                 ))
             })?
-            .size;
-        if size.bytes() != 0 {
+            .memrepr_size;
+        if memrepr_size.bytes() != 0 {
             return Err(Error::new(format!(
                 "Cannot create a zero-sized constant for type `{ty_internal}`: \
                  Type `{ty_internal}` has {} bytes",
-                size.bytes()
+                memrepr_size.bytes()
             )));
         }
 
@@ -520,14 +523,12 @@ impl<'tcx> SmirCtxt<'tcx> {
         let mut tables = self.0.borrow_mut();
         let tcx = tables.tcx;
         let ty = ty::Ty::new_uint(tcx, uint_ty.internal(&mut *tables, tcx));
-        let size = tables
-            .tcx
-            .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty))
-            .unwrap()
-            .size;
-        let scalar = ScalarInt::try_from_uint(value, size).ok_or_else(|| {
-            Error::new(format!("Value overflow: cannot convert `{value}` to `{ty}`."))
-        })?;
+        let dl =
+            tables.tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty)).unwrap();
+        let scalar = ScalarInt::try_from_uint(value, dl.data_size.unwrap(), dl.memrepr_size)
+            .ok_or_else(|| {
+                Error::new(format!("Value overflow: cannot convert `{value}` to `{ty}`."))
+            })?;
         Ok(mir::Const::from_scalar(tcx, mir::interpret::Scalar::Int(scalar), ty)
             .stable(&mut tables))
     }
@@ -539,16 +540,14 @@ impl<'tcx> SmirCtxt<'tcx> {
         let mut tables = self.0.borrow_mut();
         let tcx = tables.tcx;
         let ty = ty::Ty::new_uint(tcx, uint_ty.internal(&mut *tables, tcx));
-        let size = tables
-            .tcx
-            .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty))
-            .unwrap()
-            .size;
+        let dl =
+            tables.tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty)).unwrap();
 
         // We don't use Const::from_bits since it doesn't have any error checking.
-        let scalar = ScalarInt::try_from_uint(value, size).ok_or_else(|| {
-            Error::new(format!("Value overflow: cannot convert `{value}` to `{ty}`."))
-        })?;
+        let scalar = ScalarInt::try_from_uint(value, dl.data_size.unwrap(), dl.memrepr_size)
+            .ok_or_else(|| {
+                Error::new(format!("Value overflow: cannot convert `{value}` to `{ty}`."))
+            })?;
         Ok(ty::Const::new_value(tcx, ValTree::from_scalar_int(tcx, scalar), ty)
             .stable(&mut *tables))
     }

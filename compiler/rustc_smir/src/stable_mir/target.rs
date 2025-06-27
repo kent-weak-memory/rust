@@ -9,7 +9,8 @@ use crate::stable_mir;
 #[derive(Clone, PartialEq, Eq, Serialize)]
 pub struct MachineInfo {
     pub endian: Endian,
-    pub pointer_width: MachineSize,
+    pub pointer_data_size: MachineSize,
+    pub pointer_memrepr_size: MachineSize,
 }
 
 impl MachineInfo {
@@ -21,8 +22,12 @@ impl MachineInfo {
         with(|cx| cx.target_info().endian)
     }
 
-    pub fn target_pointer_width() -> MachineSize {
-        with(|cx| cx.target_info().pointer_width)
+    pub fn target_pointer_data_size() -> MachineSize {
+        with(|cx| cx.target_info().pointer_data_size)
+    }
+
+    pub fn target_pointer_memrepr_size() -> MachineSize {
+        with(|cx| cx.target_info().pointer_memrepr_size)
     }
 }
 

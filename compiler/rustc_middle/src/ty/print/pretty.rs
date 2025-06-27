@@ -1717,7 +1717,9 @@ pub trait PrettyPrinter<'tcx>: Printer<'tcx> + fmt::Write {
         ty: Ty<'tcx>,
     ) -> Result<(), PrintError> {
         match scalar {
-            Scalar::Ptr(ptr, _size) => self.pretty_print_const_scalar_ptr(ptr, ty),
+            Scalar::Ptr(ptr, _data_size, _memrepr_size) => {
+                self.pretty_print_const_scalar_ptr(ptr, ty)
+            }
             Scalar::Int(int) => {
                 self.pretty_print_const_scalar_int(int, ty, /* print_ty */ true)
             }
@@ -1741,7 +1743,12 @@ pub trait PrettyPrinter<'tcx>: Printer<'tcx> + fmt::Write {
                 {
                     match self.tcx().try_get_global_alloc(prov.alloc_id()) {
                         Some(GlobalAlloc::Memory(alloc)) => {
-                            let range = AllocRange { start: offset, size: Size::from_bytes(len) };
+                            let size = Size::from_bytes(len);
+                            let range = AllocRange {
+                                start: offset,
+                                data_size: Some(size),
+                                memrepr_size: size,
+                            };
                             if let Ok(byte_str) =
                                 alloc.inner().get_bytes_strip_provenance(&self.tcx(), range)
                             {
@@ -1825,7 +1832,7 @@ pub trait PrettyPrinter<'tcx>: Printer<'tcx> + fmt::Write {
             }
             // Pointer types
             ty::Ref(..) | ty::RawPtr(_, _) | ty::FnPtr(..) => {
-                let data = int.to_bits(self.tcx().data_layout.pointer_size);
+                let data = int.to_bits(self.tcx().data_layout.pointer_data_size);
                 self.typed_value(
                     |this| {
                         write!(this, "0x{data:x}")?;
@@ -1842,7 +1849,7 @@ pub trait PrettyPrinter<'tcx>: Printer<'tcx> + fmt::Write {
             // Nontrivial types with scalar bit representation
             _ => {
                 let print = |this: &mut Self| {
-                    if int.size() == Size::ZERO {
+                    if int.data_size() == Size::ZERO {
                         write!(this, "transmute(())")?;
                     } else {
                         write!(this, "transmute(0x{int:x})")?;

@@ -2,7 +2,7 @@ use hir::def_id::DefId;
 use rustc_abi::Integer::{I8, I32};
 use rustc_abi::Primitive::{self, Float, Int, Pointer};
 use rustc_abi::{
-    AddressSpace, BackendRepr, FIRST_VARIANT, FieldIdx, FieldsShape, HasDataLayout, Layout,
+    BackendRepr, FIRST_VARIANT, FieldIdx, FieldsShape, HasDataLayout, Layout,
     LayoutCalculatorError, LayoutData, Niche, ReprOptions, Scalar, Size, StructKind, TagEncoding,
     VariantIdx, Variants, WrappingRange,
 };
@@ -194,7 +194,7 @@ fn layout_of_uncached<'tcx>(
         Err(err) => Err(map_error(cx, ty, err)),
     };
     let scalar_unit = |value: Primitive| {
-        let size = value.size(dl);
+        let size = value.data_size(dl);
         assert!(size.bits() <= 128);
         Scalar::Initialized { value, valid_range: WrappingRange::full(size) }
     };
@@ -231,8 +231,8 @@ fn layout_of_uncached<'tcx>(
                         // so we can just go with this for now
                         if scalar.is_signed() {
                             let range = scalar.valid_range_mut();
-                            let start = layout.size.sign_extend(range.start);
-                            let end = layout.size.sign_extend(range.end);
+                            let start = layout.memrepr_size.sign_extend(range.start);
+                            let end = layout.memrepr_size.sign_extend(range.end);
                             if end < start {
                                 let guar = tcx.dcx().err(format!(
                                     "pattern type ranges cannot wrap: {start}..={end}"
@@ -305,12 +305,16 @@ fn layout_of_uncached<'tcx>(
                             let mut first = variants[0];
                             let mut second = variants[1];
                             if second.0
-                                == layout.size.truncate(layout.size.signed_int_min() as u128)
+                                == layout
+                                    .data_size
+                                    .unwrap()
+                                    .truncate(layout.data_size.unwrap().signed_int_min() as u128)
                             {
                                 (second, first) = (first, second);
                             }
 
-                            if layout.size.sign_extend(first.1) >= layout.size.sign_extend(second.0)
+                            if layout.data_size.unwrap().sign_extend(first.1)
+                                >= layout.data_size.unwrap().sign_extend(second.0)
                             {
                                 let guar = tcx.dcx().err(format!(
                                     "only non-overlapping pattern type ranges are allowed at present"
@@ -318,7 +322,7 @@ fn layout_of_uncached<'tcx>(
 
                                 return Err(error(cx, LayoutError::ReferencesError(guar)));
                             }
-                            if layout.size.signed_int_max() as u128 != second.1 {
+                            if layout.data_size.unwrap().signed_int_max() as u128 != second.1 {
                                 let guar = tcx.dcx().err(format!(
                                     "one pattern needs to end at `{ty}::MAX`, but was {} instead",
                                     second.1
@@ -379,7 +383,7 @@ fn layout_of_uncached<'tcx>(
 
         // Potentially-wide pointers.
         ty::Ref(_, pointee, _) | ty::RawPtr(pointee, _) => {
-            let mut data_ptr = scalar_unit(Pointer(AddressSpace::DATA));
+            let mut data_ptr = scalar_unit(Pointer(cx.data_layout().data_address_space));
             if !ty.is_raw_ptr() {
                 data_ptr.valid_range_mut().start = 1;
             }
@@ -433,9 +437,9 @@ fn layout_of_uncached<'tcx>(
                     ty::Foreign(..) => {
                         return Ok(tcx.mk_layout(LayoutData::scalar(cx, data_ptr)));
                     }
-                    ty::Slice(_) | ty::Str => scalar_unit(Int(dl.ptr_sized_integer(), false)),
+                    ty::Slice(_) | ty::Str => scalar_unit(Int(dl.ptr_data_sized_integer(), false)),
                     ty::Dynamic(..) => {
-                        let mut vtable = scalar_unit(Pointer(AddressSpace::DATA));
+                        let mut vtable = scalar_unit(Pointer(cx.data_layout().data_address_space));
                         vtable.valid_range_mut().start = 1;
                         vtable
                     }
@@ -450,9 +454,10 @@ fn layout_of_uncached<'tcx>(
         }
 
         ty::Dynamic(_, _, ty::DynStar) => {
-            let mut data = scalar_unit(Pointer(AddressSpace::DATA));
+            let default_addr_space = cx.data_layout().data_address_space;
+            let mut data = scalar_unit(Pointer(default_addr_space));
             data.valid_range_mut().start = 0;
-            let mut vtable = scalar_unit(Pointer(AddressSpace::DATA));
+            let mut vtable = scalar_unit(Pointer(default_addr_space));
             vtable.valid_range_mut().start = 1;
             tcx.mk_layout(LayoutData::scalar_pair(cx, data, vtable))
         }
@@ -739,7 +744,7 @@ fn record_layout_for_printing<'tcx>(cx: &LayoutCx<'tcx>, layout: TyAndLayout<'tc
             kind,
             type_desc,
             layout.align.abi,
-            layout.size,
+            layout.memrepr_size,
             packed,
             opt_discr_size,
             variants,
@@ -787,12 +792,12 @@ fn variant_info_for_adt<'tcx>(
             .map(|(i, &name)| {
                 let field_layout = layout.field(cx, i);
                 let offset = layout.fields.offset(i);
-                min_size = min_size.max(offset + field_layout.size);
+                min_size = min_size.max(offset + field_layout.memrepr_size);
                 FieldInfo {
                     kind: FieldKind::AdtField,
                     name,
                     offset: offset.bytes(),
-                    size: field_layout.size.bytes(),
+                    size: field_layout.memrepr_size.bytes(),
                     align: field_layout.align.abi.bytes(),
                     type_name: None,
                 }
@@ -803,7 +808,11 @@ fn variant_info_for_adt<'tcx>(
             name: n,
             kind: if layout.is_unsized() { SizeKind::Min } else { SizeKind::Exact },
             align: layout.align.abi.bytes(),
-            size: if min_size.bytes() == 0 { layout.size.bytes() } else { min_size.bytes() },
+            size: if min_size.bytes() == 0 {
+                layout.memrepr_size.bytes()
+            } else {
+                min_size.bytes()
+            },
             fields: field_info,
         }
     };
@@ -836,7 +845,7 @@ fn variant_info_for_adt<'tcx>(
             (
                 variant_infos,
                 match tag_encoding {
-                    TagEncoding::Direct => Some(tag.size(cx)),
+                    TagEncoding::Direct => Some(tag.memrepr_size(cx)),
                     _ => None,
                 },
             )
@@ -869,12 +878,12 @@ fn variant_info_for_coroutine<'tcx>(
         .map(|(field_idx, (_, name))| {
             let field_layout = layout.field(cx, field_idx);
             let offset = layout.fields.offset(field_idx);
-            upvars_size = upvars_size.max(offset + field_layout.size);
+            upvars_size = upvars_size.max(offset + field_layout.memrepr_size);
             FieldInfo {
                 kind: FieldKind::Upvar,
                 name: *name,
                 offset: offset.bytes(),
-                size: field_layout.size.bytes(),
+                size: field_layout.memrepr_size.bytes(),
                 align: field_layout.align.abi.bytes(),
                 type_name: None,
             }
@@ -895,7 +904,7 @@ fn variant_info_for_coroutine<'tcx>(
                     let field_layout = variant_layout.field(cx, field_idx);
                     let offset = variant_layout.fields.offset(field_idx);
                     // The struct is as large as the last field's end
-                    variant_size = variant_size.max(offset + field_layout.size);
+                    variant_size = variant_size.max(offset + field_layout.memrepr_size);
                     FieldInfo {
                         kind: FieldKind::CoroutineLocal,
                         name: field_name.unwrap_or(Symbol::intern(&format!(
@@ -903,7 +912,7 @@ fn variant_info_for_coroutine<'tcx>(
                             local.as_usize()
                         ))),
                         offset: offset.bytes(),
-                        size: field_layout.size.bytes(),
+                        size: field_layout.memrepr_size.bytes(),
                         align: field_layout.align.abi.bytes(),
                         // Include the type name if there is no field name, or if the name is the
                         // __awaitee placeholder symbol which means a child future being `.await`ed.
@@ -936,7 +945,7 @@ fn variant_info_for_coroutine<'tcx>(
             // better, but this "works" for now.
             if layout.fields.offset(tag_field) >= variant_size {
                 variant_size += match tag_encoding {
-                    TagEncoding::Direct => tag.size(cx),
+                    TagEncoding::Direct => tag.memrepr_size(cx),
                     _ => Size::ZERO,
                 };
             }
@@ -962,7 +971,7 @@ fn variant_info_for_coroutine<'tcx>(
     (
         variant_infos,
         match tag_encoding {
-            TagEncoding::Direct => Some(tag.size(cx)),
+            TagEncoding::Direct => Some(tag.memrepr_size(cx)),
             _ => None,
         },
     )

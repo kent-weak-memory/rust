@@ -227,13 +227,15 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 // rotate_right: (X << ((BW - S) % BW)) | (X >> (S % BW))
                 let layout_val = self.layout_of(instance_args.type_at(0))?;
                 let val = self.read_scalar(&args[0])?;
-                let val_bits = val.to_bits(layout_val.size)?; // sign is ignored here
+                let val_bits =
+                    val.to_bits(layout_val.data_size.unwrap(), layout_val.memrepr_size)?; // sign is ignored here
 
                 let layout_raw_shift = self.layout_of(self.tcx.types.u32)?;
                 let raw_shift = self.read_scalar(&args[1])?;
-                let raw_shift_bits = raw_shift.to_bits(layout_raw_shift.size)?;
+                let raw_shift_bits = raw_shift
+                    .to_bits(layout_raw_shift.data_size.unwrap(), layout_raw_shift.memrepr_size)?;
 
-                let width_bits = u128::from(layout_val.size.bits());
+                let width_bits = u128::from(layout_val.memrepr_size.bits());
                 let shift_bits = raw_shift_bits % width_bits;
                 let inv_shift_bits = (width_bits - shift_bits) % width_bits;
                 let result_bits = if intrinsic_name == sym::rotate_left {
@@ -241,8 +243,12 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 } else {
                     (val_bits >> shift_bits) | (val_bits << inv_shift_bits)
                 };
-                let truncated_bits = layout_val.size.truncate(result_bits);
-                let result = Scalar::from_uint(truncated_bits, layout_val.size);
+                let truncated_bits = layout_val.memrepr_size.truncate(result_bits);
+                let result = Scalar::from_uint(
+                    truncated_bits,
+                    layout_val.data_size.unwrap(),
+                    layout_val.memrepr_size,
+                );
                 self.write_scalar(result, dest)?;
             }
             sym::copy => {
@@ -260,7 +266,8 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 let offset_count = self.read_target_isize(&args[1])?;
                 let pointee_ty = instance_args.type_at(0);
 
-                let pointee_size = i64::try_from(self.layout_of(pointee_ty)?.size.bytes()).unwrap();
+                let pointee_size =
+                    i64::try_from(self.layout_of(pointee_ty)?.memrepr_size.bytes()).unwrap();
                 let offset_bytes = offset_count.wrapping_mul(pointee_size);
                 let offset_ptr = ptr.wrapping_signed_offset(offset_bytes, self);
                 self.write_pointer(offset_ptr, dest)?;
@@ -324,7 +331,9 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                         // difference as isize, we'll get the proper signed difference. If that
                         // seems *positive* or equal to isize::MIN, they were more than isize::MAX apart.
                         let dist = val.to_target_isize(self)?;
-                        if dist >= 0 || i128::from(dist) == self.pointer_size().signed_int_min() {
+                        if dist >= 0
+                            || i128::from(dist) == self.pointer_data_size().signed_int_min()
+                        {
                             throw_ub_custom!(
                                 fluent::const_eval_offset_from_underflow,
                                 name = intrinsic_name,
@@ -393,7 +402,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 let pointee_layout = self.layout_of(instance_args.type_at(0))?;
                 // If ret_layout is unsigned, we checked that so is the distance, so we are good.
                 let val = ImmTy::from_int(dist, ret_layout);
-                let size = ImmTy::from_int(pointee_layout.size.bytes(), ret_layout);
+                let size = ImmTy::from_int(pointee_layout.memrepr_size.bytes(), ret_layout);
                 self.exact_div(&val, &size, dest)?;
             }
 
@@ -551,8 +560,8 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         ret_layout: TyAndLayout<'tcx>,
     ) -> InterpResult<'tcx, Scalar<M::Provenance>> {
         assert!(layout.ty.is_integral(), "invalid type for numeric intrinsic: {}", layout.ty);
-        let bits = val.to_bits(layout.size)?; // these operations all ignore the sign
-        let extra = 128 - u128::from(layout.size.bits());
+        let bits = val.to_bits(layout.data_size.unwrap(), layout.memrepr_size)?; // these operations all ignore the sign
+        let extra = 128 - u128::from(layout.memrepr_size.bits());
         let bits_out = match name {
             sym::ctpop => u128::from(bits.count_ones()),
             sym::ctlz_nonzero | sym::cttz_nonzero if bits == 0 => {
@@ -570,7 +579,11 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
             }
             _ => bug!("not a numeric intrinsic: {}", name),
         };
-        interp_ok(Scalar::from_uint(bits_out, ret_layout.size))
+        interp_ok(Scalar::from_uint(
+            bits_out,
+            ret_layout.data_size.unwrap(),
+            ret_layout.memrepr_size,
+        ))
     }
 
     pub fn exact_div(
@@ -587,7 +600,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         // First, check x % y != 0 (or if that computation overflows).
         let rem = self.binary_op(BinOp::Rem, a, b)?;
         // sign does not matter for 0 test, so `to_bits` is fine
-        if rem.to_scalar().to_bits(a.layout.size)? != 0 {
+        if rem.to_scalar().to_bits(a.layout.data_size.unwrap(), a.layout.memrepr_size)? != 0 {
             throw_ub_custom!(
                 fluent::const_eval_exact_div_has_remainder,
                 a = format!("{a}"),
@@ -612,30 +625,42 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         let (val, overflowed) =
             self.binary_op(mir_op.wrapping_to_overflowing().unwrap(), l, r)?.to_scalar_pair();
         interp_ok(if overflowed.to_bool()? {
-            let size = l.layout.size;
+            let size = l.layout.memrepr_size;
             if l.layout.backend_repr.is_signed() {
                 // For signed ints the saturated value depends on the sign of the first
                 // term since the sign of the second term can be inferred from this and
                 // the fact that the operation has overflowed (if either is 0 no
                 // overflow can occur)
-                let first_term: i128 = l.to_scalar().to_int(l.layout.size)?;
+                let first_term: i128 = l.to_scalar().to_int(l.layout.memrepr_size)?;
                 if first_term >= 0 {
                     // Negative overflow not possible since the positive first term
                     // can only increase an (in range) negative term for addition
                     // or corresponding negated positive term for subtraction.
-                    Scalar::from_int(size.signed_int_max(), size)
+                    Scalar::from_int(
+                        size.signed_int_max(),
+                        l.layout.data_size.unwrap(),
+                        l.layout.memrepr_size,
+                    )
                 } else {
                     // Positive overflow not possible for similar reason.
-                    Scalar::from_int(size.signed_int_min(), size)
+                    Scalar::from_int(
+                        size.signed_int_min(),
+                        l.layout.data_size.unwrap(),
+                        l.layout.memrepr_size,
+                    )
                 }
             } else {
                 // unsigned
                 if matches!(mir_op, BinOp::Add) {
                     // max unsigned
-                    Scalar::from_uint(size.unsigned_int_max(), size)
+                    Scalar::from_uint(
+                        size.unsigned_int_max(),
+                        l.layout.data_size.unwrap(),
+                        l.layout.memrepr_size,
+                    )
                 } else {
                     // underflow to 0
-                    Scalar::from_uint(0u128, size)
+                    Scalar::from_uint(0u128, l.layout.data_size.unwrap(), l.layout.memrepr_size)
                 }
             }
         } else {
@@ -670,7 +695,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
     ) -> InterpResult<'tcx> {
         let count = self.read_target_usize(count)?;
         let layout = self.layout_of(src.layout.ty.builtin_deref(true).unwrap())?;
-        let (size, align) = (layout.size, layout.align.abi);
+        let (size, align) = (layout.memrepr_size, layout.align.abi);
 
         let size = self.compute_size_in_bytes(size, count).ok_or_else(|| {
             err_ub_custom!(
@@ -704,7 +729,12 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
 
         // We want to always enforce non-overlapping, even if this is a scalar type.
         // Therefore we directly use the underlying `mem_copy` here.
-        self.mem_copy(right.ptr(), left.ptr(), left.layout.size, /*nonoverlapping*/ true)?;
+        self.mem_copy(
+            right.ptr(),
+            left.ptr(),
+            left.layout.memrepr_size,
+            /*nonoverlapping*/ true,
+        )?;
         // This means we also need to do the validation of the value that used to be in `right`
         // ourselves. This value is now in `left.` The one that started out in `left` already got
         // validated by the copy above.
@@ -738,7 +768,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         // `checked_mul` enforces a too small bound (the correct one would probably be target_isize_max),
         // but no actual allocation can be big enough for the difference to be noticeable.
         let len = self
-            .compute_size_in_bytes(layout.size, count)
+            .compute_size_in_bytes(layout.memrepr_size, count)
             .ok_or_else(|| err_ub_custom!(fluent::const_eval_size_overflow, name = name))?;
 
         let bytes = std::iter::repeat(byte).take(len.bytes_usize());
@@ -755,8 +785,8 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         let right = self.read_pointer(right)?;
         let n = Size::from_bytes(self.read_target_usize(byte_count)?);
 
-        let left_bytes = self.read_bytes_ptr_strip_provenance(left, n)?;
-        let right_bytes = self.read_bytes_ptr_strip_provenance(right, n)?;
+        let left_bytes = self.read_bytes_ptr_strip_provenance(left, None, n)?;
+        let right_bytes = self.read_bytes_ptr_strip_provenance(right, None, n)?;
 
         // `Ordering`'s discriminants are -1/0/+1, so casting does the right thing.
         let result = Ord::cmp(left_bytes, right_bytes) as i32;
@@ -772,19 +802,21 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         assert!(layout.is_sized());
 
         let get_bytes = |this: &InterpCx<'tcx, M>,
-                         op: &OpTy<'tcx, <M as Machine<'tcx>>::Provenance>|
+                         op: &OpTy<'tcx, <M as Machine<'tcx>>::Provenance>,
+                         data_size,
+                         memrepr_size|
          -> InterpResult<'tcx, &[u8]> {
             let ptr = this.read_pointer(op)?;
             this.check_ptr_align(ptr, layout.align.abi)?;
-            let Some(alloc_ref) = self.get_ptr_alloc(ptr, layout.size)? else {
+            let Some(alloc_ref) = self.get_ptr_alloc(ptr, data_size, memrepr_size)? else {
                 // zero-sized access
                 return interp_ok(&[]);
             };
             alloc_ref.get_bytes_strip_provenance()
         };
 
-        let lhs_bytes = get_bytes(self, lhs)?;
-        let rhs_bytes = get_bytes(self, rhs)?;
+        let lhs_bytes = get_bytes(self, lhs, layout.data_size, layout.memrepr_size)?;
+        let rhs_bytes = get_bytes(self, rhs, layout.data_size, layout.memrepr_size)?;
         interp_ok(Scalar::from_bool(lhs_bytes == rhs_bytes))
     }
 

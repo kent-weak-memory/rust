@@ -7,7 +7,7 @@ use crate::callconv::{ArgAbi, FnAbi, Reg, RegKind};
 use crate::spec::HasTargetSpec;
 
 fn classify_ret<Ty>(ret: &mut ArgAbi<'_, Ty>) {
-    let size = ret.layout.size;
+    let size = ret.layout.memrepr_size;
     if size.bits() <= 128 && matches!(ret.layout.backend_repr, BackendRepr::SimdVector { .. }) {
         return;
     }
@@ -38,7 +38,7 @@ where
         return;
     }
 
-    let size = arg.layout.size;
+    let size = arg.layout.memrepr_size;
     if size.bits() <= 128 {
         if let BackendRepr::SimdVector { .. } = arg.layout.backend_repr {
             // pass non-wrapped vector types using `PassMode::Direct`

@@ -11,7 +11,7 @@ use rustc_hir::def_id::DefId;
 use rustc_middle::middle::codegen_fn_attrs::{CodegenFnAttrFlags, CodegenFnAttrs};
 use rustc_middle::mir::interpret::{
     Allocation, ConstAllocation, ErrorHandled, InitChunk, Pointer, Scalar as InterpScalar,
-    read_target_uint,
+    alloc_range, read_target_uint,
 };
 use rustc_middle::mir::mono::{Linkage, MonoItem};
 use rustc_middle::ty::layout::{HasTypingEnv, LayoutOf};
@@ -47,7 +47,7 @@ pub(crate) fn const_alloc_to_llvm<'ll>(
     }
     let mut llvals = Vec::with_capacity(alloc.provenance().ptrs().len() + 1);
     let dl = cx.data_layout();
-    let pointer_size = dl.pointer_size.bytes() as usize;
+    let pointer_size = dl.pointer_memrepr_size.bytes() as usize;
 
     // Note: this function may call `inspect_with_uninit_and_ptr_outside_interpreter`, so `range`
     // must be within the bounds of `alloc` and not contain or overlap a pointer provenance.
@@ -57,7 +57,11 @@ pub(crate) fn const_alloc_to_llvm<'ll>(
         alloc: &'a Allocation,
         range: Range<usize>,
     ) {
-        let chunks = alloc.init_mask().range_as_init_chunks(range.clone().into());
+        let chunks = alloc.init_mask().range_as_init_chunks(alloc_range(
+            Size::from_bytes(range.start),
+            None,
+            Size::from_bytes(range.end - range.start),
+        ));
 
         let chunk_to_llval = move |chunk| match chunk {
             InitChunk::Init(range) => {
@@ -115,7 +119,7 @@ pub(crate) fn const_alloc_to_llvm<'ll>(
             InterpScalar::from_pointer(Pointer::new(prov, Size::from_bytes(ptr_offset)), &cx.tcx),
             Scalar::Initialized {
                 value: Primitive::Pointer(address_space),
-                valid_range: WrappingRange::full(dl.pointer_size),
+                valid_range: WrappingRange::full(dl.pointer_memrepr_size),
             },
             cx.type_ptr_ext(address_space),
         ));

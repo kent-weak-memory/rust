@@ -250,11 +250,14 @@ impl<'tcx> SimplifyMatch<'tcx> for SimplifyToIf {
                     } else {
                         // Different value between blocks. Make value conditional on switch
                         // condition.
-                        let size = tcx.layout_of(typing_env.as_query_input(discr_ty)).unwrap().size;
+                        let size = tcx
+                            .layout_of(typing_env.as_query_input(discr_ty))
+                            .unwrap()
+                            .memrepr_size;
                         let const_cmp = Operand::const_from_scalar(
                             tcx,
                             discr_ty,
-                            rustc_const_eval::interpret::Scalar::from_uint(val, size),
+                            rustc_const_eval::interpret::Scalar::from_uint(val, size, size),
                             rustc_span::DUMMY_SP,
                         );
                         let op = if f_b { BinOp::Eq } else { BinOp::Ne };
@@ -280,10 +283,15 @@ fn can_cast(
     cast_ty: Ty<'_>,
     target_scalar: ScalarInt,
 ) -> bool {
-    let from_scalar = ScalarInt::try_from_uint(src_val.into(), src_layout.size).unwrap();
+    let from_scalar = ScalarInt::try_from_uint(
+        src_val.into(),
+        src_layout.data_size.unwrap(),
+        src_layout.memrepr_size,
+    )
+    .unwrap();
     let v = match src_layout.ty.kind() {
-        ty::Uint(_) => from_scalar.to_uint(src_layout.size),
-        ty::Int(_) => from_scalar.to_int(src_layout.size) as u128,
+        ty::Uint(_) => from_scalar.to_uint(src_layout.memrepr_size),
+        ty::Int(_) => from_scalar.to_int(src_layout.memrepr_size) as u128,
         _ => unreachable!("invalid int"),
     };
     let size = match *cast_ty.kind() {
@@ -292,7 +300,7 @@ fn can_cast(
         _ => unreachable!("invalid int"),
     };
     let v = size.truncate(v);
-    let cast_scalar = ScalarInt::try_from_uint(v, size).unwrap();
+    let cast_scalar = ScalarInt::try_from_uint(v, size, size).unwrap();
     cast_scalar == target_scalar
 }
 

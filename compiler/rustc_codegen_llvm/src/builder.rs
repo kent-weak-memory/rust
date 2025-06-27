@@ -493,8 +493,8 @@ impl<'a, 'll, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
         use rustc_middle::ty::{Int, Uint};
 
         let new_kind = match ty.kind() {
-            Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_width)),
-            Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_width)),
+            Int(t @ Isize) => Int(t.normalize(self.tcx.sess.target.pointer_data_size)),
+            Uint(t @ Usize) => Uint(t.normalize(self.tcx.sess.target.pointer_data_size)),
             t @ (Uint(_) | Int(_)) => *t,
             _ => panic!("tried to get overflow intrinsic for op applied to non-int type"),
         };
@@ -712,7 +712,7 @@ impl<'a, 'll, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
             });
             OperandValue::Immediate(llval)
         } else if let abi::BackendRepr::ScalarPair(a, b) = place.layout.backend_repr {
-            let b_offset = a.size(self).align_to(b.align(self).abi);
+            let b_offset = a.memrepr_size(self).align_to(b.align(self).abi);
 
             let mut load = |i, scalar: abi::Scalar, layout, align, offset| {
                 let llptr = if i == 0 {

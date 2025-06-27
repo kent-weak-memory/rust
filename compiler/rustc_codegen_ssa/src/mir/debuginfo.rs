@@ -544,16 +544,16 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     calculate_debuginfo_offset(bx, &fragment.projection, var_layout);
                 assert!(indirect_offsets.is_empty());
 
-                if fragment_layout.size == Size::ZERO {
+                if fragment_layout.memrepr_size == Size::ZERO {
                     // Fragment is a ZST, so does not represent anything. Avoid generating anything
                     // as this may conflict with a fragment that covers the entire variable.
                     continue;
-                } else if fragment_layout.size == var_layout.size {
+                } else if fragment_layout.memrepr_size == var_layout.memrepr_size {
                     // Fragment covers entire variable, so as far as
                     // DWARF is concerned, it's not really a fragment.
                     None
                 } else {
-                    Some(direct_offset..direct_offset + fragment_layout.size)
+                    Some(direct_offset..direct_offset + fragment_layout.memrepr_size)
                 }
             } else {
                 None

@@ -35,7 +35,8 @@ pub fn wants_c_like_enum_debuginfo<'tcx>(
                 0 => false,
                 1 => {
                     // Univariant enums unless they are zero-sized
-                    enum_type_and_layout.size != Size::ZERO && adt_def.all_fields().count() == 0
+                    enum_type_and_layout.memrepr_size != Size::ZERO
+                        && adt_def.all_fields().count() == 0
                 }
                 _ => {
                     // Enums with more than one variant if they have no fields
@@ -81,7 +82,7 @@ fn tag_base_type_opt<'tcx>(
                         // is a pointer so we fix this up to just be `usize`.
                         // DWARF might be able to deal with this but with an integer type we are on
                         // the safe side there too.
-                        tcx.data_layout.ptr_sized_integer()
+                        tcx.data_layout.ptr_data_sized_integer()
                     }
                 }
                 .to_ty(tcx, false),

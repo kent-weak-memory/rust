@@ -94,8 +94,8 @@ fn remove_successors_from_switch<'tcx>(
 
     let discr_ty = discr.ty(body, tcx);
     let discr_size = Size::from_bits(match discr_ty.kind() {
-        ty::Uint(uint) => uint.normalize(tcx.sess.target.pointer_width).bit_width().unwrap(),
-        ty::Int(int) => int.normalize(tcx.sess.target.pointer_width).bit_width().unwrap(),
+        ty::Uint(uint) => uint.normalize(tcx.sess.target.pointer_data_size).bit_width().unwrap(),
+        ty::Int(int) => int.normalize(tcx.sess.target.pointer_data_size).bit_width().unwrap(),
         ty::Char => 32,
         ty::Bool => 1,
         other => bug!("unhandled type: {:?}", other),
@@ -106,7 +106,11 @@ fn remove_successors_from_switch<'tcx>(
         let value = Operand::Constant(Box::new(ConstOperand {
             span: source_info.span,
             user_ty: None,
-            const_: Const::from_scalar(tcx, Scalar::from_uint(value, discr_size), discr_ty),
+            const_: Const::from_scalar(
+                tcx,
+                Scalar::from_uint(value, discr_size, discr_size),
+                discr_ty,
+            ),
         }));
         let cmp = Rvalue::BinaryOp(binop, Box::new((discr.to_copy(), value)));
         patch.add_assign(location, local.into(), cmp);

@@ -71,14 +71,14 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                     Primitive::Int(..) | Primitive::Pointer(_) => RegKind::Integer,
                     Primitive::Float(_) => RegKind::Float,
                 };
-                Ok(HomogeneousAggregate::Homogeneous(Reg { kind, size: self.size }))
+                Ok(HomogeneousAggregate::Homogeneous(Reg { kind, size: self.memrepr_size }))
             }
 
             BackendRepr::SimdVector { .. } => {
                 assert!(!self.is_zst());
                 Ok(HomogeneousAggregate::Homogeneous(Reg {
                     kind: RegKind::Vector,
-                    size: self.size,
+                    size: self.memrepr_size,
                 }))
             }
 
@@ -101,7 +101,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                                 } else {
                                     HomogeneousAggregate::NoData
                                 };
-                                return Ok((result, layout.size));
+                                return Ok((result, layout.memrepr_size));
                             }
                             FieldsShape::Union(_) => true,
                             FieldsShape::Arbitrary { .. } => false,
@@ -126,7 +126,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                             result = result.merge(field.homogeneous_aggregate(cx)?)?;
 
                             // Keep track of the offset (without padding).
-                            let size = field.size;
+                            let size = field.memrepr_size;
                             if is_union {
                                 total = total.max(size);
                             } else {
@@ -166,7 +166,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
                 }
 
                 // There needs to be no padding.
-                if total != self.size {
+                if total != self.memrepr_size {
                     Err(Heterogeneous)
                 } else {
                     match result {

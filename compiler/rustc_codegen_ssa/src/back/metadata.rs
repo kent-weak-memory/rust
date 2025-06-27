@@ -681,7 +681,7 @@ pub fn create_metadata_file_for_wasm(sess: &Session, data: &[u8], section_name: 
     let mut module = wasm_encoder::Module::new();
     let mut imports = wasm_encoder::ImportSection::new();
 
-    if sess.target.pointer_width == 64 {
+    if sess.target.pointer_memrepr_size == 64 {
         imports.import(
             "env",
             "__linear_memory",

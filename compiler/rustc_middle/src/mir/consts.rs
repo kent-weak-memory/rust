@@ -111,7 +111,7 @@ impl<'tcx> ConstValue<'tcx> {
         let size = tcx
             .layout_of(typing_env.with_post_analysis_normalized(tcx).as_query_input(ty))
             .ok()?
-            .size;
+            .memrepr_size;
         self.try_to_bits(size)
     }
 
@@ -142,7 +142,7 @@ impl<'tcx> ConstValue<'tcx> {
                 // The reference itself is stored behind an indirection.
                 // Load the reference, and then load the actual slice contents.
                 let a = tcx.global_alloc(alloc_id).unwrap_memory().inner();
-                let ptr_size = tcx.data_layout.pointer_size;
+                let ptr_size = tcx.data_layout.pointer_data_size;
                 if a.size() < offset + 2 * ptr_size {
                     // (partially) dangling reference
                     return None;
@@ -151,7 +151,7 @@ impl<'tcx> ConstValue<'tcx> {
                 let ptr = a
                     .read_scalar(
                         &tcx,
-                        alloc_range(offset, ptr_size),
+                        alloc_range(offset, None, ptr_size),
                         /* read_provenance */ true,
                     )
                     .ok()?;
@@ -159,7 +159,7 @@ impl<'tcx> ConstValue<'tcx> {
                 let len = a
                     .read_scalar(
                         &tcx,
-                        alloc_range(offset + ptr_size, ptr_size),
+                        alloc_range(offset + ptr_size, None, ptr_size),
                         /* read_provenance */ false,
                     )
                     .ok()?;
@@ -194,7 +194,7 @@ impl<'tcx> ConstValue<'tcx> {
                 .unwrap_memory()
                 .inner()
                 .provenance()
-                .range_empty(AllocRange::from(offset..offset + size), &tcx),
+                .range_empty(alloc_range(offset, None, offset + size), &tcx),
         }
     }
 
@@ -210,10 +210,11 @@ impl<'tcx> ConstValue<'tcx> {
         let init_mask = alloc.0.init_mask();
         let init_range = init_mask.is_range_initialized(AllocRange {
             start: Size::ZERO,
-            size: Size::from_bytes(alloc.0.len()),
+            data_size: None,
+            memrepr_size: Size::from_bytes(alloc.0.len()),
         });
         if let Err(range) = init_range {
-            if range.size == alloc.0.size() {
+            if range.memrepr_size == alloc.0.size() {
                 return true;
             }
         }
@@ -406,7 +407,8 @@ impl<'tcx> Const<'tcx> {
         let size = tcx
             .layout_of(typing_env.with_post_analysis_normalized(tcx).as_query_input(self.ty()))
             .ok()?
-            .size;
+            .data_size
+            .unwrap();
         Some(int.to_bits(size))
     }
 
@@ -449,11 +451,11 @@ impl<'tcx> Const<'tcx> {
         typing_env: ty::TypingEnv<'tcx>,
         ty: Ty<'tcx>,
     ) -> Self {
-        let size = tcx
+        let dl = tcx
             .layout_of(typing_env.as_query_input(ty))
-            .unwrap_or_else(|e| bug!("could not compute layout for {ty:?}: {e:?}"))
-            .size;
-        let cv = ConstValue::Scalar(Scalar::from_uint(bits, size));
+            .unwrap_or_else(|e| bug!("could not compute layout for {ty:?}: {e:?}"));
+        let cv =
+            ConstValue::Scalar(Scalar::from_uint(bits, dl.data_size.unwrap(), dl.memrepr_size));
 
         Self::Val(cv, ty)
     }

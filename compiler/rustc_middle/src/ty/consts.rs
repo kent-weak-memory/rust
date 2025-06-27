@@ -185,15 +185,12 @@ impl<'tcx> Const<'tcx> {
         typing_env: ty::TypingEnv<'tcx>,
         ty: Ty<'tcx>,
     ) -> Self {
-        let size = tcx
+        let layout = tcx
             .layout_of(typing_env.as_query_input(ty))
-            .unwrap_or_else(|e| panic!("could not compute layout for {ty:?}: {e:?}"))
-            .size;
-        ty::Const::new_value(
-            tcx,
-            ty::ValTree::from_scalar_int(tcx, ScalarInt::try_from_uint(bits, size).unwrap()),
-            ty,
-        )
+            .unwrap_or_else(|e| panic!("could not compute layout for {ty:?}: {e:?}"));
+        let scalar =
+            ScalarInt::try_from_uint(bits, layout.data_size.unwrap(), layout.memrepr_size).unwrap();
+        ty::Const::new_value(tcx, ty::ValTree::from_scalar_int(tcx, scalar), ty)
     }
 
     #[inline]

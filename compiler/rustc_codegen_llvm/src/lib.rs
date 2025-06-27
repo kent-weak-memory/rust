@@ -114,8 +114,11 @@ impl ExtraBackendMethods for LlvmCodegenBackend {
         alloc_error_handler_kind: AllocatorKind,
     ) -> ModuleLlvm {
         let module_llvm = ModuleLlvm::new_metadata(tcx, module_name);
-        let cx =
-            SimpleCx::new(module_llvm.llmod(), &module_llvm.llcx, tcx.data_layout.pointer_size);
+        let cx = SimpleCx::new(
+            module_llvm.llmod(),
+            &module_llvm.llcx,
+            tcx.data_layout.pointer_data_size,
+        );
         unsafe {
             allocator::codegen(tcx, cx, module_name, kind, alloc_error_handler_kind);
         }

@@ -117,7 +117,11 @@ impl<Prov: Provenance> Immediate<Prov> {
     pub fn assert_matches_abi(self, abi: BackendRepr, msg: &str, cx: &impl HasDataLayout) {
         match (self, abi) {
             (Immediate::Scalar(scalar), BackendRepr::Scalar(s)) => {
-                assert_eq!(scalar.size(), s.size(cx), "{msg}: scalar value has wrong size");
+                assert_eq!(
+                    scalar.data_size(),
+                    s.data_size(cx),
+                    "{msg}: scalar value has wrong size: {scalar:?}, {s:?}"
+                );
                 if !matches!(s.primitive(), abi::Primitive::Pointer(..)) {
                     // This is not a pointer, it should not carry provenance.
                     assert!(
@@ -128,8 +132,8 @@ impl<Prov: Provenance> Immediate<Prov> {
             }
             (Immediate::ScalarPair(a_val, b_val), BackendRepr::ScalarPair(a, b)) => {
                 assert_eq!(
-                    a_val.size(),
-                    a.size(cx),
+                    a_val.memrepr_size(),
+                    a.memrepr_size(cx),
                     "{msg}: first component of scalar pair has wrong size"
                 );
                 if !matches!(a.primitive(), abi::Primitive::Pointer(..)) {
@@ -139,8 +143,8 @@ impl<Prov: Provenance> Immediate<Prov> {
                     );
                 }
                 assert_eq!(
-                    b_val.size(),
-                    b.size(cx),
+                    b_val.memrepr_size(),
+                    b.memrepr_size(cx),
                     "{msg}: second component of scalar pair has wrong size"
                 );
                 if !matches!(b.primitive(), abi::Primitive::Pointer(..)) {
@@ -192,7 +196,7 @@ impl<Prov: Provenance> std::fmt::Display for ImmTy<'_, Prov> {
         ) -> Result<(), std::fmt::Error> {
             match s {
                 Scalar::Int(int) => cx.pretty_print_const_scalar_int(int, ty, true),
-                Scalar::Ptr(ptr, _sz) => {
+                Scalar::Ptr(ptr, _data_size, _memrepr_size) => {
                     // Just print the ptr value. `pretty_print_const_scalar_ptr` would also try to
                     // print what is points to, which would fail since it has no access to the local
                     // memory.
@@ -245,7 +249,7 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
     #[inline]
     pub fn from_scalar(val: Scalar<Prov>, layout: TyAndLayout<'tcx>) -> Self {
         debug_assert!(layout.backend_repr.is_scalar(), "`ImmTy::from_scalar` on non-scalar layout");
-        debug_assert_eq!(val.size(), layout.size);
+        debug_assert_eq!(val.memrepr_size(), layout.memrepr_size);
         ImmTy { imm: val.into(), layout }
     }
 
@@ -287,12 +291,18 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
 
     #[inline]
     pub fn from_uint(i: impl Into<u128>, layout: TyAndLayout<'tcx>) -> Self {
-        Self::from_scalar(Scalar::from_uint(i, layout.size), layout)
+        Self::from_scalar(
+            Scalar::from_uint(i, layout.data_size.unwrap(), layout.memrepr_size),
+            layout,
+        )
     }
 
     #[inline]
     pub fn from_int(i: impl Into<i128>, layout: TyAndLayout<'tcx>) -> Self {
-        Self::from_scalar(Scalar::from_int(i, layout.size), layout)
+        Self::from_scalar(
+            Scalar::from_int(i, layout.data_size.unwrap(), layout.memrepr_size),
+            layout,
+        )
     }
 
     #[inline]
@@ -328,10 +338,12 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
     #[inline]
     pub fn to_scalar_int(&self) -> InterpResult<'tcx, ScalarInt> {
         let s = self.to_scalar().to_scalar_int()?;
-        if s.size() != self.layout.size {
+        if s.memrepr_size() != self.layout.memrepr_size {
             throw_ub!(ScalarSizeMismatch(ScalarSizeMismatch {
-                target_size: self.layout.size.bytes(),
-                data_size: s.size().bytes(),
+                target_data_size: self.layout.data_size.unwrap().bytes(),
+                target_memory_size: self.layout.memrepr_size.bytes(),
+                data_data_size: s.data_size().bytes(),
+                data_memory_size: s.memrepr_size().bytes()
             }));
         }
         interp_ok(s)
@@ -341,7 +353,7 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
     pub fn to_const_int(self) -> ConstInt {
         assert!(self.layout.ty.is_integral());
         let int = self.imm.to_scalar_int();
-        assert_eq!(int.size(), self.layout.size);
+        assert_eq!(int.memrepr_size(), self.layout.memrepr_size);
         ConstInt::new(int, self.layout.ty.is_signed(), self.layout.ty.is_ptr_sized_integral())
     }
 
@@ -372,10 +384,10 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
         // remains in-bounds. This cannot actually be violated since projections are type-checked
         // and bounds-checked.
         assert!(
-            offset + layout.size <= self.layout.size,
+            offset + layout.memrepr_size <= self.layout.memrepr_size,
             "attempting to project to field at offset {} with size {} into immediate with layout {:#?}",
             offset.bytes(),
-            layout.size.bytes(),
+            layout.memrepr_size.bytes(),
             self.layout,
         );
         // This makes several assumptions about what layouts we will encounter; we match what
@@ -399,7 +411,7 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
                 Immediate::Uninit
             }
             // the field covers the entire type
-            _ if layout.size == self.layout.size => {
+            _ if layout.memrepr_size == self.layout.memrepr_size => {
                 assert_eq!(offset.bytes(), 0);
                 **self
             }
@@ -408,7 +420,7 @@ impl<'tcx, Prov: Provenance> ImmTy<'tcx, Prov> {
                 Immediate::from(if offset.bytes() == 0 {
                     a_val
                 } else {
-                    assert_eq!(offset, a.size(cx).align_to(b.align(cx).abi));
+                    assert_eq!(offset, a.memrepr_size(cx).align_to(b.align(cx).abi));
                     b_val
                 })
             }
@@ -583,10 +595,13 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         // like a `Scalar` (or `ScalarPair`).
         interp_ok(match mplace.layout.backend_repr {
             BackendRepr::Scalar(abi::Scalar::Initialized { value: s, .. }) => {
-                let size = s.size(self);
-                assert_eq!(size, mplace.layout.size, "abi::Scalar size does not match layout size");
+                let size = s.memrepr_size(self);
+                assert_eq!(
+                    size, mplace.layout.memrepr_size,
+                    "abi::Scalar size does not match layout size"
+                );
                 let scalar = alloc.read_scalar(
-                    alloc_range(Size::ZERO, size),
+                    alloc_range(Size::ZERO, Some(s.data_size(self)), size),
                     /*read_provenance*/ matches!(s, abi::Primitive::Pointer(_)),
                 )?;
                 Some(ImmTy::from_scalar(scalar, mplace.layout))
@@ -598,15 +613,15 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 // We checked `ptr_align` above, so all fields will have the alignment they need.
                 // We would anyway check against `ptr_align.restrict_for_offset(b_offset)`,
                 // which `ptr.offset(b_offset)` cannot possibly fail to satisfy.
-                let (a_size, b_size) = (a.size(self), b.size(self));
+                let (a_size, b_size) = (a.memrepr_size(self), b.memrepr_size(self));
                 let b_offset = a_size.align_to(b.align(self).abi);
                 assert!(b_offset.bytes() > 0); // in `operand_field` we use the offset to tell apart the fields
                 let a_val = alloc.read_scalar(
-                    alloc_range(Size::ZERO, a_size),
+                    alloc_range(Size::ZERO, Some(a.data_size(self)), a_size),
                     /*read_provenance*/ matches!(a, abi::Primitive::Pointer(_)),
                 )?;
                 let b_val = alloc.read_scalar(
-                    alloc_range(b_offset, b_size),
+                    alloc_range(b_offset, Some(b.data_size(self)), b_size),
                     /*read_provenance*/ matches!(b, abi::Primitive::Pointer(_)),
                 )?;
                 Some(ImmTy::from_immediate(Immediate::ScalarPair(a_val, b_val), mplace.layout))
@@ -703,7 +718,8 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
     /// Turn the wide MPlace into a string (must already be dereferenced!)
     pub fn read_str(&self, mplace: &MPlaceTy<'tcx, M::Provenance>) -> InterpResult<'tcx, &str> {
         let len = mplace.len(self)?;
-        let bytes = self.read_bytes_ptr_strip_provenance(mplace.ptr(), Size::from_bytes(len))?;
+        let bytes =
+            self.read_bytes_ptr_strip_provenance(mplace.ptr(), None, Size::from_bytes(len))?;
         let s = std::str::from_utf8(bytes).map_err(|err| err_ub!(InvalidStr(err)))?;
         interp_ok(s)
     }
@@ -842,7 +858,9 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         // Other cases need layout.
         let adjust_scalar = |scalar| -> InterpResult<'tcx, _> {
             interp_ok(match scalar {
-                Scalar::Ptr(ptr, size) => Scalar::Ptr(self.global_root_pointer(ptr)?, size),
+                Scalar::Ptr(ptr, data_size, memrepr_size) => {
+                    Scalar::Ptr(self.global_root_pointer(ptr)?, data_size, memrepr_size)
+                }
                 Scalar::Int(int) => Scalar::Int(int),
             })
         };

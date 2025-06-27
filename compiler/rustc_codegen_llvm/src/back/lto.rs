@@ -668,8 +668,11 @@ pub(crate) fn run_pass_manager(
     }
 
     if cfg!(llvm_enzyme) && enable_ad && !thin {
-        let cx =
-            SimpleCx::new(module.module_llvm.llmod(), &module.module_llvm.llcx, cgcx.pointer_size);
+        let cx = SimpleCx::new(
+            module.module_llvm.llmod(),
+            &module.module_llvm.llcx,
+            cgcx.pointer_data_size,
+        );
 
         for function in cx.get_functions() {
             let enzyme_marker = "enzyme_marker";

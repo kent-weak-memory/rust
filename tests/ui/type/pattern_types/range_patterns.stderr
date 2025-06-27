@@ -1,5 +1,8 @@
 error: layout_of(NonZero<u32>) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $SOME_ALIGN,
@@ -45,7 +48,10 @@ LL | type X = std::num::NonZeroU32;
    | ^^^^^^
 
 error: layout_of((u32) is 1..) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $SOME_ALIGN,
@@ -84,7 +90,10 @@ LL | type Y = pattern_type!(u32 is 1..);
    | ^^^^^^
 
 error: layout_of(Option<(u32) is 1..>) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $SOME_ALIGN,
@@ -124,7 +133,10 @@ error: layout_of(Option<(u32) is 1..>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memrepr_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $SOME_ALIGN,
@@ -146,7 +158,10 @@ error: layout_of(Option<(u32) is 1..>) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: Some(
+                           Size(4 bytes),
+                       ),
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $SOME_ALIGN,
@@ -198,7 +213,10 @@ LL | type Z = Option<pattern_type!(u32 is 1..)>;
    | ^^^^^^
 
 error: layout_of(Option<NonZero<u32>>) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $SOME_ALIGN,
@@ -238,7 +256,10 @@ error: layout_of(Option<NonZero<u32>>) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(0 bytes),
+                       data_size: Some(
+                           Size(0 bytes),
+                       ),
+                       memrepr_size: Size(0 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: $SOME_ALIGN,
@@ -260,7 +281,10 @@ error: layout_of(Option<NonZero<u32>>) = Layout {
                        randomization_seed: $SEED,
                    },
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: Some(
+                           Size(4 bytes),
+                       ),
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: $SOME_ALIGN,
@@ -312,7 +336,10 @@ LL | type A = Option<std::num::NonZeroU32>;
    | ^^^^^^
 
 error: layout_of(NonZeroU32New) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: $SOME_ALIGN,
@@ -386,7 +413,10 @@ LL | type WRAP2 = pattern_type!(u32 is 5..2);
    | ^^^^^^^^^^
 
 error: layout_of((i8) is -10..=10) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $SOME_ALIGN,
@@ -425,7 +455,10 @@ LL | type SIGN = pattern_type!(i8 is -10..=10);
    | ^^^^^^^^^
 
 error: layout_of((i8) is i8::MIN..=0) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $SOME_ALIGN,

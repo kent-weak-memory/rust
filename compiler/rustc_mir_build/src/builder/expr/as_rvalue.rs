@@ -652,7 +652,8 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 let lhs_bits = Operand::const_from_scalar(
                     self.tcx,
                     unsigned_ty,
-                    Scalar::from_uint(lhs_size.bits(), rhs_size),
+                    // FIXME(seharris/xdoardo): this is likely the wrong memory size.
+                    Scalar::from_uint(lhs_size.bits(), rhs_size, rhs_size),
                     span,
                 );
 
@@ -857,7 +858,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     // Helper to get a `-1` value of the appropriate type
     fn neg_1_literal(&mut self, span: Span, ty: Ty<'tcx>) -> Operand<'tcx> {
         let typing_env = ty::TypingEnv::fully_monomorphized();
-        let size = self.tcx.layout_of(typing_env.as_query_input(ty)).unwrap().size;
+        let size = self.tcx.layout_of(typing_env.as_query_input(ty)).unwrap().data_size.unwrap();
         let literal = Const::from_bits(self.tcx, size.unsigned_int_max(), typing_env, ty);
 
         self.literal_operand(span, literal)
@@ -867,7 +868,8 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     fn minval_literal(&mut self, span: Span, ty: Ty<'tcx>) -> Operand<'tcx> {
         assert!(ty.is_signed());
         let typing_env = ty::TypingEnv::fully_monomorphized();
-        let bits = self.tcx.layout_of(typing_env.as_query_input(ty)).unwrap().size.bits();
+        let bits =
+            self.tcx.layout_of(typing_env.as_query_input(ty)).unwrap().data_size.unwrap().bits();
         let n = 1 << (bits - 1);
         let literal = Const::from_bits(self.tcx, n, typing_env, ty);
 

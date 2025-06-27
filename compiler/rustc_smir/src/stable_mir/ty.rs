@@ -589,7 +589,7 @@ pub enum IntTy {
 impl IntTy {
     pub fn num_bytes(self) -> usize {
         match self {
-            IntTy::Isize => MachineInfo::target_pointer_width().bytes(),
+            IntTy::Isize => MachineInfo::target_pointer_data_size().bytes(),
             IntTy::I8 => 1,
             IntTy::I16 => 2,
             IntTy::I32 => 4,
@@ -612,7 +612,7 @@ pub enum UintTy {
 impl UintTy {
     pub fn num_bytes(self) -> usize {
         match self {
-            UintTy::Usize => MachineInfo::target_pointer_width().bytes(),
+            UintTy::Usize => MachineInfo::target_pointer_data_size().bytes(),
             UintTy::U8 => 1,
             UintTy::U16 => 2,
             UintTy::U32 => 4,
@@ -1307,7 +1307,7 @@ impl Allocation {
     /// Read this allocation as a pointer and return whether it represents a `null` pointer.
     pub fn is_null(&self) -> Result<bool, Error> {
         let len = self.bytes.len();
-        let ptr_len = MachineInfo::target_pointer_width().bytes();
+        let ptr_len = MachineInfo::target_pointer_data_size().bytes();
         if len != ptr_len {
             return Err(error!("Expected width of pointer (`{ptr_len}`), but found: `{len}`"));
         }

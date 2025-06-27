@@ -2215,7 +2215,7 @@ impl<'test> TestCx<'test> {
         output_kind: TestOutput,
         explicit_format: bool,
     ) -> usize {
-        let stderr_bits = format!("{}bit.stderr", self.config.get_pointer_width());
+        let stderr_bits = format!("{}bit.stderr", self.config.get_pointer_memrepr_size());
         let (stderr_kind, stdout_kind) = match output_kind {
             TestOutput::Compile => (
                 if self.force_color_svg() {

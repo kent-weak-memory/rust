@@ -20,8 +20,8 @@ use super::type_::{ArgAbiBuilderMethods, BaseTypeCodegenMethods, LayoutTypeCodeg
 use super::{CodegenMethods, StaticBuilderMethods};
 use crate::MemFlags;
 use crate::common::{
-    AtomicOrdering, AtomicRmwBinOp, IntPredicate, PreserveCheriTags,
-    RealPredicate, SynchronizationScope, TypeKind,
+    AtomicOrdering, AtomicRmwBinOp, IntPredicate, PreserveCheriTags, RealPredicate,
+    SynchronizationScope, TypeKind,
 };
 use crate::mir::operand::{OperandRef, OperandValue};
 use crate::mir::place::{PlaceRef, PlaceValue};
@@ -475,7 +475,7 @@ pub trait BuilderMethods<'a, 'tcx>:
             let temp = self.load_operand(src.with_type(layout));
             temp.val.store_with_flags(self, dst.with_type(layout), flags);
         } else if !layout.is_zst() {
-            let bytes = self.const_usize(layout.size.bytes());
+            let bytes = self.const_usize(layout.memrepr_size.bytes());
             self.memcpy(
                 dst.llval,
                 dst.align,

@@ -442,7 +442,7 @@ fn print_const_with_custom_print_scalar<'tcx>(
             let size = tcx
                 .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty))
                 .unwrap()
-                .size;
+                .memrepr_size;
             let sign_extended_data = int.assert_scalar_int().to_int(size);
             let mut output = if with_underscores {
                 format_integer_with_underscore_sep(&sign_extended_data.to_string())

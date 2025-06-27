@@ -71,15 +71,24 @@ impl<'tcx> IrPrint<PatternKind<'tcx>> for TyCtxt<'tcx> {
 
                 if let Some(c) = end.try_to_value() {
                     let end = c.valtree.unwrap_leaf();
-                    let size = end.size();
+                    let data_size = end.data_size();
+                    let memrepr_size = end.memrepr_size();
                     let max = match c.ty.kind() {
-                        ty::Int(_) => {
-                            Some(ty::ScalarInt::truncate_from_int(size.signed_int_max(), size))
-                        }
-                        ty::Uint(_) => {
-                            Some(ty::ScalarInt::truncate_from_uint(size.unsigned_int_max(), size))
-                        }
-                        ty::Char => Some(ty::ScalarInt::truncate_from_uint(char::MAX, size)),
+                        ty::Int(_) => Some(ty::ScalarInt::truncate_from_int(
+                            data_size.signed_int_max(),
+                            data_size,
+                            memrepr_size,
+                        )),
+                        ty::Uint(_) => Some(ty::ScalarInt::truncate_from_uint(
+                            data_size.unsigned_int_max(),
+                            data_size,
+                            memrepr_size,
+                        )),
+                        ty::Char => Some(ty::ScalarInt::truncate_from_uint(
+                            char::MAX,
+                            data_size,
+                            memrepr_size,
+                        )),
                         _ => None,
                     };
                     if let Some((max, _)) = max

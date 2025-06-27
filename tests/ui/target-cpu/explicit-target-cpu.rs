@@ -1,15 +1,16 @@
 //! Check that certain target *requires* the user to specify a target CPU via `-C target-cpu`.
 
+// ignore
 //@ revisions: amdgcn_nocpu amdgcn_cpu
 
 //@[amdgcn_nocpu] compile-flags: --target=amdgcn-amd-amdhsa
 //@[amdgcn_nocpu] needs-llvm-components: amdgpu
-//@[amdgcn_nocpu] build-fail
+//@[amdgcn_nocpu] should-fail
 
 //@[amdgcn_cpu] compile-flags: --target=amdgcn-amd-amdhsa
 //@[amdgcn_cpu] needs-llvm-components: amdgpu
 //@[amdgcn_cpu] compile-flags: -Ctarget-cpu=gfx900
-//@[amdgcn_cpu] build-pass
+//@[amdgcn_cpu] should-fail
 
 //@ revisions: avr_nocpu avr_cpu
 

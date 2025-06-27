@@ -277,14 +277,14 @@ pub(crate) fn default_configuration(sess: &Session) -> Cfg {
                 ins_sym!(sym::target_has_atomic_load_store, sym);
             };
             insert_atomic(sym::integer(i), align);
-            if sess.target.pointer_width as u64 == i {
+            if sess.target.pointer_data_size as u64 == i {
                 insert_atomic(sym::ptr, layout.pointer_align.abi);
             }
         }
     }
 
     ins_str!(sym::target_os, &sess.target.os);
-    ins_sym!(sym::target_pointer_width, sym::integer(sess.target.pointer_width));
+    ins_sym!(sym::target_pointer_width, sym::integer(sess.target.pointer_data_size));
 
     if sess.opts.unstable_opts.has_thread_local.unwrap_or(sess.target.has_thread_local) {
         ins_none!(sym::target_thread_local);
@@ -445,7 +445,7 @@ impl CheckCfg {
                         target.options.families.iter().map(|family| Symbol::intern(family)),
                     );
                     values_target_os.insert(Symbol::intern(&target.options.os));
-                    values_target_pointer_width.insert(sym::integer(target.pointer_width));
+                    values_target_pointer_width.insert(sym::integer(target.pointer_data_size));
                     values_target_vendor.insert(Symbol::intern(&target.options.vendor));
                 }
             }

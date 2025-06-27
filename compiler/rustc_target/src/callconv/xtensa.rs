@@ -47,7 +47,7 @@ where
         return;
     }
 
-    let size = arg.layout.size.bits();
+    let size = arg.layout.memrepr_size.bits();
     let needed_align = arg.layout.align.abi.bits();
     let mut must_use_stack = false;
 

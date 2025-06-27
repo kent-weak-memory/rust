@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::{fmt, ptr};
 
 use libc::{c_char, c_uint};
-use rustc_abi::{AddressSpace, Align, Integer, Reg, Size};
+use rustc_abi::{AddressSpace, Align, HasDataLayout, Integer, Reg, Size};
 use rustc_codegen_ssa::common::TypeKind;
 use rustc_codegen_ssa::traits::*;
 use rustc_data_structures::small_c_str::SmallCStr;
@@ -205,10 +205,6 @@ impl<'ll, CX: Borrow<SCx<'ll>>> BaseTypeCodegenMethods for GenericCx<'ll, CX> {
         unsafe { llvm::LLVMRustGetTypeKind(ty).to_generic() }
     }
 
-    fn type_ptr(&self) -> &'ll Type {
-        self.type_ptr_ext(AddressSpace::DATA)
-    }
-
     fn type_ptr_ext(&self, address_space: AddressSpace) -> &'ll Type {
         unsafe { llvm::LLVMPointerTypeInContext(self.llcx(), address_space.0) }
     }
@@ -290,6 +286,13 @@ impl<'ll, 'tcx> LayoutTypeCodegenMethods<'tcx> for CodegenCx<'ll, 'tcx> {
     fn fn_ptr_backend_type(&self, fn_abi: &FnAbi<'tcx, Ty<'tcx>>) -> &'ll Type {
         fn_abi.ptr_to_llvm_type(self)
     }
+
+    fn type_ptr(&self) -> &'ll Type {
+        unsafe {
+            llvm::LLVMPointerTypeInContext(self.llcx(), self.data_layout().data_address_space.0)
+        }
+    }
+
     fn reg_backend_type(&self, ty: &Reg) -> &'ll Type {
         ty.llvm_type(self)
     }

@@ -103,14 +103,16 @@ pub(super) fn vtable_allocation_provider<'tcx>(
         .layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(ty))
         .expect("failed to build vtable representation");
     assert!(layout.is_sized(), "can't create a vtable for an unsized type");
-    let size = layout.size.bytes();
+    let memory_size = layout.memrepr_size.bytes();
     let align = layout.align.abi.bytes();
 
-    let ptr_size = tcx.data_layout.pointer_size;
+    let ptr_memrepr_size = tcx.data_layout.pointer_memrepr_size;
+    let ptr_data_size = tcx.data_layout.pointer_data_size;
     let ptr_align = tcx.data_layout.pointer_align.abi;
 
-    let vtable_size = ptr_size * u64::try_from(vtable_entries.len()).unwrap();
+    let vtable_size = ptr_memrepr_size * u64::try_from(vtable_entries.len()).unwrap();
     let mut vtable = Allocation::new(vtable_size, ptr_align, AllocInit::Uninit);
+
 
     // No need to do any alignment checks on the memory accesses below, because we know the
     // allocation is correctly aligned as we created it above. Also we're only offsetting by
@@ -129,8 +131,10 @@ pub(super) fn vtable_allocation_provider<'tcx>(
                     Scalar::from_maybe_pointer(Pointer::null(), &tcx)
                 }
             }
-            VtblEntry::MetadataSize => Scalar::from_uint(size, ptr_size),
-            VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_size),
+            VtblEntry::MetadataSize => {
+                Scalar::from_uint(memory_size, ptr_data_size, ptr_memrepr_size)
+            }
+            VtblEntry::MetadataAlign => Scalar::from_uint(align, ptr_data_size, ptr_memrepr_size),
             VtblEntry::Vacant => continue,
             VtblEntry::Method(instance) => {
                 // Prepare the fn ptr we write into the vtable.
@@ -146,7 +150,11 @@ pub(super) fn vtable_allocation_provider<'tcx>(
             }
         };
         vtable
-            .write_scalar(&tcx, alloc_range(ptr_size * idx, ptr_size), scalar)
+            .write_scalar(
+                &tcx,
+                alloc_range(ptr_memrepr_size * idx, Some(ptr_data_size), ptr_memrepr_size),
+                scalar,
+            )
             .expect("failed to build vtable representation");
     }
 

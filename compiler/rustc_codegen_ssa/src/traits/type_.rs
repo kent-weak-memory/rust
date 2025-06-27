@@ -25,7 +25,6 @@ pub trait BaseTypeCodegenMethods: BackendTypes {
     fn type_array(&self, ty: Self::Type, len: u64) -> Self::Type;
     fn type_func(&self, args: &[Self::Type], ret: Self::Type) -> Self::Type;
     fn type_kind(&self, ty: Self::Type) -> TypeKind;
-    fn type_ptr(&self) -> Self::Type;
     fn type_ptr_ext(&self, address_space: AddressSpace) -> Self::Type;
     fn element_type(&self, ty: Self::Type) -> Self::Type;
 
@@ -117,6 +116,8 @@ pub trait LayoutTypeCodegenMethods<'tcx>: BackendTypes {
         index: usize,
         immediate: bool,
     ) -> Self::Type;
+
+    fn type_ptr(&self) -> Self::Type;
 
     /// A type that produces an [`OperandValue::Ref`] when loaded.
     ///

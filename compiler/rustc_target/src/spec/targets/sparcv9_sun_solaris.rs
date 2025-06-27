@@ -19,7 +19,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: Some(true),
         },
-        pointer_width: 64,
+        pointer_data_size: 64,
+        pointer_memrepr_size: 64,
         data_layout: "E-m:e-i64:64-i128:128-n32:64-S128".into(),
         // Use "sparc64" instead of "sparcv9" here, since the former is already
         // used widely in the source base. If we ever needed ABI

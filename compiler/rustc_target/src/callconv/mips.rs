@@ -10,7 +10,7 @@ where
         ret.extend_integer_width_to(32);
     } else {
         ret.make_indirect();
-        *offset += cx.data_layout().pointer_size;
+        *offset += cx.data_layout().pointer_memrepr_size;
     }
 }
 
@@ -23,7 +23,7 @@ where
         return;
     }
     let dl = cx.data_layout();
-    let size = arg.layout.size;
+    let size = arg.layout.memrepr_size;
     let align = arg.layout.align.max(dl.i32_align).min(dl.i64_align).abi;
 
     if arg.layout.is_aggregate() {

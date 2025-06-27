@@ -59,7 +59,7 @@ fn check_validity_requirement_strict<'tcx>(
     if kind == ValidityRequirement::Zero {
         cx.write_bytes_ptr(
             allocated.ptr(),
-            std::iter::repeat(0_u8).take(ty.layout.size().bytes_usize()),
+            std::iter::repeat(0_u8).take(ty.layout.memrepr_size().bytes_usize()),
         )
         .expect("failed to write bytes for zero valid check");
     }
@@ -98,7 +98,7 @@ fn check_validity_requirement_lax<'tcx>(
             ValidityRequirement::UninitMitigated0x01Fill => {
                 // The range must include an 0x01-filled buffer.
                 let mut val: u128 = 0x01;
-                for _ in 1..s.size(cx).bytes() {
+                for _ in 1..s.memrepr_size(cx).bytes() {
                     // For sizes >1, repeat the 0x01.
                     val = (val << 8) | 0x01;
                 }
@@ -133,7 +133,7 @@ fn check_validity_requirement_lax<'tcx>(
             // 0x01-filling is not aligned.
             return Ok(false);
         }
-        if pointee.size.bytes() > 0 {
+        if pointee.memrepr_size.bytes() > 0 {
             // A 'fake' integer pointer is not sufficiently dereferenceable.
             return Ok(false);
         }

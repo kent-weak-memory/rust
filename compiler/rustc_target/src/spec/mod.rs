@@ -2156,8 +2156,17 @@ pub struct Target {
     /// Metadata about a target, for example the description or tier.
     /// Used for generating target documentation.
     pub metadata: TargetMetadata,
-    /// Number of bits in a pointer. Influences the `target_pointer_width` `cfg` variable.
-    pub pointer_width: u32,
+    /// Number of bits of data in a pointer. Influences the `target_pointer_data_size` `cfg`
+    /// variable. For backwards compatibility, this is also influences the `target_pointer_width`
+    /// `cfg` variable.
+    pub pointer_data_size: u32,
+    /// Number of bits of the in-memory representation of a pointer. Influences the
+    /// `target_pointer_memrepr_size` `cfg` variable.
+    ///
+    /// Note: for a vast number of targets (as of now, all but CHERI targets) this value matches
+    /// precisely that of [`Self::pointer_data_size`]; it is not the case for target architectures
+    /// that support or solely use non-integral pointer types.
+    pub pointer_memrepr_size: u32,
     /// Architecture to use for ABI considerations. Valid options include: "x86",
     /// "x86_64", "arm", "aarch64", "mips", "powerpc", "powerpc64", and others.
     pub arch: StaticCow<str>,
@@ -2196,11 +2205,16 @@ impl Target {
             });
         }
 
-        let target_pointer_width: u64 = self.pointer_width.into();
-        if dl.pointer_size.bits() != target_pointer_width {
+        let target_pointer_data_size: u64 = self.pointer_data_size.into();
+        let target_pointer_memrepr_size: u64 = self.pointer_memrepr_size.into();
+        if dl.pointer_data_size.bits() != target_pointer_data_size
+            || dl.pointer_memrepr_size.bits() != target_pointer_memrepr_size
+        {
             return Err(TargetDataLayoutErrors::InconsistentTargetPointerWidth {
-                pointer_size: dl.pointer_size.bits(),
-                target: self.pointer_width,
+                pointer_data_size: dl.pointer_data_size.bits(),
+                pointer_memrepr_size: dl.pointer_memrepr_size.bits(),
+                target_pointer_data_size: self.pointer_data_size,
+                target_pointer_memrepr_size: self.pointer_memrepr_size,
             });
         }
 
@@ -3033,7 +3047,7 @@ impl Target {
     /// Maximum integer size in bits that this target can perform atomic
     /// operations on.
     pub fn max_atomic_width(&self) -> u64 {
-        self.max_atomic_width.unwrap_or_else(|| self.pointer_width.into())
+        self.max_atomic_width.unwrap_or_else(|| self.pointer_data_size.into())
     }
 
     /// Check some basic consistency of the current target. For JSON targets we are less strict;
@@ -3557,7 +3571,7 @@ impl Target {
         Some(match self.arch.as_ref() {
             "arm" => (Architecture::Arm, None),
             "aarch64" => (
-                if self.pointer_width == 32 {
+                if self.pointer_memrepr_size == 32 {
                     Architecture::Aarch64_Ilp32
                 } else {
                     Architecture::Aarch64
@@ -3581,7 +3595,7 @@ impl Target {
                 None,
             ),
             "x86_64" => (
-                if self.pointer_width == 32 {
+                if self.pointer_memrepr_size == 32 {
                     Architecture::X86_64_X32
                 } else {
                     Architecture::X86_64

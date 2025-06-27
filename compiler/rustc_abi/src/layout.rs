@@ -125,17 +125,21 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
         count_if_sized: Option<u64>, // None for slices
     ) -> LayoutCalculatorResult<FieldIdx, VariantIdx, F> {
         let count = count_if_sized.unwrap_or(0);
-        let size =
-            element.size.checked_mul(count, &self.cx).ok_or(LayoutCalculatorError::SizeOverflow)?;
+        let memrepr_size = element
+            .memrepr_size
+            .checked_mul(count, &self.cx)
+            .ok_or(LayoutCalculatorError::SizeOverflow)?;
 
+        let backend_repr = BackendRepr::Memory { sized: count_if_sized.is_some() };
         Ok(LayoutData {
             variants: Variants::Single { index: VariantIdx::new(0) },
-            fields: FieldsShape::Array { stride: element.size, count },
-            backend_repr: BackendRepr::Memory { sized: count_if_sized.is_some() },
+            fields: FieldsShape::Array { stride: element.memrepr_size, count },
+            backend_repr,
             largest_niche: element.largest_niche.filter(|_| count != 0),
             uninhabited: element.uninhabited && count != 0,
             align: element.align,
-            size,
+            data_size: self.data_size_for_backend_repr(&backend_repr, memrepr_size),
+            memrepr_size,
             max_repr_align: None,
             unadjusted_abi_align: element.align.abi,
             randomization_seed: element.randomization_seed.wrapping_add(Hash64::new(count)),
@@ -167,8 +171,10 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
 
         // Compute the size and alignment of the vector
         let dl = self.cx.data_layout();
-        let size =
-            elt.size.checked_mul(count, dl).ok_or_else(|| LayoutCalculatorError::SizeOverflow)?;
+        let memrepr_size = elt
+            .memrepr_size
+            .checked_mul(count, dl)
+            .ok_or_else(|| LayoutCalculatorError::SizeOverflow)?;
         let (repr, align) = if repr_packed && !count.is_power_of_two() {
             // Non-power-of-two vectors have padding up to the next power-of-two.
             // If we're a packed repr, remove the padding while keeping the alignment as close
@@ -176,14 +182,17 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             (
                 BackendRepr::Memory { sized: true },
                 AbiAndPrefAlign {
-                    abi: Align::max_aligned_factor(size),
-                    pref: dl.llvmlike_vector_align(size).pref,
+                    abi: Align::max_aligned_factor(memrepr_size),
+                    pref: dl.llvmlike_vector_align(memrepr_size).pref,
                 },
             )
         } else {
-            (BackendRepr::SimdVector { element: e_repr, count }, dl.llvmlike_vector_align(size))
+            (
+                BackendRepr::SimdVector { element: e_repr, count },
+                dl.llvmlike_vector_align(memrepr_size),
+            )
         };
-        let size = size.align_to(align.abi);
+        let memrepr_size = memrepr_size.align_to(align.abi);
 
         Ok(LayoutData {
             variants: Variants::Single { index: VariantIdx::new(0) },
@@ -194,7 +203,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             backend_repr: repr,
             largest_niche: elt.largest_niche,
             uninhabited: false,
-            size,
+            data_size: self.data_size_for_backend_repr(&repr, memrepr_size),
+            memrepr_size,
             align,
             max_repr_align: None,
             unadjusted_abi_align: elt.align.abi,
@@ -255,8 +265,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             if !matches!(kind, StructKind::MaybeUnsized) {
                 if let Some(niche) = layout.largest_niche {
                     let head_space = niche.offset.bytes();
-                    let niche_len = niche.value.size(dl).bytes();
-                    let tail_space = layout.size.bytes() - head_space - niche_len;
+                    let niche_len = niche.value.memrepr_size(dl).bytes();
+                    let tail_space = layout.memrepr_size.bytes() - head_space - niche_len;
 
                     // This may end up doing redundant work if the niche is already in the last
                     // field (e.g. a trailing bool) and there is tail padding. But it's non-trivial
@@ -269,11 +279,14 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                             .largest_niche
                             .expect("alt layout should have a niche like the regular one");
                         let alt_head_space = alt_niche.offset.bytes();
-                        let alt_niche_len = alt_niche.value.size(dl).bytes();
+                        let alt_niche_len = alt_niche.value.memrepr_size(dl).bytes();
                         let alt_tail_space =
-                            alt_layout.size.bytes() - alt_head_space - alt_niche_len;
+                            alt_layout.memrepr_size.bytes() - alt_head_space - alt_niche_len;
 
-                        debug_assert_eq!(layout.size.bytes(), alt_layout.size.bytes());
+                        debug_assert_eq!(
+                            layout.memrepr_size.bytes(),
+                            alt_layout.memrepr_size.bytes()
+                        );
 
                         let prefer_alt_layout =
                             alt_head_space > head_space && alt_head_space > tail_space;
@@ -282,7 +295,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                             "sz: {}, default_niche_at: {}+{}, default_tail_space: {}, alt_niche_at/head_space: {}+{}, alt_tail: {}, num_fields: {}, better: {}\n\
                             layout: {}\n\
                             alt_layout: {}\n",
-                            layout.size.bytes(),
+                            layout.memrepr_size.bytes(),
                             head_space,
                             niche_len,
                             tail_space,
@@ -303,6 +316,27 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             }
         }
         layout
+    }
+
+    fn data_size_for_backend_repr(
+        &self,
+        backend_repr: &BackendRepr,
+        memrepr_size: Size,
+    ) -> Option<Size> {
+        match backend_repr {
+            BackendRepr::Scalar(scalar) => {
+                if let Primitive::Pointer(_) = scalar.primitive() {
+                    let dl = self.cx.data_layout();
+                    Some(dl.pointer_data_size)
+                } else {
+                    Some(memrepr_size)
+                }
+            }
+            BackendRepr::Memory { sized: true } if memrepr_size.bytes() == 0 => Some(memrepr_size),
+            //BackendRepr::ScalarPair(scalar, scalar1) => todo!(),
+            //BackendRepr::SimdVector { element, count } => todo!(),
+            _ => None,
+        }
     }
 
     pub fn layout_of_struct_or_enum<
@@ -392,7 +426,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             Ok(None)
         };
 
-        let mut size = Size::ZERO;
+        let mut memrepr_size = Size::ZERO;
         let only_variant_idx = VariantIdx::new(0);
         let only_variant = &variants[only_variant_idx];
         for field in only_variant {
@@ -402,7 +436,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
 
             align = align.max(field.align);
             max_repr_align = max_repr_align.max(field.max_repr_align);
-            size = cmp::max(size, field.size);
+            memrepr_size = cmp::max(memrepr_size, field.memrepr_size);
 
             if field.is_zst() {
                 // Nothing more to do for ZST fields
@@ -487,7 +521,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             largest_niche: None,
             uninhabited: false,
             align,
-            size: size.align_to(align.abi),
+            memrepr_size: memrepr_size.align_to(align.abi),
+            data_size: self.data_size_for_backend_repr(&backend_repr, memrepr_size),
             max_repr_align,
             unadjusted_abi_align,
             randomization_seed: combined_seed,
@@ -527,7 +562,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
         if is_special_no_niche {
             let hide_niches = |scalar: &mut _| match scalar {
                 Scalar::Initialized { value, valid_range } => {
-                    *valid_range = WrappingRange::full(value.size(dl))
+                    *valid_range = WrappingRange::full(value.memrepr_size(dl))
                 }
                 // Already doesn't have any niches
                 Scalar::Union { .. } => {}
@@ -556,7 +591,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 // Because of that we only check that the start and end
                 // of the range is representable with this scalar type.
 
-                let max_value = scalar.size(dl).unsigned_int_max();
+                let max_value = scalar.data_size(dl).unsigned_int_max();
                 if let Bound::Included(start) = start {
                     // FIXME(eddyb) this might be incorrect - it doesn't
                     // account for wrap-around (end < start) ranges.
@@ -652,7 +687,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
 
             let largest_variant_index = variant_layouts
                 .iter_enumerated()
-                .max_by_key(|(_i, layout)| layout.size.bytes())
+                .max_by_key(|(_i, layout)| layout.memrepr_size.bytes())
                 .map(|(i, _layout)| i)?;
 
             let all_indices = variants.indices();
@@ -668,8 +703,9 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             let niche = variant_layouts[largest_variant_index].largest_niche?;
             let (niche_start, niche_scalar) = niche.reserve(dl, count)?;
             let niche_offset = niche.offset;
-            let niche_size = niche.value.size(dl);
-            let size = variant_layouts[largest_variant_index].size.align_to(align.abi);
+            let niche_size = niche.value.memrepr_size(dl);
+            let memrepr_size =
+                variant_layouts[largest_variant_index].memrepr_size.align_to(align.abi);
 
             let all_variants_fit = variant_layouts.iter_enumerated_mut().all(|(i, layout)| {
                 if i == largest_variant_index {
@@ -678,7 +714,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
 
                 layout.largest_niche = None;
 
-                if layout.size <= niche_offset {
+                if layout.memrepr_size <= niche_offset {
                     // This variant will fit before the niche.
                     return true;
                 }
@@ -687,7 +723,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 let this_align = layout.align.abi;
                 let this_offset = (niche_offset + niche_size).align_to(this_align);
 
-                if this_offset + layout.size > size {
+                if this_offset + layout.memrepr_size > memrepr_size {
                     return false;
                 }
 
@@ -707,7 +743,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 if !layout.is_uninhabited() {
                     layout.backend_repr = BackendRepr::Memory { sized: true };
                 }
-                layout.size += this_offset;
+                layout.memrepr_size += this_offset;
 
                 true
             });
@@ -720,8 +756,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
 
             let others_zst = variant_layouts
                 .iter_enumerated()
-                .all(|(i, layout)| i == largest_variant_index || layout.size == Size::ZERO);
-            let same_size = size == variant_layouts[largest_variant_index].size;
+                .all(|(i, layout)| i == largest_variant_index || layout.memrepr_size == Size::ZERO);
+            let same_size = memrepr_size == variant_layouts[largest_variant_index].memrepr_size;
             let same_align = align == variant_layouts[largest_variant_index].align;
 
             let uninhabited = variant_layouts.iter().all(|v| v.is_uninhabited());
@@ -768,7 +804,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 backend_repr: abi,
                 largest_niche,
                 uninhabited,
-                size,
+                memrepr_size,
+                data_size: self.data_size_for_backend_repr(&abi, memrepr_size),
                 align,
                 max_repr_align,
                 unadjusted_abi_align,
@@ -810,7 +847,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
         let mut max_repr_align = repr.align;
         let mut unadjusted_abi_align = align.abi;
 
-        let mut size = Size::ZERO;
+        let mut memrepr_size = Size::ZERO;
 
         // We're interested in the smallest alignment, so start large.
         let mut start_align = Align::from_bytes(256).unwrap();
@@ -849,7 +886,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                         break;
                     }
                 }
-                size = cmp::max(size, st.size);
+                memrepr_size = cmp::max(memrepr_size, st.memrepr_size);
                 align = align.max(st.align);
                 max_repr_align = max_repr_align.max(st.max_repr_align);
                 unadjusted_abi_align = unadjusted_abi_align.max(st.unadjusted_abi_align);
@@ -858,10 +895,10 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             .collect::<Result<IndexVec<VariantIdx, _>, _>>()?;
 
         // Align the maximum variant size to the largest alignment.
-        size = size.align_to(align.abi);
+        memrepr_size = memrepr_size.align_to(align.abi);
 
         // FIXME(oli-obk): deduplicate and harden these checks
-        if size.bytes() >= dl.obj_size_bound() {
+        if memrepr_size.bytes() >= dl.obj_size_bound() {
             return Err(LayoutCalculatorError::SizeOverflow);
         }
 
@@ -917,8 +954,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                             }
                         }
                         // We might be making the struct larger.
-                        if variant.size <= old_ity_size {
-                            variant.size = new_ity_size;
+                        if variant.memrepr_size <= old_ity_size {
+                            variant.memrepr_size = new_ity_size;
                         }
                     }
                     FieldsShape::Primitive | FieldsShape::Array { .. } | FieldsShape::Union(..) => {
@@ -939,7 +976,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
         let mut abi = BackendRepr::Memory { sized: true };
 
         let uninhabited = layout_variants.iter().all(|v| v.is_uninhabited());
-        if tag.size(dl) == size {
+        if tag.memrepr_size(dl) == memrepr_size {
             // Make sure we only use scalar layout when the enum is entirely its
             // own tag (i.e. it has no padding nor any non-ZST variant fields).
             abi = BackendRepr::Scalar(tag);
@@ -997,7 +1034,8 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                         // roundtripping pointers through ptrtoint/inttoptr.
                         (p @ Primitive::Pointer(_), i @ Primitive::Int(..))
                         | (i @ Primitive::Int(..), p @ Primitive::Pointer(_))
-                            if p.size(dl) == i.size(dl) && p.align(dl) == i.align(dl) =>
+                            if p.memrepr_size(dl) == i.memrepr_size(dl)
+                                && p.align(dl) == i.align(dl) =>
                         {
                             p
                         }
@@ -1014,7 +1052,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             }
             if let Some((prim, offset)) = common_prim {
                 let prim_scalar = if common_prim_initialized_in_all_variants {
-                    let size = prim.size(dl);
+                    let size = prim.memrepr_size(dl);
                     assert!(size.bits() <= 128);
                     Scalar::Initialized { value: prim, valid_range: WrappingRange::full(size) }
                 } else {
@@ -1033,7 +1071,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 if pair_offsets[FieldIdx::new(0)] == Size::ZERO
                     && pair_offsets[FieldIdx::new(1)] == *offset
                     && align == pair.align
-                    && size == pair.size
+                    && memrepr_size == pair.memrepr_size
                 {
                     // We can use `ScalarPair` only when it matches our
                     // already computed layout (including `#[repr(C)]`).
@@ -1055,7 +1093,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                     variant.backend_repr = abi;
                     // Also need to bump up the size and alignment, so that the entire value fits
                     // in here.
-                    variant.size = cmp::max(variant.size, size);
+                    variant.memrepr_size = cmp::max(variant.memrepr_size, memrepr_size);
                     variant.align.abi = cmp::max(variant.align.abi, align.abi);
                 }
             }
@@ -1067,7 +1105,6 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             .iter()
             .map(|v| v.randomization_seed)
             .fold(repr.field_shuffle_seed, |acc, seed| acc.wrapping_add(seed));
-
         let tagged_layout = LayoutData {
             variants: Variants::Multiple {
                 tag,
@@ -1083,10 +1120,11 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             uninhabited,
             backend_repr: abi,
             align,
-            size,
             max_repr_align,
             unadjusted_abi_align,
             randomization_seed: combined_seed,
+            data_size: self.data_size_for_backend_repr(&abi, memrepr_size),
+            memrepr_size,
         };
 
         let tagged_layout = TmpLayout { layout: tagged_layout, variants: layout_variants };
@@ -1100,7 +1138,10 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 let niche_size = |tmp_l: &TmpLayout<FieldIdx, VariantIdx>| {
                     tmp_l.layout.largest_niche.map_or(0, |n| n.available(dl))
                 };
-                match (tl.layout.size.cmp(&nl.layout.size), niche_size(&tl).cmp(&niche_size(&nl))) {
+                match (
+                    tl.layout.memrepr_size.cmp(&nl.layout.memrepr_size),
+                    niche_size(&tl).cmp(&niche_size(&nl)),
+                ) {
                     (Greater, _) => nl,
                     (Equal, Less) => nl,
                     _ => tl,
@@ -1191,7 +1232,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                         // Returns `log2(effective-align)`. The calculation assumes that size is an
                         // integer multiple of align, except for ZSTs.
                         let align = layout.align.abi.bytes();
-                        let size = layout.size.bytes();
+                        let size = layout.memrepr_size.bytes();
                         let niche_size = layout.largest_niche.map(|n| n.available(dl)).unwrap_or(0);
                         // Group [u8; 4] with align-4 or [u8; 6] with align-2 fields.
                         let size_as_align = align.max(size).trailing_zeros();
@@ -1230,7 +1271,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                         // padding. This kind of packing can't be achieved by sorting.
                         optimizing.sort_by_key(|&x| {
                             let f = &fields[x];
-                            let field_size = f.size.bytes();
+                            let field_size = f.memrepr_size.bytes();
                             let niche_size = f.largest_niche.map_or(0, |n| n.available(dl));
                             let niche_size_key = match niche_bias {
                                 // large niche first
@@ -1241,7 +1282,9 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                             let inner_niche_offset_key = match niche_bias {
                                 NicheBias::Start => f.largest_niche.map_or(0, |n| n.offset.bytes()),
                                 NicheBias::End => f.largest_niche.map_or(0, |n| {
-                                    !(field_size - n.value.size(dl).bytes() - n.offset.bytes())
+                                    !(field_size
+                                        - n.value.memrepr_size(dl).bytes()
+                                        - n.offset.bytes())
                                 }),
                             };
 
@@ -1334,8 +1377,9 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                 }
             }
 
-            offset =
-                offset.checked_add(field.size, dl).ok_or(LayoutCalculatorError::SizeOverflow)?;
+            offset = offset
+                .checked_add(field.memrepr_size, dl)
+                .ok_or(LayoutCalculatorError::SizeOverflow)?;
         }
 
         // The unadjusted ABI alignment does not include repr(align), but does include repr(pack).
@@ -1361,9 +1405,9 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             debug_assert!(inverse_memory_index.iter().copied().eq(fields.indices()));
             inverse_memory_index.into_iter().map(|it| it.index() as u32).collect()
         };
-        let size = min_size.align_to(align.abi);
+        let memrepr_size = min_size.align_to(align.abi);
         // FIXME(oli-obk): deduplicate and harden these checks
-        if size.bytes() >= dl.obj_size_bound() {
+        if memrepr_size.bytes() >= dl.obj_size_bound() {
             return Err(LayoutCalculatorError::SizeOverflow);
         }
         let mut layout_of_single_non_zst_field = None;
@@ -1373,7 +1417,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
         let optimize_abi = !repr.inhibit_newtype_abi_optimization();
 
         // Try to make this a Scalar/ScalarPair.
-        if sized && size.bytes() > 0 {
+        if sized && memrepr_size.bytes() > 0 {
             // We skip *all* ZST here and later check if we are good in terms of alignment.
             // This lets us handle some cases involving aligned ZST.
             let mut non_zst_fields = fields.iter_enumerated().filter(|&(_, f)| !f.is_zst());
@@ -1384,7 +1428,9 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                     layout_of_single_non_zst_field = Some(field);
 
                     // Field fills the struct and it has a scalar or scalar pair ABI.
-                    if offsets[i].bytes() == 0 && align.abi == field.align.abi && size == field.size
+                    if offsets[i].bytes() == 0
+                        && align.abi == field.align.abi
+                        && memrepr_size == field.memrepr_size
                     {
                         match field.backend_repr {
                             // For plain scalars, or vectors of them, we can't unpack
@@ -1430,7 +1476,7 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
                             if offsets[i] == pair_offsets[FieldIdx::new(0)]
                                 && offsets[j] == pair_offsets[FieldIdx::new(1)]
                                 && align == pair.align
-                                && size == pair.size
+                                && memrepr_size == pair.memrepr_size
                             {
                                 // We can use `ScalarPair` only when it matches our
                                 // already computed layout (including `#[repr(C)]`).
@@ -1467,10 +1513,11 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
             largest_niche,
             uninhabited,
             align,
-            size,
             max_repr_align,
             unadjusted_abi_align,
             randomization_seed: seed,
+            data_size: self.data_size_for_backend_repr(&abi, memrepr_size),
+            memrepr_size,
         })
     }
 
@@ -1489,14 +1536,15 @@ impl<Cx: HasDataLayout> LayoutCalculator<Cx> {
         for i in layout.fields.index_by_increasing_offset() {
             let offset = layout.fields.offset(i);
             let f = &fields[FieldIdx::new(i)];
-            write!(s, "[o{}a{}s{}", offset.bytes(), f.align.abi.bytes(), f.size.bytes()).unwrap();
+            write!(s, "[o{}a{}s{}", offset.bytes(), f.align.abi.bytes(), f.memrepr_size.bytes())
+                .unwrap();
             if let Some(n) = f.largest_niche {
                 write!(
                     s,
                     " n{}b{}s{}",
                     n.offset.bytes(),
                     n.available(dl).ilog2(),
-                    n.value.size(dl).bytes()
+                    n.value.memrepr_size(dl).bytes()
                 )
                 .unwrap();
             }

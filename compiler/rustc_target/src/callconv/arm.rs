@@ -9,7 +9,7 @@ where
     C: HasDataLayout,
 {
     arg.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()).and_then(|unit| {
-        let size = arg.layout.size;
+        let size = arg.layout.memrepr_size;
 
         // Ensure we have at most four uniquely addressable members.
         if size > unit.size.checked_mul(4, cx).unwrap() {
@@ -47,7 +47,7 @@ where
         }
     }
 
-    let size = ret.layout.size;
+    let size = ret.layout.memrepr_size;
     let bits = size.bits();
     if bits <= 32 {
         ret.cast_to(Uniform::new(Reg::i32(), size));
@@ -78,7 +78,7 @@ where
     }
 
     let align = arg.layout.align.abi.bytes();
-    let total = arg.layout.size;
+    let total = arg.layout.memrepr_size;
     arg.cast_to(Uniform::consecutive(if align <= 4 { Reg::i32() } else { Reg::i64() }, total));
 }
 

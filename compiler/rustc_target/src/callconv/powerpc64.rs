@@ -27,8 +27,8 @@ where
     arg.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()).and_then(|unit| {
         // ELFv1 and AIX only passes one-member aggregates transparently.
         // ELFv2 passes up to eight uniquely addressable members.
-        if ((abi == ELFv1 || abi == AIX) && arg.layout.size > unit.size)
-            || arg.layout.size > unit.size.checked_mul(8, cx).unwrap()
+        if ((abi == ELFv1 || abi == AIX) && arg.layout.memrepr_size > unit.size)
+            || arg.layout.memrepr_size > unit.size.checked_mul(8, cx).unwrap()
         {
             return None;
         }
@@ -36,10 +36,10 @@ where
         let valid_unit = match unit.kind {
             RegKind::Integer => false,
             RegKind::Float => true,
-            RegKind::Vector => arg.layout.size.bits() == 128,
+            RegKind::Vector => arg.layout.memrepr_size.bits() == 128,
         };
 
-        valid_unit.then_some(Uniform::consecutive(unit, arg.layout.size))
+        valid_unit.then_some(Uniform::consecutive(unit, arg.layout.memrepr_size))
     })
 }
 
@@ -77,7 +77,7 @@ where
         return;
     }
 
-    let size = arg.layout.size;
+    let size = arg.layout.memrepr_size;
     if is_ret && size.bits() > 128 {
         // Non-homogeneous aggregates larger than two doublewords are returned indirectly.
         arg.make_indirect();

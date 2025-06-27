@@ -140,9 +140,14 @@ fn parse_cfg_name_directive<'a>(
         message: "when the architecture is {name}"
     }
     condition! {
-        name: format!("{}bit", target_cfg.pointer_width),
-        allowed_names: &target_cfgs.all_pointer_widths,
-        message: "when the pointer width is {name}"
+        name: format!("{}bit", target_cfg.pointer_data_size),
+        allowed_names: &target_cfgs.all_pointer_data_sizes,
+        message: "when the pointer data size is {name}"
+    }
+    condition! {
+        name: format!("{}bit", target_cfg.pointer_memrepr_size),
+        allowed_names: &target_cfgs.all_pointer_memrepr_sizes,
+        message: "when the pointer in-memory representation size is {name}"
     }
     condition! {
         name: &*target_cfg.families,

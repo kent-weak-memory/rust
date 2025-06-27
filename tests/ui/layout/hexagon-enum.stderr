@@ -1,5 +1,8 @@
 error: layout_of(A) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: Align(1 bytes),
@@ -44,7 +47,8 @@ error: layout_of(A) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(1 bytes),
+                       data_size: None,
+                       memrepr_size: Size(1 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: Align(1 bytes),
@@ -77,7 +81,10 @@ LL | enum A { Apple }
    | ^^^^^^
 
 error: layout_of(B) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: Align(1 bytes),
@@ -122,7 +129,8 @@ error: layout_of(B) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(1 bytes),
+                       data_size: None,
+                       memrepr_size: Size(1 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(1 bytes),
                            pref: Align(1 bytes),
@@ -155,7 +163,10 @@ LL | enum B { Banana = 255, }
    | ^^^^^^
 
 error: layout_of(C) = Layout {
-           size: Size(2 bytes),
+           data_size: Some(
+               Size(2 bytes),
+           ),
+           memrepr_size: Size(2 bytes),
            align: AbiAndPrefAlign {
                abi: Align(2 bytes),
                pref: Align(2 bytes),
@@ -200,7 +211,8 @@ error: layout_of(C) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(2 bytes),
+                       data_size: None,
+                       memrepr_size: Size(2 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(2 bytes),
                            pref: Align(2 bytes),
@@ -233,7 +245,10 @@ LL | enum C { Chaenomeles = 256, }
    | ^^^^^^
 
 error: layout_of(P) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: Align(4 bytes),
@@ -278,7 +293,8 @@ error: layout_of(P) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: Align(4 bytes),
@@ -311,7 +327,10 @@ LL | enum P { Peach = 0x1000_0000isize, }
    | ^^^^^^
 
 error: layout_of(T) = Layout {
-           size: Size(4 bytes),
+           data_size: Some(
+               Size(4 bytes),
+           ),
+           memrepr_size: Size(4 bytes),
            align: AbiAndPrefAlign {
                abi: Align(4 bytes),
                pref: Align(4 bytes),
@@ -356,7 +375,8 @@ error: layout_of(T) = Layout {
                tag_field: 0,
                variants: [
                    Layout {
-                       size: Size(4 bytes),
+                       data_size: None,
+                       memrepr_size: Size(4 bytes),
                        align: AbiAndPrefAlign {
                            abi: Align(4 bytes),
                            pref: Align(4 bytes),

@@ -498,12 +498,12 @@ impl TestProps {
                             NormalizeKind::Stdout => self.normalize_stdout.push(rule_tuple),
                             NormalizeKind::Stderr => self.normalize_stderr.push(rule_tuple),
                             NormalizeKind::Stderr32bit => {
-                                if config.target_cfg().pointer_width == 32 {
+                                if config.target_cfg().pointer_memrepr_size == 32 {
                                     self.normalize_stderr.push(rule_tuple);
                                 }
                             }
                             NormalizeKind::Stderr64bit => {
-                                if config.target_cfg().pointer_width == 64 {
+                                if config.target_cfg().pointer_memrepr_size == 64 {
                                     self.normalize_stderr.push(rule_tuple);
                                 }
                             }

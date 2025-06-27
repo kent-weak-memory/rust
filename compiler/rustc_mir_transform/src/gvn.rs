@@ -531,7 +531,7 @@ impl<'body, 'tcx> VnState<'body, 'tcx> {
                     return None;
                 }
                 let val = match null_op {
-                    NullOp::SizeOf => layout.size.bytes(),
+                    NullOp::SizeOf => layout.memrepr_size.bytes(),
                     NullOp::AlignOf => layout.align.abi.bytes(),
                     NullOp::OffsetOf(fields) => self
                         .ecx
@@ -584,12 +584,12 @@ impl<'body, 'tcx> VnState<'body, 'tcx> {
                     if value.as_mplace_or_imm().is_right() {
                         let can_transmute = match (value.layout.backend_repr, to.backend_repr) {
                             (BackendRepr::Scalar(s1), BackendRepr::Scalar(s2)) => {
-                                s1.size(&self.ecx) == s2.size(&self.ecx)
+                                s1.memrepr_size(&self.ecx) == s2.memrepr_size(&self.ecx)
                                     && !matches!(s1.primitive(), Primitive::Pointer(..))
                             }
                             (BackendRepr::ScalarPair(a1, b1), BackendRepr::ScalarPair(a2, b2)) => {
-                                a1.size(&self.ecx) == a2.size(&self.ecx) &&
-                                b1.size(&self.ecx) == b2.size(&self.ecx) &&
+                                a1.memrepr_size(&self.ecx) == a2.memrepr_size(&self.ecx) &&
+                                b1.memrepr_size(&self.ecx) == b2.memrepr_size(&self.ecx) &&
                                 // The alignment of the second component determines its offset, so that also needs to match.
                                 b1.align(&self.ecx) == b2.align(&self.ecx) &&
                                 // None of the inputs may be a pointer.
@@ -1248,7 +1248,9 @@ impl<'body, 'tcx> VnState<'body, 'tcx> {
             let constant = self.evaluated[value].as_ref()?;
             if layout.backend_repr.is_scalar() {
                 let scalar = self.ecx.read_scalar(constant).discard_err()?;
-                scalar.to_bits(constant.layout.size).discard_err()
+                scalar
+                    .to_bits(constant.layout.data_size.unwrap(), constant.layout.memrepr_size)
+                    .discard_err()
             } else {
                 // `constant` is a wide pointer. Do not evaluate to bits.
                 None
@@ -1294,7 +1296,7 @@ impl<'body, 'tcx> VnState<'body, 'tcx> {
             ) => p,
             // Attempt to simplify `x & ALL_ONES` to `x`, with `ALL_ONES` depending on type size.
             (BinOp::BitAnd, Right(p), Left(ones)) | (BinOp::BitAnd, Left(ones), Right(p))
-                if ones == layout.size.truncate(u128::MAX)
+                if ones == layout.memrepr_size.truncate(u128::MAX)
                     || (layout.ty.is_bool() && ones == 1) =>
             {
                 p
@@ -1317,19 +1319,28 @@ impl<'body, 'tcx> VnState<'body, 'tcx> {
                 | BinOp::Shr,
                 Left(0),
                 _,
-            ) => self.insert_scalar(Scalar::from_uint(0u128, layout.size), lhs_ty),
+            ) => self.insert_scalar(
+                Scalar::from_uint(0u128, layout.data_size.unwrap(), layout.memrepr_size),
+                lhs_ty,
+            ),
             // Attempt to simplify `x | ALL_ONES` to `ALL_ONES`.
             (BinOp::BitOr, _, Left(ones)) | (BinOp::BitOr, Left(ones), _)
-                if ones == layout.size.truncate(u128::MAX)
+                if ones == layout.memrepr_size.truncate(u128::MAX)
                     || (layout.ty.is_bool() && ones == 1) =>
             {
-                self.insert_scalar(Scalar::from_uint(ones, layout.size), lhs_ty)
+                self.insert_scalar(
+                    Scalar::from_uint(ones, layout.data_size.unwrap(), layout.memrepr_size),
+                    lhs_ty,
+                )
             }
             // Sub/Xor with itself.
             (BinOp::Sub | BinOp::SubWithOverflow | BinOp::SubUnchecked | BinOp::BitXor, a, b)
                 if a == b =>
             {
-                self.insert_scalar(Scalar::from_uint(0u128, layout.size), lhs_ty)
+                self.insert_scalar(
+                    Scalar::from_uint(0u128, layout.data_size.unwrap(), layout.memrepr_size),
+                    lhs_ty,
+                )
             }
             // Comparison:
             // - if both operands can be computed as bits, just compare the bits;
@@ -1565,7 +1576,7 @@ impl<'body, 'tcx> VnState<'body, 'tcx> {
             && let abi::Variants::Single { index } = layout.variants
             && index == variant
             && let Some((field_idx, field_layout)) = layout.non_1zst_field(&self.ecx)
-            && layout.size == field_layout.size
+            && layout.memrepr_size == field_layout.memrepr_size
         {
             // We needed to check the variant to avoid trying to read the tag
             // field from an enum where no fields have variants, since that tag
@@ -1624,7 +1635,7 @@ fn op_to_prop_const<'tcx>(
         // Do not try interning a value that contains provenance.
         // Due to https://github.com/rust-lang/rust/issues/79738, doing so could lead to bugs.
         // FIXME: remove this hack once that issue is fixed.
-        let alloc_ref = ecx.get_ptr_alloc(mplace.ptr(), size).discard_err()??;
+        let alloc_ref = ecx.get_ptr_alloc(mplace.ptr(), None, size).discard_err()??;
         if alloc_ref.has_provenance() {
             return None;
         }
@@ -1696,7 +1707,7 @@ impl<'tcx> VnState<'_, 'tcx> {
         // Check that we do not leak a pointer.
         // Those pointers may lose part of their identity in codegen.
         // FIXME: remove this hack once https://github.com/rust-lang/rust/issues/79738 is fixed.
-        assert!(!value.may_have_provenance(self.tcx, op.layout.size));
+        assert!(!value.may_have_provenance(self.tcx, op.layout.memrepr_size));
 
         let const_ = Const::Val(value, op.layout.ty);
         Some(ConstOperand { span: DUMMY_SP, user_ty: None, const_ })

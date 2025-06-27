@@ -174,7 +174,7 @@ pub(super) fn layout<
     let prefix =
         calc.univariant(&prefix_layouts, &ReprOptions::default(), StructKind::AlwaysSized)?;
 
-    let (prefix_size, prefix_align) = (prefix.size, prefix.align);
+    let (prefix_size, prefix_align) = (prefix.memrepr_size, prefix.align);
 
     // Split the prefix layout into the "outer" fields (upvars and
     // discriminant) and the "promoted" fields. Promoted fields will
@@ -213,7 +213,7 @@ pub(super) fn layout<
         _ => unreachable!(),
     };
 
-    let mut size = prefix.size;
+    let mut memrepr_size = prefix.memrepr_size;
     let mut align = prefix.align;
     let variants = variant_fields
         .iter_enumerated()
@@ -283,13 +283,13 @@ pub(super) fn layout<
                 memory_index: combined_memory_index,
             };
 
-            size = size.max(variant.size);
+            memrepr_size = memrepr_size.max(variant.memrepr_size);
             align = align.max(variant.align);
             Ok(variant)
         })
         .collect::<Result<IndexVec<VariantIdx, _>, _>>()?;
 
-    size = size.align_to(align.abi);
+    memrepr_size = memrepr_size.align_to(align.abi);
 
     let uninhabited = prefix.uninhabited || variants.iter().all(|v| v.is_uninhabited());
     let abi = BackendRepr::Memory { sized: true };
@@ -311,10 +311,11 @@ pub(super) fn layout<
         // FIXME: Remove when <https://github.com/rust-lang/rust/issues/125735> is implemented and aliased coroutine fields are wrapped in `UnsafePinned`.
         largest_niche: None,
         uninhabited,
-        size,
         align,
         max_repr_align: None,
         unadjusted_abi_align: align.abi,
         randomization_seed: Default::default(),
+        data_size: None,
+        memrepr_size,
     })
 }

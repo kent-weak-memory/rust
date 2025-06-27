@@ -133,7 +133,7 @@ fn is_valid_cmse_inputs<'tcx>(
         let layout = tcx.layout_of(ty::TypingEnv::fully_monomorphized().as_query_input(*ty))?;
 
         let align = layout.layout.align().abi.bytes();
-        let size = layout.layout.size().bytes();
+        let size = layout.layout.memrepr_size().bytes();
 
         accum += size;
         accum = accum.next_multiple_of(Ord::max(4, align));
@@ -162,7 +162,7 @@ fn is_valid_cmse_output<'tcx>(
 
     let mut ret_ty = fn_sig.output();
     let layout = tcx.layout_of(typing_env.as_query_input(ret_ty))?;
-    let size = layout.layout.size().bytes();
+    let size = layout.layout.memrepr_size().bytes();
 
     if size <= 4 {
         return Ok(true);

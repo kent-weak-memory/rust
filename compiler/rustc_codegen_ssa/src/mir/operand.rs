@@ -205,10 +205,10 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
         let alloc_align = alloc.inner().align;
         assert!(alloc_align >= layout.align.abi);
 
-        let read_scalar = |start, size, s: abi::Scalar, ty| {
+        let read_scalar = |start, data_size, memrepr_size, s: abi::Scalar, ty| {
             match alloc.0.read_scalar(
                 bx,
-                alloc_range(start, size),
+                alloc_range(start, data_size, memrepr_size),
                 /*read_provenance*/ matches!(s.primitive(), abi::Primitive::Pointer(_)),
             ) {
                 Ok(val) => bx.scalar_to_backend(val, s, ty),
@@ -224,27 +224,37 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
         // like a `Scalar` (or `ScalarPair`).
         match layout.backend_repr {
             BackendRepr::Scalar(s @ abi::Scalar::Initialized { .. }) => {
-                let size = s.size(bx);
-                assert_eq!(size, layout.size, "abi::Scalar size does not match layout size");
-                let val = read_scalar(offset, size, s, bx.immediate_backend_type(layout));
+                assert_eq!(
+                    s.memrepr_size(bx),
+                    layout.memrepr_size,
+                    "abi::Scalar size does not match layout size"
+                );
+                let val = read_scalar(
+                    offset,
+                    Some(s.data_size(bx)),
+                    s.memrepr_size(bx),
+                    s,
+                    bx.immediate_backend_type(layout),
+                );
                 OperandRef { val: OperandValue::Immediate(val), layout }
             }
             BackendRepr::ScalarPair(
                 a @ abi::Scalar::Initialized { .. },
                 b @ abi::Scalar::Initialized { .. },
             ) => {
-                let (a_size, b_size) = (a.size(bx), b.size(bx));
-                let b_offset = (offset + a_size).align_to(b.align(bx).abi);
+                let b_offset = a.memrepr_size(bx).align_to(b.align(bx).abi);
                 assert!(b_offset.bytes() > 0);
                 let a_val = read_scalar(
                     offset,
-                    a_size,
+                    Some(a.data_size(bx)),
+                    a.memrepr_size(bx),
                     a,
                     bx.scalar_pair_element_backend_type(layout, 0, true),
                 );
                 let b_val = read_scalar(
                     b_offset,
-                    b_size,
+                    Some(b.data_size(bx)),
+                    b.memrepr_size(bx),
                     b,
                     bx.scalar_pair_element_backend_type(layout, 1, true),
                 );
@@ -350,7 +360,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 && let BackendRepr::Memory { sized: true } = field.backend_repr
                 && count.is_power_of_two()
             {
-                assert_eq!(field.size, self.layout.size);
+                assert_eq!(field.memrepr_size, self.layout.memrepr_size);
                 // This is being deprecated, but for now stdarch still needs it for
                 // Newtype vector of array, e.g. #[repr(simd)] struct S([i32; 4]);
                 let place = PlaceRef::alloca(bx, field);
@@ -364,7 +374,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
 
         let val = if field.is_zst() {
             OperandValue::ZeroSized
-        } else if field.size == self.layout.size {
+        } else if field.memrepr_size == self.layout.memrepr_size {
             assert_eq!(offset.bytes(), 0);
             fx.codegen_transmute_operand(bx, *self, field).unwrap_or_else(|| {
                 bug!(
@@ -377,11 +387,11 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 // Extract a scalar component from a pair.
                 (OperandValue::Pair(a_llval, b_llval), BackendRepr::ScalarPair(a, b)) => {
                     if offset.bytes() == 0 {
-                        assert_eq!(field.size, a.size(bx.cx()));
+                        assert_eq!(field.memrepr_size, a.memrepr_size(bx.cx()));
                         (Some(a), a_llval)
                     } else {
-                        assert_eq!(offset, a.size(bx.cx()).align_to(b.align(bx.cx()).abi));
-                        assert_eq!(field.size, b.size(bx.cx()));
+                        assert_eq!(offset, a.memrepr_size(bx.cx()).align_to(b.align(bx.cx()).abi));
+                        assert_eq!(field.memrepr_size, b.memrepr_size(bx.cx()));
                         (Some(b), b_llval)
                     }
                 }
@@ -490,7 +500,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 let (tag, tag_llty) = match tag_scalar.primitive() {
                     // FIXME(erikdesjardins): handle non-default addrspace ptr sizes
                     Primitive::Pointer(_) => {
-                        let t = bx.type_from_integer(dl.ptr_sized_integer());
+                        let t = bx.type_from_integer(dl.ptr_data_sized_integer());
                         let tag = bx.ptrtoint(tag_imm, t);
                         (tag, t)
                     }
@@ -677,7 +687,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandValue<V> {
                 let BackendRepr::ScalarPair(a_scalar, b_scalar) = dest.layout.backend_repr else {
                     bug!("store_with_flags: invalid ScalarPair layout: {:#?}", dest.layout);
                 };
-                let b_offset = a_scalar.size(bx).align_to(b_scalar.align(bx).abi);
+                let b_offset = a_scalar.memrepr_size(bx).align_to(b_scalar.align(bx).abi);
 
                 let val = bx.from_immediate(a);
                 let align = dest.val.align;

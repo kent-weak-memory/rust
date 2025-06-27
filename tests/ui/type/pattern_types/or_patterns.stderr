@@ -40,7 +40,10 @@ LL |     let _: NonNegOneI8 = -128;
    |                          ^^^^ cannot apply unary operator `-`
 
 error: layout_of((i8) is (i8::MIN..=-1 | 1..)) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $SOME_ALIGN,
@@ -79,7 +82,10 @@ LL | type NonNullI8 = pattern_type!(i8 is ..0 | 1..);
    | ^^^^^^^^^^^^^^
 
 error: layout_of((i8) is (i8::MIN..=-2 | 0..)) = Layout {
-           size: Size(1 bytes),
+           data_size: Some(
+               Size(1 bytes),
+           ),
+           memrepr_size: Size(1 bytes),
            align: AbiAndPrefAlign {
                abi: Align(1 bytes),
                pref: $SOME_ALIGN,

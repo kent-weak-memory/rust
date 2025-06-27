@@ -779,7 +779,7 @@ impl<'p, 'tcx: 'p> RustcPatCtxt<'p, 'tcx> {
                     ty::Int(_) => miint.as_finite_int(size.bits()).unwrap(),
                     _ => miint.as_finite_uint().unwrap(),
                 };
-                match ScalarInt::try_from_uint(bits, size) {
+                match ScalarInt::try_from_uint(bits, size, size) {
                     Some(scalar) => {
                         let value = mir::Const::from_scalar(tcx, scalar.into(), ty.inner());
                         PatRangeBoundary::Finite(value)

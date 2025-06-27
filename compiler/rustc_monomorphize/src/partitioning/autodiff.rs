@@ -37,7 +37,7 @@ fn adjust_activity_to_abi<'tcx>(tcx: TyCtxt<'tcx>, fn_ty: Ty<'tcx>, da: &mut Vec
 
                 let layout = tcx.layout_of(pci);
                 let elem_size = match layout {
-                    Ok(layout) => layout.size,
+                    Ok(layout) => layout.memrepr_size,
                     Err(_) => {
                         bug!("autodiff failed to compute slice element size");
                     }

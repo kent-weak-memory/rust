@@ -11,7 +11,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: Some(true),
         },
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memrepr_size: 32,
         data_layout: "e-m:o-p:32:32-Fi8-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32".into(),
         arch,
         options: TargetOptions {

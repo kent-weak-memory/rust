@@ -361,7 +361,8 @@ pub struct CodegenContext<B: WriteBackendMethods> {
     pub target_is_like_aix: bool,
     pub split_debuginfo: rustc_target::spec::SplitDebuginfo,
     pub split_dwarf_kind: rustc_session::config::SplitDwarfKind,
-    pub pointer_size: Size,
+    pub pointer_memrepr_size: Size,
+    pub pointer_data_size: Size,
 
     /// All commandline args used to invoke the compiler, with @file args fully expanded.
     /// This will only be used within debug info, e.g. in the pdb file on windows
@@ -1231,7 +1232,8 @@ fn start_executing_work<B: ExtraBackendMethods>(
         split_debuginfo: tcx.sess.split_debuginfo(),
         split_dwarf_kind: tcx.sess.opts.unstable_opts.split_dwarf_kind,
         parallel: backend.supports_parallel() && !sess.opts.unstable_opts.no_parallel_backend,
-        pointer_size: tcx.data_layout.pointer_size,
+        pointer_memrepr_size: tcx.data_layout.pointer_memrepr_size,
+        pointer_data_size: tcx.data_layout.pointer_data_size,
         invocation_temp: sess.invocation_temp.clone(),
     };
 

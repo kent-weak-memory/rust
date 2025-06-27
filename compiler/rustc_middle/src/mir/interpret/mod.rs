@@ -297,7 +297,7 @@ impl<'tcx> GlobalAlloc<'tcx> {
         match self {
             GlobalAlloc::Function { .. } => cx.data_layout().instruction_address_space,
             GlobalAlloc::Static(..) | GlobalAlloc::Memory(..) | GlobalAlloc::VTable(..) => {
-                AddressSpace::DATA
+                cx.data_layout().data_address_space
             }
         }
     }
@@ -370,7 +370,7 @@ impl<'tcx> GlobalAlloc<'tcx> {
                         .expect("statics should not have generic parameters");
                     let layout = tcx.layout_of(typing_env.as_query_input(ty)).unwrap();
                     assert!(layout.is_sized());
-                    (layout.size, layout.align.abi)
+                    (layout.memrepr_size, layout.align.abi)
                 }
             }
             GlobalAlloc::Memory(alloc) => {

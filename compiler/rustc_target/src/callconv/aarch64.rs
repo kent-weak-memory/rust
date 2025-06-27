@@ -22,7 +22,7 @@ where
     C: HasDataLayout + HasTargetSpec,
 {
     arg.layout.homogeneous_aggregate(cx).ok().and_then(|ha| ha.unit()).and_then(|unit| {
-        let size = arg.layout.size;
+        let size = arg.layout.memrepr_size;
 
         // Ensure we have at most four uniquely addressable members.
         if size > unit.size.checked_mul(4, cx).unwrap() {
@@ -65,8 +65,8 @@ fn softfloat_float_abi<Ty>(target: &Target, arg: &mut ArgAbi<'_, Ty>) {
         // indirection. This means we lose the nice "pass it as two arguments" optimization, but we
         // currently just have to way to combine a `PassMode::Cast` with that optimization (and we
         // need a cast since we want to pass the float as an int).
-        if arg.layout.size.bits() <= target.pointer_width.into() {
-            arg.cast_to(Reg { kind: RegKind::Integer, size: arg.layout.size });
+        if arg.layout.memrepr_size.bits() <= target.pointer_data_size.into() {
+            arg.cast_to(Reg { kind: RegKind::Integer, size: arg.layout.memrepr_size });
         } else {
             arg.make_indirect();
         }
@@ -96,7 +96,7 @@ where
         ret.cast_to(uniform);
         return;
     }
-    let size = ret.layout.size;
+    let size = ret.layout.memrepr_size;
     let bits = size.bits();
     if bits <= 128 {
         ret.cast_to(Uniform::new(Reg::i64(), size));
@@ -129,7 +129,7 @@ where
         arg.cast_to(uniform);
         return;
     }
-    let size = arg.layout.size;
+    let size = arg.layout.memrepr_size;
     let align = if kind == AbiKind::AAPCS {
         // When passing small aggregates by value, the AAPCS ABI mandates using the unadjusted
         // alignment of the type (not including `repr(align)`).

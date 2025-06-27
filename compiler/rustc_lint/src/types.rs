@@ -1037,7 +1037,7 @@ pub(crate) fn repr_nullable_ptr<'tcx>(
             if let BackendRepr::Scalar(field_ty_scalar) = field_ty_abi {
                 match field_ty_scalar.valid_range(&tcx) {
                     WrappingRange { start: 0, end }
-                        if end == field_ty_scalar.size(&tcx).unsigned_int_max() - 1 =>
+                        if end == field_ty_scalar.data_size(&tcx).unsigned_int_max() - 1 =>
                     {
                         return Some(get_nullable_type(tcx, typing_env, field_ty).unwrap());
                     }
@@ -1804,19 +1804,19 @@ impl<'tcx> LateLintPass<'tcx> for VariantSizeDifferences {
                 return;
             };
 
-            let tag_size = tag.size(&cx.tcx).bytes();
+            let tag_size = tag.memrepr_size(&cx.tcx).bytes();
 
             debug!(
                 "enum `{}` is {} bytes large with layout:\n{:#?}",
                 t,
-                layout.size.bytes(),
+                layout.memrepr_size.bytes(),
                 layout
             );
 
             let (largest, slargest, largest_index) = iter::zip(enum_definition.variants, variants)
                 .map(|(variant, variant_layout)| {
                     // Subtract the size of the enum tag.
-                    let bytes = variant_layout.size.bytes().saturating_sub(tag_size);
+                    let bytes = variant_layout.memrepr_size.bytes().saturating_sub(tag_size);
 
                     debug!("- variant `{}` is {} bytes large", variant.ident, bytes);
                     bytes

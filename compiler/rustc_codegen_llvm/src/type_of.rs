@@ -54,7 +54,7 @@ fn uncached_llvm_type<'a, 'tcx>(
 
     match layout.fields {
         FieldsShape::Primitive | FieldsShape::Union(_) => {
-            let fill = cx.type_padding_filler(layout.size, layout.align.abi);
+            let fill = cx.type_padding_filler(layout.memrepr_size, layout.align.abi);
             let packed = false;
             match name {
                 None => cx.type_struct(&[fill], packed),
@@ -116,25 +116,25 @@ fn struct_llfields<'a, 'tcx>(
             debug!("    padding before: {:?}", padding);
         }
         result.push(field.llvm_type(cx));
-        offset = target_offset + field.size;
+        offset = target_offset + field.memrepr_size;
         prev_effective_align = effective_field_align;
     }
     if layout.is_sized() && field_count > 0 {
-        if offset > layout.size {
-            bug!("layout: {:#?} stride: {:?} offset: {:?}", layout, layout.size, offset);
+        if offset > layout.memrepr_size {
+            bug!("layout: {:#?} stride: {:?} offset: {:?}", layout, layout.memrepr_size, offset);
         }
-        let padding = layout.size - offset;
+        let padding = layout.memrepr_size - offset;
         if padding != Size::ZERO {
             let padding_align = prev_effective_align;
-            assert_eq!(offset.align_to(padding_align) + padding, layout.size);
+            assert_eq!(offset.align_to(padding_align) + padding, layout.memrepr_size);
             debug!(
                 "struct_llfields: pad_bytes: {:?} offset: {:?} stride: {:?}",
-                padding, offset, layout.size
+                padding, offset, layout.memrepr_size
             );
             result.push(cx.type_padding_filler(padding, padding_align));
         }
     } else {
-        debug!("struct_llfields: offset: {:?} stride: {:?}", offset, layout.size);
+        debug!("struct_llfields: offset: {:?} stride: {:?}", offset, layout.memrepr_size);
     }
     (result, packed)
 }
@@ -145,12 +145,12 @@ impl<'a, 'tcx> CodegenCx<'a, 'tcx> {
     }
 
     pub(crate) fn size_of(&self, ty: Ty<'tcx>) -> Size {
-        self.layout_of(ty).size
+        self.layout_of(ty).memrepr_size
     }
 
     pub(crate) fn size_and_align_of(&self, ty: Ty<'tcx>) -> (Size, Align) {
         let layout = self.layout_of(ty);
-        (layout.size, layout.align.abi)
+        (layout.memrepr_size, layout.align.abi)
     }
 }
 

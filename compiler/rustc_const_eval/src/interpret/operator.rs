@@ -94,10 +94,10 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         let l = left.to_scalar_int()?;
         let r = right.to_scalar_int()?;
         // Prepare to convert the values to signed or unsigned form.
-        let l_signed = || l.to_int(left.layout.size);
-        let l_unsigned = || l.to_uint(left.layout.size);
-        let r_signed = || r.to_int(right.layout.size);
-        let r_unsigned = || r.to_uint(right.layout.size);
+        let l_signed = || l.to_int(left.layout.memrepr_size);
+        let l_unsigned = || l.to_uint(left.layout.memrepr_size);
+        let r_signed = || r.to_int(right.layout.memrepr_size);
+        let r_unsigned = || r.to_uint(right.layout.memrepr_size);
 
         let throw_ub_on_overflow = match bin_op {
             AddUnchecked => Some(sym::unchecked_add),
@@ -111,7 +111,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
 
         // Shift ops can have an RHS with a different numeric type.
         if matches!(bin_op, Shl | ShlUnchecked | Shr | ShrUnchecked) {
-            let l_bits = left.layout.size.bits();
+            let l_bits = left.layout.memrepr_size.bits();
             // Compute the equivalent shift modulo `size` that is in the range `0..size`. (This is
             // the one MIR operator that does *not* directly map to a single LLVM operation.)
             let (shift_amount, overflow) = if right.layout.backend_repr.is_signed() {
@@ -133,7 +133,12 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                     Shr | ShrUnchecked => l.checked_shr(shift_amount).unwrap(),
                     _ => bug!(),
                 };
-                ScalarInt::truncate_from_int(result, left.layout.size).0
+                ScalarInt::truncate_from_int(
+                    result,
+                    left.layout.data_size.unwrap(),
+                    left.layout.memrepr_size,
+                )
+                .0
             } else {
                 let l = l_unsigned();
                 let result = match bin_op {
@@ -141,7 +146,12 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                     Shr | ShrUnchecked => l.checked_shr(shift_amount).unwrap(),
                     _ => bug!(),
                 };
-                ScalarInt::truncate_from_uint(result, left.layout.size).0
+                ScalarInt::truncate_from_uint(
+                    result,
+                    left.layout.data_size.unwrap(),
+                    left.layout.memrepr_size,
+                )
+                .0
             };
 
             if overflow && let Some(intrinsic) = throw_ub_on_overflow {
@@ -168,7 +178,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
             )
         }
 
-        let size = left.layout.size;
+        let size = left.layout.memrepr_size;
 
         // Operations that need special treatment for signed integers
         if left.layout.backend_repr.is_signed() {
@@ -214,7 +224,11 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 let (result, oflo) = op(l, r);
                 // This may be out-of-bounds for the result type, so we have to truncate.
                 // If that truncation loses any information, we have an overflow.
-                let (result, lossy) = ScalarInt::truncate_from_int(result, left.layout.size);
+                let (result, lossy) = ScalarInt::truncate_from_int(
+                    result,
+                    left.layout.data_size.unwrap(),
+                    left.layout.memrepr_size,
+                );
                 let overflow = oflo || lossy;
                 if overflow && let Some(intrinsic) = throw_ub_on_overflow {
                     throw_ub!(ArithOverflow { intrinsic });
@@ -271,7 +285,11 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 let (result, oflo) = op(l, r);
                 // Truncate to target type.
                 // If that truncation loses any information, we have an overflow.
-                let (result, lossy) = ScalarInt::truncate_from_uint(result, left.layout.size);
+                let (result, lossy) = ScalarInt::truncate_from_uint(
+                    result,
+                    left.layout.data_size.unwrap(),
+                    left.layout.memrepr_size,
+                );
                 let overflow = oflo || lossy;
                 if overflow && let Some(intrinsic) = throw_ub_on_overflow {
                     throw_ub!(ArithOverflow { intrinsic });
@@ -318,7 +336,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 assert!(pointee_layout.is_sized());
 
                 // The size always fits in `i64` as it can be at most `isize::MAX`.
-                let pointee_size = i64::try_from(pointee_layout.size.bytes()).unwrap();
+                let pointee_size = i64::try_from(pointee_layout.memrepr_size.bytes()).unwrap();
                 // This uses the same type as `right`, which can be `isize` or `usize`.
                 // `pointee_size` is guaranteed to fit into both types.
                 let pointee_size = ImmTy::from_int(pointee_size, right.layout);
@@ -467,22 +485,32 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 interp_ok(ImmTy::from_scalar(res, layout))
             }
             ty::Int(..) => {
-                let val = val.to_scalar().to_int(layout.size)?;
+                let val = val.to_scalar().to_int(layout.memrepr_size)?;
                 let res = match un_op {
                     Not => !val,
                     Neg => val.wrapping_neg(),
                     _ => span_bug!(self.cur_span(), "Invalid integer op {:?}", un_op),
                 };
-                let res = ScalarInt::truncate_from_int(res, layout.size).0;
+                let res = ScalarInt::truncate_from_int(
+                    res,
+                    layout.data_size.unwrap(),
+                    layout.memrepr_size,
+                )
+                .0;
                 interp_ok(ImmTy::from_scalar(res.into(), layout))
             }
             ty::Uint(..) => {
-                let val = val.to_scalar().to_uint(layout.size)?;
+                let val = val.to_scalar().to_uint(layout.data_size.unwrap())?;
                 let res = match un_op {
                     Not => !val,
                     _ => span_bug!(self.cur_span(), "Invalid unsigned integer op {:?}", un_op),
                 };
-                let res = ScalarInt::truncate_from_uint(res, layout.size).0;
+                let res = ScalarInt::truncate_from_uint(
+                    res,
+                    layout.data_size.unwrap(),
+                    layout.memrepr_size,
+                )
+                .0;
                 interp_ok(ImmTy::from_scalar(res.into(), layout))
             }
             ty::RawPtr(..) | ty::Ref(..) => {
@@ -521,7 +549,7 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
                 if !layout.is_sized() {
                     span_bug!(self.cur_span(), "unsized type for `NullaryOp::SizeOf`");
                 }
-                let val = layout.size.bytes();
+                let val = layout.memrepr_size.bytes();
                 ImmTy::from_uint(val, usize_layout())
             }
             AlignOf => {

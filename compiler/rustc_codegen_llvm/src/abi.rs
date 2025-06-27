@@ -228,7 +228,7 @@ impl<'ll, 'tcx> ArgAbiExt<'ll, 'tcx> for ArgAbi<'tcx, Ty<'tcx>> {
                 // - On some ABIs, the Rust layout { u16, u16, u16 } may be padded up to 8 bytes
                 //   when passed by value, making it larger.
                 let copy_bytes =
-                    cmp::min(cast.unaligned_size(bx).bytes(), self.layout.size.bytes());
+                    cmp::min(cast.unaligned_size(bx).bytes(), self.layout.memrepr_size.bytes());
                 // Allocate some scratch space...
                 let llscratch = bx.alloca(scratch_size, scratch_align);
                 bx.lifetime_start(llscratch, scratch_size);
@@ -448,7 +448,11 @@ impl<'ll, 'tcx> FnAbiLlvmExt<'ll, 'tcx> for FnAbi<'tcx, Ty<'tcx>> {
                 attributes::apply_to_llfn(
                     llfn,
                     idx,
-                    &[llvm::CreateRangeAttr(cx.llcx, scalar.size(cx), scalar.valid_range(cx))],
+                    &[llvm::CreateRangeAttr(
+                        cx.llcx,
+                        scalar.memrepr_size(cx),
+                        scalar.valid_range(cx),
+                    )],
                 );
             }
         };
@@ -465,7 +469,7 @@ impl<'ll, 'tcx> FnAbiLlvmExt<'ll, 'tcx> for FnAbi<'tcx, Ty<'tcx>> {
                 let i = apply(attrs);
                 let sret = llvm::CreateStructRetAttr(
                     cx.llcx,
-                    cx.type_array(cx.type_i8(), self.ret.layout.size.bytes()),
+                    cx.type_array(cx.type_i8(), self.ret.layout.memrepr_size.bytes()),
                 );
                 attributes::apply_to_llfn(llfn, llvm::AttributePlace::Argument(i), &[sret]);
                 if cx.sess().opts.optimize != config::OptLevel::No {
@@ -491,7 +495,7 @@ impl<'ll, 'tcx> FnAbiLlvmExt<'ll, 'tcx> for FnAbi<'tcx, Ty<'tcx>> {
                     let i = apply(attrs);
                     let byval = llvm::CreateByValAttr(
                         cx.llcx,
-                        cx.type_array(cx.type_i8(), arg.layout.size.bytes()),
+                        cx.type_array(cx.type_i8(), arg.layout.memrepr_size.bytes()),
                     );
                     attributes::apply_to_llfn(llfn, llvm::AttributePlace::Argument(i), &[byval]);
                 }
@@ -557,7 +561,7 @@ impl<'ll, 'tcx> FnAbiLlvmExt<'ll, 'tcx> for FnAbi<'tcx, Ty<'tcx>> {
                 let i = apply(bx.cx, attrs);
                 let sret = llvm::CreateStructRetAttr(
                     bx.cx.llcx,
-                    bx.cx.type_array(bx.cx.type_i8(), self.ret.layout.size.bytes()),
+                    bx.cx.type_array(bx.cx.type_i8(), self.ret.layout.memrepr_size.bytes()),
                 );
                 attributes::apply_to_callsite(callsite, llvm::AttributePlace::Argument(i), &[sret]);
             }
@@ -577,7 +581,7 @@ impl<'ll, 'tcx> FnAbiLlvmExt<'ll, 'tcx> for FnAbi<'tcx, Ty<'tcx>> {
                     let i = apply(bx.cx, attrs);
                     let byval = llvm::CreateByValAttr(
                         bx.cx.llcx,
-                        bx.cx.type_array(bx.cx.type_i8(), arg.layout.size.bytes()),
+                        bx.cx.type_array(bx.cx.type_i8(), arg.layout.memrepr_size.bytes()),
                     );
                     attributes::apply_to_callsite(
                         callsite,

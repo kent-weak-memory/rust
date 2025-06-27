@@ -26,7 +26,7 @@ pub(crate) fn compute_abi_info<'a, Ty, C>(
             // - reported in https://gcc.gnu.org/bugzilla/show_bug.cgi?id=82028
             // - fixed in https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85667
             if t.abi_return_struct_as_int || opts.reg_struct_return {
-                match fn_abi.ret.layout.size.bytes() {
+                match fn_abi.ret.layout.memrepr_size.bytes() {
                     1 => fn_abi.ret.cast_to(Reg::i8()),
                     2 => fn_abi.ret.cast_to(Reg::i16()),
                     4 => fn_abi.ret.cast_to(Reg::i32()),

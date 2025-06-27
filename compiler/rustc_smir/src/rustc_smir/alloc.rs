@@ -43,14 +43,19 @@ pub(crate) fn try_new_allocation<'tcx>(
         .map_err(|e| e.stable(tables))?;
     Ok(match const_value {
         ConstValue::Scalar(scalar) => {
-            let size = scalar.size();
+            let data_size = scalar.data_size();
+            let memrepr_size = scalar.memrepr_size();
             let mut allocation = rustc_middle::mir::interpret::Allocation::new(
-                size,
+                memrepr_size,
                 layout.align.abi,
                 AllocInit::Uninit,
             );
             allocation
-                .write_scalar(&tables.tcx, alloc_range(Size::ZERO, size), scalar)
+                .write_scalar(
+                    &tables.tcx,
+                    alloc_range(Size::ZERO, Some(data_size), memrepr_size),
+                    scalar,
+                )
                 .map_err(|e| e.stable(tables))?;
             allocation.stable(tables)
         }
@@ -62,21 +67,26 @@ pub(crate) fn try_new_allocation<'tcx>(
             let scalar_meta =
                 rustc_middle::mir::interpret::Scalar::from_target_usize(meta, &tables.tcx);
             let mut allocation = rustc_middle::mir::interpret::Allocation::new(
-                layout.size,
+                layout.memrepr_size,
                 layout.align.abi,
                 AllocInit::Uninit,
             );
+            let dl = &tables.tcx.data_layout;
             allocation
                 .write_scalar(
                     &tables.tcx,
-                    alloc_range(Size::ZERO, tables.tcx.data_layout.pointer_size),
+                    alloc_range(Size::ZERO, Some(dl.pointer_data_size), dl.pointer_memrepr_size),
                     scalar_ptr,
                 )
                 .map_err(|e| e.stable(tables))?;
             allocation
                 .write_scalar(
                     &tables.tcx,
-                    alloc_range(tables.tcx.data_layout.pointer_size, scalar_meta.size()),
+                    alloc_range(
+                        tables.tcx.data_layout.pointer_data_size,
+                        Some(scalar_meta.data_size()),
+                        scalar_meta.memrepr_size(),
+                    ),
                     scalar_meta,
                 )
                 .map_err(|e| e.stable(tables))?;
@@ -84,7 +94,11 @@ pub(crate) fn try_new_allocation<'tcx>(
         }
         ConstValue::Indirect { alloc_id, offset } => {
             let alloc = tables.tcx.global_alloc(alloc_id).unwrap_memory();
-            allocation_filter(&alloc.0, alloc_range(offset, layout.size), tables)
+            allocation_filter(
+                &alloc.0,
+                alloc_range(offset, layout.data_size, layout.memrepr_size),
+                tables,
+            )
         }
     })
 }
@@ -97,7 +111,7 @@ pub(super) fn allocation_filter<'tcx>(
 ) -> Allocation {
     let mut bytes: Vec<Option<u8>> = alloc
         .inspect_with_uninit_and_ptr_outside_interpreter(
-            alloc_range.start.bytes_usize()..alloc_range.end().bytes_usize(),
+            alloc_range.start.bytes_usize()..alloc_range.end_memrepr().bytes_usize(),
         )
         .iter()
         .copied()
@@ -113,7 +127,7 @@ pub(super) fn allocation_filter<'tcx>(
         .provenance()
         .ptrs()
         .iter()
-        .filter(|a| a.0 >= alloc_range.start && a.0 <= alloc_range.end())
+        .filter(|a| a.0 >= alloc_range.start && a.0 <= alloc_range.end_memrepr())
     {
         ptrs.push((
             offset.bytes_usize() - alloc_range.start.bytes_usize(),

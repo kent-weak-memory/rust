@@ -146,7 +146,7 @@ impl<'tcx> Value<'tcx> {
         };
         let scalar = self.valtree.try_to_scalar_int()?;
         let input = typing_env.with_post_analysis_normalized(tcx).as_query_input(self.ty);
-        let size = tcx.layout_of(input).ok()?.size;
+        let size = tcx.layout_of(input).ok()?.memrepr_size;
         Some(scalar.to_bits(size))
     }
 

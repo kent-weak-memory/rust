@@ -693,7 +693,7 @@ impl<'tcx> interpret::Machine<'tcx> for CompileTimeMachine<'tcx> {
         (_alloc_id, immutable): (AllocId, bool),
         range: AllocRange,
     ) -> InterpResult<'tcx> {
-        if range.size == Size::ZERO {
+        if range.memrepr_size == Size::ZERO {
             // Nothing to check.
             return interp_ok(());
         }

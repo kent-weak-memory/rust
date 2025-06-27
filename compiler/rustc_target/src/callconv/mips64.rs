@@ -47,7 +47,7 @@ where
         return;
     }
 
-    let size = ret.layout.size;
+    let size = ret.layout.memrepr_size;
     let bits = size.bits();
     if bits <= 128 {
         // Unlike other architectures which return aggregates in registers, MIPS n64 limits the
@@ -88,7 +88,7 @@ where
     }
 
     let dl = cx.data_layout();
-    let size = arg.layout.size;
+    let size = arg.layout.memrepr_size;
     let mut prefix = [None; 8];
     let mut prefix_index = 0;
 

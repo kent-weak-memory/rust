@@ -97,8 +97,12 @@ impl<'a> Layout<'a> {
         self.0.0.align
     }
 
-    pub fn size(self) -> Size {
-        self.0.0.size
+    pub fn data_size(self) -> Option<Size> {
+        self.0.0.data_size
+    }
+
+    pub fn memrepr_size(self) -> Size {
+        self.0.0.memrepr_size
     }
 
     pub fn max_repr_align(self) -> Option<Align> {
@@ -114,7 +118,7 @@ impl<'a> Layout<'a> {
     /// Currently, that means that the type is pointer-sized, pointer-aligned,
     /// and has a initialized (non-union), scalar ABI.
     pub fn is_pointer_like(self, data_layout: &TargetDataLayout) -> bool {
-        self.size() == data_layout.pointer_size
+        self.memrepr_size() == data_layout.pointer_memrepr_size
             && self.align().abi == data_layout.pointer_align.abi
             && matches!(self.backend_repr(), BackendRepr::Scalar(Scalar::Initialized { .. }))
     }
@@ -225,7 +229,7 @@ impl<'a, Ty> TyAndLayout<'a, Ty> {
         C: HasDataLayout,
     {
         match self.backend_repr {
-            BackendRepr::SimdVector { .. } => self.size == expected_size,
+            BackendRepr::SimdVector { .. } => self.memrepr_size == expected_size,
             BackendRepr::Memory { .. } => {
                 if self.fields.count() == 1 && self.fields.offset(0).bytes() == 0 {
                     self.field(cx, 0).is_single_vector_element(cx, expected_size)

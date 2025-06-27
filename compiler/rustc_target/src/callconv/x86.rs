@@ -1,6 +1,5 @@
 use rustc_abi::{
-    AddressSpace, Align, BackendRepr, HasDataLayout, Primitive, Reg, RegKind, TyAbiInterface,
-    TyAndLayout,
+    Align, BackendRepr, HasDataLayout, Primitive, Reg, RegKind, TyAbiInterface, TyAndLayout,
 };
 
 use crate::callconv::{ArgAttribute, FnAbi, PassMode};
@@ -37,13 +36,13 @@ where
                 // According to Clang, everyone but MSVC returns single-element
                 // float aggregates directly in a floating-point register.
                 if fn_abi.ret.layout.is_single_fp_element(cx) {
-                    match fn_abi.ret.layout.size.bytes() {
+                    match fn_abi.ret.layout.memrepr_size.bytes() {
                         4 => fn_abi.ret.cast_to(Reg::f32()),
                         8 => fn_abi.ret.cast_to(Reg::f64()),
                         _ => fn_abi.ret.make_indirect(),
                     }
                 } else {
-                    match fn_abi.ret.layout.size.bytes() {
+                    match fn_abi.ret.layout.memrepr_size.bytes() {
                         1 => fn_abi.ret.cast_to(Reg::i8()),
                         2 => fn_abi.ret.cast_to(Reg::i16()),
                         4 => fn_abi.ret.cast_to(Reg::i32()),
@@ -166,12 +165,12 @@ pub(crate) fn fill_inregs<'a, Ty, C>(
 
         // At this point we know this must be a primitive of sorts.
         let unit = arg.layout.homogeneous_aggregate(cx).unwrap().unit().unwrap();
-        assert_eq!(unit.size, arg.layout.size);
+        assert_eq!(unit.size, arg.layout.memrepr_size);
         if matches!(unit.kind, RegKind::Float | RegKind::Vector) {
             continue;
         }
 
-        let size_in_regs = (arg.layout.size.bits() + 31) / 32;
+        let size_in_regs = (arg.layout.memrepr_size.bits() + 31) / 32;
 
         if size_in_regs == 0 {
             continue;
@@ -183,7 +182,7 @@ pub(crate) fn fill_inregs<'a, Ty, C>(
 
         free_regs -= size_in_regs;
 
-        if arg.layout.size.bits() <= 32 && unit.kind == RegKind::Integer {
+        if arg.layout.memrepr_size.bits() <= 32 && unit.kind == RegKind::Integer {
             attrs.set(ArgAttribute::InReg);
         }
 
@@ -213,15 +212,21 @@ where
         if has_float {
             if cx.target_spec().rustc_abi == Some(RustcAbi::X86Sse2)
                 && fn_abi.ret.layout.backend_repr.is_scalar()
-                && fn_abi.ret.layout.size.bits() <= 128
+                && fn_abi.ret.layout.memrepr_size.bits() <= 128
             {
                 // This is a single scalar that fits into an SSE register, and the target uses the
                 // SSE ABI. We prefer this over integer registers as float scalars need to be in SSE
                 // registers for float operations, so that's the best place to pass them around.
-                fn_abi.ret.cast_to(Reg { kind: RegKind::Vector, size: fn_abi.ret.layout.size });
-            } else if fn_abi.ret.layout.size <= Primitive::Pointer(AddressSpace::DATA).size(cx) {
+                fn_abi
+                    .ret
+                    .cast_to(Reg { kind: RegKind::Vector, size: fn_abi.ret.layout.memrepr_size });
+            } else if fn_abi.ret.layout.memrepr_size
+                <= Primitive::Pointer(cx.data_layout().data_address_space).memrepr_size(cx)
+            {
                 // Same size or smaller than pointer, return in an integer register.
-                fn_abi.ret.cast_to(Reg { kind: RegKind::Integer, size: fn_abi.ret.layout.size });
+                fn_abi
+                    .ret
+                    .cast_to(Reg { kind: RegKind::Integer, size: fn_abi.ret.layout.memrepr_size });
             } else {
                 // Larger than a pointer, return indirectly.
                 fn_abi.ret.make_indirect();

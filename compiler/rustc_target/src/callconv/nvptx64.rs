@@ -6,7 +6,7 @@ use crate::callconv::{ArgAbi, FnAbi, Uniform};
 fn classify_ret<Ty>(ret: &mut ArgAbi<'_, Ty>) {
     if ret.layout.is_aggregate() && ret.layout.is_sized() {
         classify_aggregate(ret)
-    } else if ret.layout.size.bits() < 32 && ret.layout.is_sized() {
+    } else if ret.layout.memrepr_size.bits() < 32 && ret.layout.is_sized() {
         ret.extend_integer_width_to(32);
     }
 }
@@ -14,7 +14,7 @@ fn classify_ret<Ty>(ret: &mut ArgAbi<'_, Ty>) {
 fn classify_arg<Ty>(arg: &mut ArgAbi<'_, Ty>) {
     if arg.layout.is_aggregate() && arg.layout.is_sized() {
         classify_aggregate(arg)
-    } else if arg.layout.size.bits() < 32 && arg.layout.is_sized() {
+    } else if arg.layout.memrepr_size.bits() < 32 && arg.layout.is_sized() {
         arg.extend_integer_width_to(32);
     }
 }
@@ -22,7 +22,7 @@ fn classify_arg<Ty>(arg: &mut ArgAbi<'_, Ty>) {
 /// the pass mode used for aggregates in arg and ret position
 fn classify_aggregate<Ty>(arg: &mut ArgAbi<'_, Ty>) {
     let align_bytes = arg.layout.align.abi.bytes();
-    let size = arg.layout.size;
+    let size = arg.layout.memrepr_size;
 
     let reg = match align_bytes {
         1 => Reg::i8(),
@@ -76,7 +76,7 @@ where
         16 => Reg::i128(),
         _ => unreachable!("Align is given as power of 2 no larger than 16 bytes"),
     };
-    if arg.layout.size.bytes() / align_bytes == 1 {
+    if arg.layout.memrepr_size.bytes() / align_bytes == 1 {
         // Make sure we pass the struct as array at the LLVM IR level and not as a single integer.
         arg.cast_to(CastTarget {
             prefix: [Some(unit), None, None, None, None, None, None, None],
@@ -84,7 +84,7 @@ where
             attrs: ArgAttributes::new(),
         });
     } else {
-        arg.cast_to(Uniform::new(unit, arg.layout.size));
+        arg.cast_to(Uniform::new(unit, arg.layout.memrepr_size));
     }
 }
 

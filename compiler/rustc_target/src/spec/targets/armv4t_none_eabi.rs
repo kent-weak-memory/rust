@@ -23,7 +23,8 @@ pub(crate) fn target() -> Target {
             host_tools: Some(false),
             std: Some(false),
         },
-        pointer_width: 32,
+        pointer_data_size: 32,
+        pointer_memrepr_size: 32,
         arch: "arm".into(),
         /* Data layout args are '-' separated:
          * little endian
