@@ -62,8 +62,7 @@ dependencies = [
 [[package]]
 name = "compiler_builtins"
 version = "0.1.158"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "164cdc689e4c6d69417f77a5f48be240c291e84fbef0b1281755dc754b19c809"
+source = "git+https://github.com/xdoardo/compiler-builtins.git?branch=cheriot-on-0.1.158#01971a5a6bdf943575becd84318e91c6674e3539"
 dependencies = [
  "cc",
  "rustc-std-workspace-core",
@@ -355,6 +354,7 @@ name = "std_detect"
 version = "0.1.5"
 dependencies = [
  "cfg-if",
+ "compiler_builtins",
  "libc",
  "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",

@@ -1023,6 +1023,9 @@ impl Target {
                         // As above, `e` is not required.
                         NOTHING
                     }
+                    "cheriot" => {
+                        FeatureConstraints { required: &["e"], incompatible: &[] }
+                    }
                     _ => unreachable!(),
                 }
             }

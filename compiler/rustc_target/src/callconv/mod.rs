@@ -704,7 +704,7 @@ impl<'a, Ty> FnAbi<'a, Ty> {
             }
             "hexagon" => hexagon::compute_abi_info(self),
             "xtensa" => xtensa::compute_abi_info(cx, self),
-            "riscv32" | "riscv64" | "cheriot" => riscv::compute_abi_info(cx, self),
+            "riscv32" | "riscv64" | "riscv32cheriot" => riscv::compute_abi_info(cx, self),
             "wasm32" => {
                 if spec.os == "unknown" && matches!(cx.wasm_c_abi_opt(), WasmCAbi::Legacy { .. }) {
                     wasm::compute_wasm_abi_info(self)

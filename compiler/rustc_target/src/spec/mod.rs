@@ -1967,6 +1967,7 @@ supported_targets! {
     ("riscv32e-unknown-none-elf", riscv32e_unknown_none_elf),
     ("riscv32em-unknown-none-elf", riscv32em_unknown_none_elf),
     ("riscv32emc-unknown-none-elf", riscv32emc_unknown_none_elf),
+    ("riscv32cheriot-unknown-cheriotrtos", riscv32cheriot_unknown_cheriotrtos),
 
     ("riscv32imac-unknown-none-elf", riscv32imac_unknown_none_elf),
     ("riscv32imafc-unknown-none-elf", riscv32imafc_unknown_none_elf),
@@ -2447,6 +2448,7 @@ pub struct TargetOptions {
     ///   - uses SEH-based unwinding,
     ///   - supports control flow guard mechanism.
     pub is_like_msvc: bool,
+    pub is_like_cheri: bool,
     /// Whether a target toolchain is like WASM.
     pub is_like_wasm: bool,
     /// Whether a target toolchain is like Android, implying a Linux kernel and a Bionic libc
@@ -2827,6 +2829,7 @@ impl Default for TargetOptions {
             is_like_windows: false,
             is_like_msvc: false,
             is_like_wasm: false,
+            is_like_cheri: false,
             is_like_android: false,
             binary_format: BinaryFormat::Elf,
             default_dwarf_version: 4,

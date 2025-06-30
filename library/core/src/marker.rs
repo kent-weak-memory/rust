@@ -1049,13 +1049,19 @@ pub trait PointerLike {}
 marker_impls! {
     #[unstable(feature = "pointer_like_trait", issue = "none")]
     PointerLike for
-        isize,
-        usize,
         {T} &T,
         {T} &mut T,
         {T} *const T,
         {T} *mut T,
         {T: PointerLike} crate::pin::Pin<T>,
+}
+
+#[cfg(not(target_family = "cheri"))]
+marker_impls! {
+    #[unstable(feature = "pointer_like_trait", issue = "none")]
+    PointerLike for
+        isize,
+        usize,
 }
 
 /// A marker for types which can be used as types of `const` generic parameters.
