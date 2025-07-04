@@ -304,6 +304,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 }
             },
 
+            sym::null_mut => bx.inttoptr(bx.const_usize(0), llret_ty),
             sym::float_to_int_unchecked => {
                 if float_type_width(arg_tys[0]).is_none() {
                     bx.tcx().dcx().emit_err(InvalidMonomorphization::FloatToIntUnchecked {

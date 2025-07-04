@@ -550,8 +550,24 @@ pub unsafe fn drop_in_place<T: ?Sized>(to_drop: *mut T) {
 #[rustc_promotable]
 #[rustc_const_stable(feature = "const_ptr_null", since = "1.24.0")]
 #[rustc_diagnostic_item = "ptr_null"]
+#[cfg_attr(not(bootstrap), rustc_allow_const_fn_unstable(core_intrinsics))]
 pub const fn null<T: ?Sized + Thin>() -> *const T {
-    from_raw_parts(without_provenance::<()>(0), ())
+    #[cfg(bootstrap)]
+    {
+        return from_raw_parts(without_provenance::<()>(0), ());
+    }
+
+    #[cfg(not(bootstrap))]
+    {
+        #[cfg(target_family = "cheri")]
+        {
+            crate::intrinsics::null_mut()
+        }
+        #[cfg(not(target_family = "cheri"))]
+        {
+            from_raw_parts(without_provenance::<()>(0), ())
+        }
+    }
 }
 
 /// Creates a null mutable raw pointer.
@@ -574,9 +590,24 @@ pub const fn null<T: ?Sized + Thin>() -> *const T {
 #[stable(feature = "rust1", since = "1.0.0")]
 #[rustc_promotable]
 #[rustc_const_stable(feature = "const_ptr_null", since = "1.24.0")]
-#[rustc_diagnostic_item = "ptr_null_mut"]
+#[cfg_attr(not(bootstrap), rustc_allow_const_fn_unstable(core_intrinsics))]
 pub const fn null_mut<T: ?Sized + Thin>() -> *mut T {
-    from_raw_parts_mut(without_provenance_mut::<()>(0), ())
+    #[cfg(bootstrap)]
+    {
+        from_raw_parts_mut(without_provenance_mut::<()>(0), ())
+    }
+
+    #[cfg(not(bootstrap))]
+    {
+        #[cfg(target_family = "cheri")]
+        {
+            crate::intrinsics::null_mut()
+        }
+        #[cfg(not(target_family = "cheri"))]
+        {
+            from_raw_parts_mut(without_provenance_mut::<()>(0), ())
+        }
+    }
 }
 
 /// Creates a pointer with the given address and no [provenance][crate::ptr#provenance].
@@ -635,12 +666,28 @@ pub const fn dangling<T>() -> *const T {
 #[stable(feature = "strict_provenance", since = "1.84.0")]
 #[rustc_const_stable(feature = "strict_provenance", since = "1.84.0")]
 pub const fn without_provenance_mut<T>(addr: usize) -> *mut T {
-    // An int-to-pointer transmute currently has exactly the intended semantics: it creates a
-    // pointer without provenance. Note that this is *not* a stable guarantee about transmute
-    // semantics, it relies on sysroot crates having special status.
-    // SAFETY: every valid integer is also a valid pointer (as long as you don't dereference that
-    // pointer).
-    unsafe { mem::transmute(addr) }
+    #[cfg(not(bootstrap))]
+    {
+        #[cfg(target_family = "cheri")]
+        {
+            _ = addr;
+            panic!("CHERI requires strict provenance, and cant synthesize new pointers from usizes")
+        }
+
+        #[cfg(not(target_family = "cheri"))]
+        {
+            // An int-to-pointer transmute currently has exactly the intended semantics: it creates a
+            // pointer without provenance. Note that this is *not* a stable guarantee about transmute
+            // semantics, it relies on sysroot crates having special status.
+            // SAFETY: every valid integer is also a valid pointer (as long as you don't dereference that
+            // pointer).
+            unsafe { mem::transmute(addr) }
+        }
+    }
+    #[cfg(bootstrap)]
+    {
+        unsafe { mem::transmute(addr) }
+    }
 }
 
 /// Creates a new pointer that is dangling, but non-null and well-aligned.

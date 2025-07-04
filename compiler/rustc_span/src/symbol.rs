@@ -1472,6 +1472,7 @@ symbols! {
         not,
         notable_trait,
         note,
+        null_mut,
         object_safe_for_dispatch,
         of,
         off,

@@ -107,6 +107,7 @@ fn intrinsic_operation_unsafety(tcx: TyCtxt<'_>, intrinsic_id: LocalDefId) -> hi
         | sym::maxnumf32
         | sym::maxnumf64
         | sym::maxnumf128
+        | sym::null_mut
         | sym::rustc_peek
         | sym::type_name
         | sym::forget
@@ -246,7 +247,7 @@ pub(crate) fn check_intrinsic_type(
                 (1, 0, vec![Ty::new_imm_ptr(tcx, param(0)), tcx.types.i32], tcx.types.unit)
             }
             sym::needs_drop => (1, 0, vec![], tcx.types.bool),
-
+            sym::null_mut => (1, 0, vec![], Ty::new_mut_ptr(tcx, param(0))),
             sym::type_name => (1, 0, vec![], Ty::new_static_str(tcx)),
             sym::type_id => (1, 0, vec![], tcx.types.u128),
             sym::offset => (2, 0, vec![param(0), param(1)], param(0)),
