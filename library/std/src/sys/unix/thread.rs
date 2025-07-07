@@ -843,6 +843,11 @@ pub mod guard {
             // by the security.bsd.stack_guard_page sysctl, but there are
             // few reasons to change it from the default. The default value has
             // been 1 ever since FreeBSD 11.1 and 10.4.
+            //
+            // The size of guard pages is set to zero on CHERI BSD, but in
+            // practice the automatic mapping of new stack pages seems to
+            // include segfaulting when the last page is used.
+            // This means that we effectively *do* have a guard page.
             const GUARD_PAGES: usize = 1;
             let guard = guardaddr..guardaddr + GUARD_PAGES * page_size;
             Some(guard)
@@ -913,17 +918,37 @@ pub mod guard {
         #[cfg(not(target_os = "freebsd"))]
         let e = libc::pthread_getattr_np(libc::pthread_self(), &mut attr);
         if e == 0 {
+            // Icky hack because bootstrap compiler doesn't know about
+            // `target_abi = "purecap"`, but we don't have another way to detect
+            // CHERI BSD.
+            //
+            // CHERI BSD sets the guard page size to zero.
+            // In practice, the stack seems to start off containing
+            // mostly unmapped pages, and when the process uses them
+            // they're automatically remapped to actual memory.
+            // When the process reaches the last page of the stack, the
+            // kernel seems to generate a segfault, even though in
+            // theory it could just map that page normally.
+            // As a result, even if in theory there is no guard page,
+            // in practice there *is* a final page in the stack that
+            // will trigger a segfault when it's accessed.
+            // This is identical in use to a guard page, though it does
+            // appear at a slightly different address.
+            #[cfg(bootstrap)]
+            let is_this_cheri_bsd = false;
+            #[cfg(not(bootstrap))]
+            let is_this_cheri_bsd = cfg!(all(target_os = "freebsd", target_arch = "aarch64", target_abi = "purecap"));
             let mut guardsize = 0;
             assert_eq!(libc::pthread_attr_getguardsize(&attr, &mut guardsize), 0);
             if guardsize == 0 {
-// TODO(seharris): allow zero guard page for CHERI?
-// TODO(seharris): replace conditional with one that detects capability feature
-//                 see: https://doc.rust-lang.org/reference/conditional-compilation.html#target_feature
-// HACK this works around a CHERI bsd thing...
-                if cfg!(all(target_os = "linux", target_env = "musl")) || cfg!(all(target_os = "freebsd", target_arch="aarch64")) {
+                if cfg!(all(target_os = "linux", target_env = "musl")) {
                     // musl versions before 1.1.19 always reported guard
                     // size obtained from pthread_attr_get_np as zero.
                     // Use page size as a fallback.
+                    guardsize = PAGE_SIZE.load(Ordering::Relaxed);
+                } else if is_this_cheri_bsd {
+                    // See comment above about why we have a special case for CHERI
+                    // BSD.
                     guardsize = PAGE_SIZE.load(Ordering::Relaxed);
                 } else {
                     panic!("there is no guard page");
@@ -934,7 +959,11 @@ pub mod guard {
             assert_eq!(libc::pthread_attr_getstack(&attr, &mut stackptr, &mut size), 0);
 
             let stackaddr = stackptr.addr();
-            ret = if cfg!(any(target_os = "freebsd", target_os = "netbsd")) {
+            ret = if is_this_cheri_bsd {
+                // See comment above about why we have a special case for CHERI
+                // BSD.
+                Some(stackaddr..stackaddr+guardsize)
+            } else if cfg!(any(target_os = "freebsd", target_os = "netbsd")) {
                 Some(stackaddr - guardsize..stackaddr)
             } else if cfg!(all(target_os = "linux", target_env = "musl")) {
                 Some(stackaddr - guardsize..stackaddr)
