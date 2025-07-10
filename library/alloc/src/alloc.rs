@@ -182,7 +182,33 @@ impl Global {
     #[cfg_attr(miri, track_caller)] // even without panics, this helps for Miri backtraces
     fn alloc_impl(&self, layout: Layout, zeroed: bool) -> Result<NonNull<[u8]>, AllocError> {
         match layout.size() {
-            0 => Ok(NonNull::slice_from_raw_parts(layout.dangling(), 0)),
+            0 => {
+                #[cfg(not(bootstrap))]
+                {
+                    #[cfg(target_family = "cheri")]
+                    {
+                        Ok(NonNull::slice_from_raw_parts(
+                            unsafe {
+                                NonNull::from_ref(
+                                    core::ptr::null::<u8>()
+                                        .with_addr(layout.align())
+                                        .as_ref()
+                                        .unwrap(),
+                                )
+                            },
+                            0,
+                        ))
+                    }
+                    #[cfg(not(target_family = "cheri"))]
+                    {
+                        Ok(NonNull::slice_from_raw_parts(layout.dangling(), 0))
+                    }
+                }
+                #[cfg(bootstrap)]
+                {
+                    Ok(NonNull::slice_from_raw_parts(layout.dangling(), 0))
+                }
+            }
             // SAFETY: `layout` is non-zero in size,
             size => unsafe {
                 let raw_ptr = if zeroed { alloc_zeroed(layout) } else { alloc(layout) };

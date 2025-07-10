@@ -199,6 +199,7 @@
 // that the feature-gate isn't enabled. Ideally, it wouldn't check for the feature gate for docs
 // from other crates, but since this can only appear for lang items, it doesn't seem worth fixing.
 #![feature(intra_doc_pointers)]
+#![cfg_attr(not(bootstrap), cfg_attr(target_family = "cheri", feature(non_null_from_ref)))]
 
 // Module with internal macros used by other modules (needs to be included before other modules).
 #[macro_use]
