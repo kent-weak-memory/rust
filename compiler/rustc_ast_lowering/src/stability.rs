@@ -134,5 +134,8 @@ pub fn extern_abi_stability(abi: ExternAbi) -> Result<(), UnstableAbi> {
             feature: sym::cmse_nonsecure_entry,
             explain: GateReason::Experimental,
         }),
+        ExternAbi::CHERILibCall | ExternAbi::CHERICCall | ExternAbi::CHERICCallee => {
+            Err(UnstableAbi { abi, feature: sym::abi_chericc, explain: GateReason::Experimental })
+        }
     }
 }

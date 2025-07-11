@@ -681,6 +681,9 @@ impl llvm::CallConv {
             Conv::X86VectorCall => llvm::X86_VectorCall,
             Conv::X86_64SysV => llvm::X86_64_SysV,
             Conv::X86_64Win64 => llvm::X86_64_Win64,
+            Conv::CHERICCall => llvm::CHERICCall,
+            Conv::CHERICCallee => llvm::CHERICCallee,
+            Conv::CHERILibCall => llvm::CHERILibCall,
         }
     }
 }

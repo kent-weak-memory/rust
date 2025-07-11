@@ -496,6 +496,9 @@ impl RustcInternal for Abi {
             Abi::RustCold => rustc_abi::ExternAbi::RustCold,
             Abi::RiscvInterruptM => rustc_abi::ExternAbi::RiscvInterruptM,
             Abi::RiscvInterruptS => rustc_abi::ExternAbi::RiscvInterruptS,
+            Abi::CHERICCall => rustc_abi::ExternAbi::CHERICCall,
+            Abi::CHERICCallee => rustc_abi::ExternAbi::CHERICCallee,
+            Abi::CHERILibCall => rustc_abi::ExternAbi::CHERILibCall,
         }
     }
 }

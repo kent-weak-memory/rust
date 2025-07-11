@@ -879,6 +879,9 @@ impl<'tcx> Stable<'tcx> for rustc_abi::ExternAbi {
             ExternAbi::RustCold => Abi::RustCold,
             ExternAbi::RiscvInterruptM => Abi::RiscvInterruptM,
             ExternAbi::RiscvInterruptS => Abi::RiscvInterruptS,
+            ExternAbi::CHERICCall => Abi::CHERICCall,
+            ExternAbi::CHERICCallee => Abi::CHERICCallee,
+            ExternAbi::CHERILibCall => Abi::CHERILibCall,
         }
     }
 }

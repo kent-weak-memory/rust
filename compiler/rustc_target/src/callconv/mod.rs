@@ -561,6 +561,9 @@ pub enum Conv {
     AvrNonBlockingInterrupt,
 
     RiscvInterrupt { kind: RiscvInterruptKind },
+    CHERICCall,
+    CHERICCallee,
+    CHERILibCall,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, HashStable_Generic)]

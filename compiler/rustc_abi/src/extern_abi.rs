@@ -70,6 +70,10 @@ pub enum ExternAbi {
     RustCold,
     RiscvInterruptM,
     RiscvInterruptS,
+
+    CHERICCall,
+    CHERICCallee,
+    CHERILibCall,
 }
 
 macro_rules! abi_impls {
@@ -141,6 +145,9 @@ abi_impls! {
             Win64 { unwind: false } =><= "win64",
             Win64 { unwind: true } =><= "win64-unwind",
             X86Interrupt =><= "x86-interrupt",
+            CHERICCall =><= "chericcallcc",
+            CHERICCallee =><= "chericcallcce",
+            CHERILibCall =><= "cherilibcallcc",
     }
 }
 

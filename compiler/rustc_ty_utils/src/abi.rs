@@ -273,6 +273,9 @@ fn conv_from_spec_abi(tcx: TyCtxt<'_>, abi: ExternAbi, c_variadic: bool) -> Conv
         AvrNonBlockingInterrupt => Conv::AvrNonBlockingInterrupt,
         RiscvInterruptM => Conv::RiscvInterrupt { kind: RiscvInterruptKind::Machine },
         RiscvInterruptS => Conv::RiscvInterrupt { kind: RiscvInterruptKind::Supervisor },
+        CHERICCall => Conv::CHERICCall,
+        CHERICCallee => Conv::CHERICCallee,
+        CHERILibCall => Conv::CHERILibCall,
 
         // These API constants ought to be more specific...
         Cdecl { .. } => Conv::C,

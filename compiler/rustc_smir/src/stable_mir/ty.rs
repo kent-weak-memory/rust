@@ -1098,6 +1098,9 @@ pub enum Abi {
     RustCold,
     RiscvInterruptM,
     RiscvInterruptS,
+    CHERICCall,
+    CHERICCallee,
+    CHERILibCall,
 }
 
 /// A binder represents a possibly generic type and its bound vars.

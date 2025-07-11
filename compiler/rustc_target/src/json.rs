@@ -119,6 +119,9 @@ impl ToJson for crate::callconv::Conv {
                 buf = format!("RiscvInterrupt({})", kind.as_str());
                 &buf
             }
+            Self::CHERICCall => "CHERICCall",
+            Self::CHERICCallee => "CHERICCallee",
+            Self::CHERILibCall => "CHERILibCall",
         };
         Json::String(s.to_owned())
     }

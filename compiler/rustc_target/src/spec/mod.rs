@@ -3001,6 +3001,7 @@ impl Target {
             RiscvInterruptM | RiscvInterruptS => ["riscv32", "riscv64"].contains(&&self.arch[..]),
             AvrInterrupt | AvrNonBlockingInterrupt => self.arch == "avr",
             Thiscall { .. } => self.arch == "x86",
+            CHERICCall | CHERICCallee | CHERILibCall => self.is_like_cheri,
             // On windows these fall-back to platform native calling convention (C) when the
             // architecture is not supported.
             //

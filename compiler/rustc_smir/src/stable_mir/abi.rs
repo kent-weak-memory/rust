@@ -454,4 +454,8 @@ pub enum CallConvention {
     AvrNonBlockingInterrupt,
 
     RiscvInterrupt,
+
+    CHERICCall,
+    CHERICCallee,
+    CHERILibCall,
 }
