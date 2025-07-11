@@ -75,7 +75,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/ub-wide-ptr.rs:63:1
    |
 LL | const SLICE_LENGTH_UNINIT: &[u8] = unsafe {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: it is undefined behavior to use this value
   --> $DIR/ub-wide-ptr.rs:70:1
@@ -183,7 +183,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/ub-wide-ptr.rs:105:1
    |
 LL | const RAW_SLICE_LENGTH_UNINIT: *const [u8] = unsafe {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: it is undefined behavior to use this value
   --> $DIR/ub-wide-ptr.rs:114:1

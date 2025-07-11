@@ -68,7 +68,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/ub-ref-ptr.rs:36:41
    |
 LL | const UNINIT_PTR: *const i32 = unsafe { MaybeUninit { uninit: () }.init };
-   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: it is undefined behavior to use this value
   --> $DIR/ub-ref-ptr.rs:40:1
@@ -85,7 +85,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/ub-ref-ptr.rs:42:38
    |
 LL | const UNINIT_FN_PTR: fn() = unsafe { MaybeUninit { uninit: () }.init };
-   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: it is undefined behavior to use this value
   --> $DIR/ub-ref-ptr.rs:45:1

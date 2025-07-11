@@ -47,7 +47,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/const-pointer-values-in-various-types.rs:41:47
    |
 LL |     const I32_REF_U128_UNION: u128 = unsafe { Nonsense { int_32_ref: &3 }.uint_128 };
-   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: evaluation of constant value failed
   --> $DIR/const-pointer-values-in-various-types.rs:45:43
@@ -89,7 +89,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/const-pointer-values-in-various-types.rs:57:47
    |
 LL |     const I32_REF_I128_UNION: i128 = unsafe { Nonsense { int_32_ref: &3 }.int_128 };
-   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: evaluation of constant value failed
   --> $DIR/const-pointer-values-in-various-types.rs:61:45

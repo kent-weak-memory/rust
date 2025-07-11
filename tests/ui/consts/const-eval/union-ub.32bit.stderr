@@ -13,7 +13,7 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/union-ub.rs:34:36
    |
 LL | const UNINIT_BOOL: bool = unsafe { DummyUnion { unit: () }.bool};
-   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error: aborting due to 2 previous errors
 

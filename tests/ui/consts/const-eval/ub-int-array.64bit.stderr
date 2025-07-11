@@ -2,19 +2,19 @@ error[E0080]: evaluation of constant value failed
   --> $DIR/ub-int-array.rs:15:9
    |
 LL |         MaybeUninit { uninit: () }.init,
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: evaluation of constant value failed
   --> $DIR/ub-int-array.rs:30:13
    |
 LL |             MaybeUninit { uninit: () }.init,
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error[E0080]: evaluation of constant value failed
   --> $DIR/ub-int-array.rs:56:13
    |
 LL |             MaybeUninit { uninit: () }.init,
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data, but this operation requires initialized memory
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ using uninitialized data (is this CHERI metadata?), but this operation requires initialized memory
 
 error: aborting due to 3 previous errors
 
