@@ -60,7 +60,8 @@ fn codegen_fn_attrs(tcx: TyCtxt<'_>, did: LocalDefId) -> CodegenFnAttrs {
         );
     }
 
-    let attrs = tcx.hir_attrs(tcx.local_def_id_to_hir_id(did));
+    let id = tcx.local_def_id_to_hir_id(did);
+    let attrs = tcx.hir_attrs(id);
     let mut codegen_fn_attrs = CodegenFnAttrs::new();
     if tcx.should_inherit_track_caller(did) {
         codegen_fn_attrs.flags |= CodegenFnAttrFlags::TRACK_CALLER;
@@ -467,7 +468,16 @@ fn codegen_fn_attrs(tcx: TyCtxt<'_>, did: LocalDefId) -> CodegenFnAttrs {
                     ))
                 })
             }
+            sym::cheriot_compartment => codegen_fn_attrs.cheriot_compartment = attr.value_str(),
             _ => {}
+        }
+    }
+
+    if codegen_fn_attrs.cheriot_compartment.is_none() {
+        if let Some(compartment_attr) =
+            tcx.get_attr(rustc_hir::CRATE_OWNER_ID.to_def_id(), sym::cheriot_compartment)
+        {
+            codegen_fn_attrs.cheriot_compartment = compartment_attr.value_str();
         }
     }
 

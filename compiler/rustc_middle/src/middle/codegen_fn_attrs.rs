@@ -55,6 +55,9 @@ pub struct CodegenFnAttrs {
     pub patchable_function_entry: Option<PatchableFunctionEntry>,
     /// For the `#[autodiff]` macros.
     pub autodiff_item: Option<AutoDiffAttrs>,
+
+    /// The optional `#[cheriot_compartment = "..."]` attribute.
+    pub cheriot_compartment: Option<Symbol>,
 }
 
 #[derive(Copy, Clone, Debug, TyEncodable, TyDecodable, HashStable)]
@@ -164,6 +167,7 @@ impl CodegenFnAttrs {
             alignment: None,
             patchable_function_entry: None,
             autodiff_item: None,
+            cheriot_compartment: None,
         }
     }
 

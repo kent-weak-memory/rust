@@ -619,6 +619,12 @@ pub static BUILTIN_ATTRIBUTES: &[BuiltinAttribute] = &[
         EncodeCrossCrate::Yes, min_generic_const_args, experimental!(type_const),
     ),
 
+    /* CHERI stuff */
+    gated!(
+        cheriot_compartment, Normal, template!(NameValueStr: "name"), ErrorFollowing,
+        EncodeCrossCrate::No, experimental!(cheriot_compartment)
+    ),
+
     // ==========================================================================
     // Internal attributes: Stability, deprecation, and unsafe:
     // ==========================================================================

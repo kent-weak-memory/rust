@@ -87,6 +87,10 @@ passes_change_fields_to_be_of_unit_type =
      *[other] fields
     }
 
+passes_cheriot_compartment_attr =
+    `#[cheriot_compartment = "..."]` can be used as a crate-level attribute or can be applied to foreign functions with the "C" ABI.
+    .label = not a foreign function nor a crate-level attribute
+
 passes_cold =
     {passes_should_be_applied_to_fn}
     .warn = {-passes_previously_accepted}

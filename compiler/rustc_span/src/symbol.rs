@@ -627,6 +627,7 @@ symbols! {
         cfi_encoding,
         char,
         char_is_ascii,
+        cheriot_compartment,
         child_id,
         child_kill,
         client,

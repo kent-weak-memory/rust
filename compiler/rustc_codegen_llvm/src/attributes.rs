@@ -546,6 +546,11 @@ pub(crate) fn llfn_attrs_from_instance<'ll, 'tcx>(
         to_add.push(llvm::CreateAttrStringValue(cx.llcx, "target-features", &target_features));
     }
 
+    if let Some(compartment) = codegen_fn_attrs.cheriot_compartment {
+        let compartment = compartment.to_string();
+        to_add.push(llvm::CreateAttrStringValue(cx.llcx, "cheri-compartment", &compartment))
+    }
+
     attributes::apply_to_llfn(llfn, Function, &to_add);
 }
 

@@ -241,9 +241,14 @@ fn fn_sig_for_fn_abi<'tcx>(
 }
 
 #[inline]
-fn conv_from_spec_abi(tcx: TyCtxt<'_>, abi: ExternAbi, c_variadic: bool) -> Conv {
+fn conv_from_spec_abi(
+    tcx: TyCtxt<'_>,
+    abi: ExternAbi,
+    c_variadic: bool,
+    instance_def_id: Option<rustc_hir::def_id::DefId>,
+) -> Conv {
     use rustc_abi::ExternAbi::*;
-    match tcx.sess.target.adjust_abi(abi, c_variadic) {
+    let mut conv = match tcx.sess.target.adjust_abi(abi, c_variadic) {
         Rust | RustCall => Conv::Rust,
 
         // This is intentionally not using `Conv::Cold`, as that has to preserve
@@ -279,7 +284,25 @@ fn conv_from_spec_abi(tcx: TyCtxt<'_>, abi: ExternAbi, c_variadic: bool) -> Conv
 
         // These API constants ought to be more specific...
         Cdecl { .. } => Conv::C,
+    };
+
+    /* CHERIoT-specific check */
+    if let Some(fn_cheriot_compartment) =
+        instance_def_id.and_then(|v| tcx.get_attr(v, rustc_span::sym::cheriot_compartment))
+    {
+        let maybe_crate_cheriot_compartment =
+            tcx.get_attr(rustc_hir::def_id::CRATE_DEF_ID, rustc_span::sym::cheriot_compartment);
+
+        if maybe_crate_cheriot_compartment
+            .is_some_and(|v| v.value_str() == fn_cheriot_compartment.value_str())
+        {
+            conv = Conv::CHERICCallee
+        } else {
+            conv = Conv::CHERICCall
+        }
     }
+
+    conv
 }
 
 fn fn_abi_of_fn_ptr<'tcx>(
@@ -532,7 +555,7 @@ fn fn_abi_new_uncached<'tcx>(
     };
     let sig = tcx.normalize_erasing_regions(cx.typing_env, sig);
 
-    let conv = conv_from_spec_abi(cx.tcx(), sig.abi, sig.c_variadic);
+    let conv = conv_from_spec_abi(cx.tcx(), sig.abi, sig.c_variadic, instance.map(|v| v.def_id()));
 
     let mut inputs = sig.inputs();
     let extra_args = if sig.abi == ExternAbi::RustCall {

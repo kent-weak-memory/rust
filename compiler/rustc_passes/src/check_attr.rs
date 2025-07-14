@@ -266,6 +266,7 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
                         }
                         [sym::linkage, ..] => self.check_linkage(attr, span, target),
                         [sym::rustc_pub_transparent, ..] => self.check_rustc_pub_transparent(attr.span(), span, attrs),
+                        [sym::cheriot_compartment, ..] => self.check_cheriot_compartment(hir_id, attr, span, target),
                         [
                             // ok
                             sym::allow
@@ -2664,6 +2665,33 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
             Target::Fn => {}
             _ => {
                 self.dcx().emit_err(errors::AutoDiffAttr { attr_span: span });
+                self.abort.set(true);
+            }
+        }
+    }
+
+    fn check_cheriot_compartment(
+        &self,
+        hir_id: HirId,
+        _attr: &Attribute,
+        span: Span,
+        target: Target,
+    ) {
+        match target {
+            Target::Mod if hir_id == rustc_hir::CRATE_HIR_ID => {}
+            Target::ForeignFn => {
+                let foreign_item = self.tcx.hir_node(hir_id).expect_foreign_item();
+
+                let rustc_hir::ForeignItemKind::Fn(sig, _, _) = foreign_item.kind else {
+                    unreachable!()
+                };
+
+                if !matches!(sig.header.abi, ExternAbi::C { .. } | ExternAbi::Rust) {
+                    self.dcx().emit_err(errors::CHERIoTCompartmentAttr { attr_span: span });
+                }
+            }
+            _ => {
+                self.dcx().emit_err(errors::CHERIoTCompartmentAttr { attr_span: span });
                 self.abort.set(true);
             }
         }

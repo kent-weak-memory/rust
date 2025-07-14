@@ -32,6 +32,14 @@ pub(crate) struct AutoDiffAttr {
     pub attr_span: Span,
 }
 
+#[derive(Diagnostic)]
+#[diag(passes_cheriot_compartment_attr)]
+pub(crate) struct CHERIoTCompartmentAttr {
+    #[primary_span]
+    #[label]
+    pub attr_span: Span,
+}
+
 #[derive(LintDiagnostic)]
 #[diag(passes_outer_crate_level_attr)]
 pub(crate) struct OuterCrateLevelAttr;
