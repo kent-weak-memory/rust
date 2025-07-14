@@ -405,15 +405,15 @@ impl Config {
     }
 
     pub fn is_cheri(&self) -> bool {
-        self.target_cfg().pointer_data_size < self.target_cfg().pointer_memory_size
+        self.target_cfg().get_pointer_data_size() < self.target_cfg().get_pointer_memory_size()
     }
 
     pub fn get_pointer_data_size(&self) -> u32 {
-        *&self.target_cfg().pointer_data_size
+        self.target_cfg().get_pointer_data_size()
     }
 
     pub fn get_pointer_memory_size(&self) -> u32 {
-        *&self.target_cfg().pointer_memory_size
+        self.target_cfg().get_pointer_memory_size()
     }
 
     pub fn can_unwind(&self) -> bool {
@@ -484,8 +484,8 @@ impl TargetCfgs {
             for family in &cfg.families {
                 all_families.insert(family.clone());
             }
-            all_pointer_data_sizes.insert(format!("{}bit", cfg.pointer_data_size));
-            all_pointer_memory_sizes.insert(format!("{}bit", cfg.pointer_memory_size));
+            all_pointer_data_sizes.insert(format!("{}bit", cfg.get_pointer_data_size()));
+            all_pointer_memory_sizes.insert(format!("{}bit", cfg.get_pointer_memory_size()));
 
             all_targets.insert(target.clone());
         }
@@ -560,10 +560,17 @@ pub struct TargetCfg {
     pub(crate) abi: String,
     #[serde(rename = "target-family", default)]
     pub(crate) families: Vec<String>,
-    #[serde(rename = "target-pointer-data-size", deserialize_with = "serde_parse_u32")]
-    pub(crate) pointer_data_size: u32,
-    #[serde(rename = "target-pointer-memory-size", deserialize_with = "serde_parse_u32")]
-    pub(crate) pointer_memory_size: u32,
+    // Fallback for bootstrap compiler.
+    #[serde(rename = "target-pointer-width", deserialize_with = "serde_parse_some_u32", default = "serde_none_u32")]
+    pointer_width: Option<u32>,
+    // Updated format for `pointer_width` used in this fork.
+    // See `get_pointer_data_size()` and `get_pointer_memory_size()` for getters
+    // that handle falling back to `pointer_width` when querying a bootstrap
+    // compiler that doesn't provide these fields.
+    #[serde(rename = "target-pointer-data-size", deserialize_with = "serde_parse_some_u32", default = "serde_none_u32")]
+    pointer_data_size: Option<u32>,
+    #[serde(rename = "target-pointer-memory-size", deserialize_with = "serde_parse_some_u32", default = "serde_none_u32")]
+    pointer_memory_size: Option<u32>,
     #[serde(rename = "target-endian", default)]
     endian: Endian,
     #[serde(rename = "panic-strategy", default)]
@@ -575,6 +582,12 @@ pub struct TargetCfg {
 impl TargetCfg {
     pub(crate) fn os_and_env(&self) -> String {
         format!("{}-{}", self.os, self.env)
+    }
+    pub(crate) fn get_pointer_data_size(&self) -> u32 {
+        self.pointer_data_size.or(self.pointer_width).unwrap()
+    }
+    pub(crate) fn get_pointer_memory_size(&self) -> u32 {
+        self.pointer_memory_size.or(self.pointer_width).unwrap()
     }
 }
 
@@ -610,9 +623,17 @@ fn rustc_output(config: &Config, args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
+fn serde_parse_some_u32<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u32>, D::Error> {
+    Ok(Some(serde_parse_u32(deserializer)?))
+}
+
 fn serde_parse_u32<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
     let string = String::deserialize(deserializer)?;
     string.parse().map_err(D::Error::custom)
+}
+
+fn serde_none_u32() -> Option<u32> {
+    None
 }
 
 #[derive(Debug, Clone)]

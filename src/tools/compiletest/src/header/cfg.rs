@@ -135,12 +135,12 @@ pub(super) fn parse_cfg_name_directive<'a>(
         message: "when the architecture is {name}"
     }
     condition! {
-        name: format!("{}bit", target_cfg.pointer_data_size),
+        name: format!("{}bit", target_cfg.get_pointer_data_size()),
         allowed_names: &target_cfgs.all_pointer_data_sizes,
         message: "when the pointer data size is {name}"
     }
     condition! {
-        name: format!("{}bit", target_cfg.pointer_memory_size),
+        name: format!("{}bit", target_cfg.get_pointer_memory_size()),
         allowed_names: &target_cfgs.all_pointer_memory_sizes,
         message: "when the pointer memory size is {name}"
     }
