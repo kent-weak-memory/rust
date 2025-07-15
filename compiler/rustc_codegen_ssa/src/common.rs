@@ -59,6 +59,13 @@ pub enum AtomicRmwBinOp {
     AtomicUMin,
 }
 
+#[derive(Copy, Clone)]
+pub enum PreserveCheriTags {
+    Unknown,
+    Required,
+    Unnecessary,
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum AtomicOrdering {
     Unordered,

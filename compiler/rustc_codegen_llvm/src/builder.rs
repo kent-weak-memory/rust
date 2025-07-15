@@ -1111,9 +1111,11 @@ impl<'a, 'll, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
         src_align: Align,
         size: &'ll Value,
         flags: MemFlags,
+        preserve_tags: rustc_codegen_ssa::common::PreserveCheriTags,
     ) {
         assert!(!flags.contains(MemFlags::NONTEMPORAL), "non-temporal memcpy not supported");
         let size = self.intcast(size, self.type_isize(), false);
+        let preserve_tags = llvm::PreserveCheriTags::from_generic(preserve_tags);
         let is_volatile = flags.contains(MemFlags::VOLATILE);
         unsafe {
             llvm::LLVMRustBuildMemCpy(
@@ -1123,6 +1125,7 @@ impl<'a, 'll, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
                 src,
                 src_align.bytes() as c_uint,
                 size,
+                preserve_tags,
                 is_volatile,
             );
         }
@@ -1136,9 +1139,11 @@ impl<'a, 'll, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
         src_align: Align,
         size: &'ll Value,
         flags: MemFlags,
+        preserve_tags: rustc_codegen_ssa::common::PreserveCheriTags,
     ) {
         assert!(!flags.contains(MemFlags::NONTEMPORAL), "non-temporal memmove not supported");
         let size = self.intcast(size, self.type_isize(), false);
+        let preserve_tags = llvm::PreserveCheriTags::from_generic(preserve_tags);
         let is_volatile = flags.contains(MemFlags::VOLATILE);
         unsafe {
             llvm::LLVMRustBuildMemMove(
@@ -1148,6 +1153,7 @@ impl<'a, 'll, 'tcx> BuilderMethods<'a, 'tcx> for Builder<'a, 'll, 'tcx> {
                 src,
                 src_align.bytes() as c_uint,
                 size,
+                preserve_tags,
                 is_volatile,
             );
         }
