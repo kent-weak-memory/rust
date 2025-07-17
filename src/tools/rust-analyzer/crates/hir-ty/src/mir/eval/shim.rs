@@ -231,7 +231,7 @@ impl Evaluator<'_> {
         span: MirSpan,
     ) -> Result<()> {
         for (i, ty) in ty_iter.enumerate() {
-            let size = self.layout(&ty)?.size.bytes_usize();
+            let size = self.layout(&ty)?.memrepr_size.bytes_usize();
             let tmp = self.heap_allocate(self.ptr_size(), self.ptr_size())?;
             let arg = IntervalAndTy {
                 interval: Interval { addr: tmp, size: self.ptr_size() },
@@ -1027,7 +1027,7 @@ impl Evaluator<'_> {
                 let is_overflow = vec![u8::from(is_overflow)];
                 let layout = self.layout(&result_ty)?;
                 let result = self.construct_with_layout(
-                    layout.size.bytes_usize(),
+                    layout.memrepr_size.bytes_usize(),
                     &layout,
                     None,
                     [ans.to_le_bytes()[0..op_size].to_vec(), is_overflow]
@@ -1565,7 +1565,7 @@ impl Evaluator<'_> {
             .intern(Interner);
             let layout = self.layout(&result_ty)?;
             let result = self.construct_with_layout(
-                layout.size.bytes_usize(),
+                layout.memrepr_size.bytes_usize(),
                 &layout,
                 None,
                 [IntervalOrOwned::Borrowed(dest.0), IntervalOrOwned::Owned(vec![u8::from(dest.1)])]

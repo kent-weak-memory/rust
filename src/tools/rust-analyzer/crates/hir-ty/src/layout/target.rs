@@ -35,9 +35,13 @@ pub fn target_data_layout_query(
                         format!(r#"inconsistent target specification: "data-layout" claims architecture is {dl}-endian, while "target-endian" is `{target}`"#)
                     }
                     TargetDataLayoutErrors::InconsistentTargetPointerWidth {
-                        pointer_size,
-                        target,
-                    } => format!(r#"inconsistent target specification: "data-layout" claims pointers are {pointer_size}-bit, while "target-pointer-width" is `{target}`"#),
+                        pointer_data_size,
+                        pointer_memrepr_size,
+                        target_pointer_data_size,
+                        target_pointer_memrepr_size
+                    } => {
+                        format!(r#"inconsistent target specification: "data-layout" claims addresses are {pointer_data_size}-bit with a {pointer_memrepr_size} in-memory representation, while the target spec says `{target_pointer_data_size}` and `{target_pointer_memrepr_size}`, respectively"#)
+                    }
                     TargetDataLayoutErrors::InvalidBitsSize { err } => err,
                 }.into())
             }

@@ -225,7 +225,7 @@ impl Interval {
     }
 
     fn get<'a>(&self, memory: &'a Evaluator<'a>) -> Result<&'a [u8]> {
-        memory.read_memory(self.addr, self.memrepr_size)
+        memory.read_memory(self.addr, self.size)
     }
 
     fn write_from_bytes(&self, memory: &mut Evaluator<'_>, bytes: &[u8]) -> Result<()> {
@@ -243,7 +243,7 @@ impl Interval {
 
 impl IntervalAndTy {
     fn get<'a>(&self, memory: &'a Evaluator<'a>) -> Result<&'a [u8]> {
-        memory.read_memory(self.interval.addr, self.interval.memrepr_size)
+        memory.read_memory(self.interval.addr, self.interval.size)
     }
 
     fn new(
@@ -630,7 +630,7 @@ impl Evaluator<'_> {
             Ok(target_data_layout) => target_data_layout,
             Err(e) => return Err(MirEvalError::TargetDataLayoutNotAvailable(e)),
         };
-        let cached_ptr_size = target_data_layout.pointer_size.bytes_usize();
+        let cached_ptr_size = target_data_layout.pointer_memrepr_size.bytes_usize();
         Ok(Evaluator {
             target_data_layout,
             stack: vec![0],
@@ -1793,7 +1793,9 @@ impl Evaluator<'_> {
         }
         let layout = self.layout_adt(adt, subst)?;
         Ok(match &layout.variants {
-            Variants::Single { .. } | Variants::Empty => (layout.memrepr_size.bytes_usize(), layout, None),
+            Variants::Single { .. } | Variants::Empty => {
+                (layout.memrepr_size.bytes_usize(), layout, None)
+            }
             Variants::Multiple { variants, tag, tag_encoding, .. } => {
                 let enum_variant_id = match it {
                     VariantId::EnumVariantId(it) => it,
@@ -1930,7 +1932,7 @@ impl Evaluator<'_> {
             if size == 16 && v.len() < 16 {
                 Cow::Owned(pad16(v, false).to_vec())
             } else if size < 16 && v.len() == 16 {
-                Cow::Borrowed(&v[0.memrepr_size])
+                Cow::Borrowed(&v[0..size])
             } else {
                 return Err(MirEvalError::InvalidConst(konst.clone()));
             }
@@ -2054,7 +2056,7 @@ impl Evaluator<'_> {
         if let Some(layout) = self.layout_cache.borrow().get(ty) {
             return Ok(layout
                 .is_sized()
-                .then(|| (layout.size.bytes_usize(), layout.align.abi.bytes() as usize)));
+                .then(|| (layout.memrepr_size.bytes_usize(), layout.align.abi.bytes() as usize)));
         }
         if let DefWithBodyId::VariantId(f) = locals.body.owner {
             if let Some((AdtId::EnumId(e), _)) = ty.as_adt() {
@@ -2074,7 +2076,7 @@ impl Evaluator<'_> {
         let layout = layout?;
         Ok(layout
             .is_sized()
-            .then(|| (layout.size.bytes_usize(), layout.align.abi.bytes() as usize)))
+            .then(|| (layout.memrepr_size.bytes_usize(), layout.align.abi.bytes() as usize)))
     }
 
     /// A version of `self.size_of` which returns error if the type is unsized. `what` argument should
@@ -2219,7 +2221,7 @@ impl Evaluator<'_> {
                     for (id, ty) in subst.iter(Interner).enumerate() {
                         let ty = ty.assert_ty_ref(Interner); // Tuple only has type argument
                         let offset = layout.fields.offset(id).bytes_usize();
-                        let size = this.layout(ty)?.size.bytes_usize();
+                        let size = this.layout(ty)?.memrepr_size.bytes_usize();
                         rec(
                             this,
                             &bytes[offset..offset + size],
@@ -2241,7 +2243,7 @@ impl Evaluator<'_> {
                                 .offset(u32::from(f.into_raw()) as usize)
                                 .bytes_usize();
                             let ty = &field_types[f].clone().substitute(Interner, subst);
-                            let size = this.layout(ty)?.size.bytes_usize();
+                            let size = this.layout(ty)?.memrepr_size.bytes_usize();
                             rec(
                                 this,
                                 &bytes[offset..offset + size],
@@ -2267,7 +2269,7 @@ impl Evaluator<'_> {
                                 let offset =
                                     l.fields.offset(u32::from(f.into_raw()) as usize).bytes_usize();
                                 let ty = &field_types[f].clone().substitute(Interner, subst);
-                                let size = this.layout(ty)?.size.bytes_usize();
+                                let size = this.layout(ty)?.memrepr_size.bytes_usize();
                                 rec(
                                     this,
                                     &bytes[offset..offset + size],
@@ -2344,7 +2346,7 @@ impl Evaluator<'_> {
                         &layout,
                         self.db,
                         &self.target_data_layout,
-                        self.read_memory(addr, layout.size.bytes_usize())?,
+                        self.read_memory(addr, layout.memrepr_size.bytes_usize())?,
                         e,
                     ) {
                         for (i, (_, ty)) in self.db.field_types(ev.into()).iter().enumerate() {
@@ -2716,13 +2718,13 @@ impl Evaluator<'_> {
                     .intern(Interner);
                     let layout = self.layout(&ty)?;
                     let result = self.construct_with_layout(
-                        layout.size.bytes_usize(),
+                        layout.memrepr_size.bytes_usize(),
                         &layout,
                         None,
                         args.iter().map(|it| IntervalOrOwned::Borrowed(it.interval)),
                     )?;
                     // FIXME: there is some leak here
-                    let size = layout.size.bytes_usize();
+                    let size = layout.memrepr_size.bytes_usize();
                     let addr = self.heap_allocate(size, layout.align.abi.bytes() as usize)?;
                     self.write_memory(addr, &result)?;
                     IntervalAndTy { interval: Interval { addr, size }, ty }

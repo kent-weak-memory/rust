@@ -1415,7 +1415,7 @@ impl<'ctx> MirLowerCtx<'ctx> {
         let size = || {
             self.db
                 .layout_of_ty(ty.clone(), self.db.trait_environment_for_body(self.owner))
-                .map(|it| it.size.bytes_usize())
+                .map(|it| it.memrepr_size.bytes_usize())
         };
         const USIZE_SIZE: usize = size_of::<usize>();
         let bytes: Box<[_]> = match l {

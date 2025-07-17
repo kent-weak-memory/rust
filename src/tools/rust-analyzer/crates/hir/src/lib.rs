@@ -5933,7 +5933,7 @@ pub struct Layout(Arc<TyLayout>, Arc<TargetDataLayout>);
 
 impl Layout {
     pub fn size(&self) -> u64 {
-        self.0.size.bytes()
+        self.0.memrepr_size.bytes()
     }
 
     pub fn align(&self) -> u64 {
@@ -5976,7 +5976,7 @@ impl Layout {
         let tag_size =
             if let layout::Variants::Multiple { tag, tag_encoding, .. } = &self.0.variants {
                 match tag_encoding {
-                    TagEncoding::Direct => tag.size(&*self.1).bytes_usize(),
+                    TagEncoding::Direct => tag.memrepr_size(&*self.1).bytes_usize(),
                     TagEncoding::Niche { .. } => 0,
                 }
             } else {

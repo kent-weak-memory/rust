@@ -791,7 +791,7 @@ fn render_const_scalar(
                 let Ok(layout) = f.db.layout_of_ty(ty.clone(), trait_env) else {
                     return f.write_str("<layout-error>");
                 };
-                let size_one = layout.size.bytes_usize();
+                let size_one = layout.memrepr_size.bytes_usize();
                 let Some(bytes) = memory_map.get(addr, size_one * count) else {
                     return f.write_str("<ref-data-not-available>");
                 };
@@ -817,7 +817,7 @@ fn render_const_scalar(
                 let Ok(layout) = f.db.layout_of_ty(t.clone(), trait_env) else {
                     return f.write_str("<layout-error>");
                 };
-                let size = layout.size.bytes_usize();
+                let size = layout.memrepr_size.bytes_usize();
                 let Some(bytes) = memory_map.get(addr, size) else {
                     return f.write_str("<ref-data-not-available>");
                 };
@@ -847,7 +847,7 @@ fn render_const_scalar(
                 let Ok(layout) = f.db.layout_of_ty(t.clone(), trait_env) else {
                     return f.write_str("<layout-error>");
                 };
-                let size = layout.size.bytes_usize();
+                let size = layout.memrepr_size.bytes_usize();
                 let Some(bytes) = memory_map.get(addr, size) else {
                     return f.write_str("<ref-data-not-available>");
                 };
@@ -873,7 +873,7 @@ fn render_const_scalar(
                     f.write_str("<layout-error>")?;
                     continue;
                 };
-                let size = layout.size.bytes_usize();
+                let size = layout.memrepr_size.bytes_usize();
                 render_const_scalar(f, &b[offset..offset + size], memory_map, ty)?;
             }
             f.write_str(")")
@@ -945,7 +945,7 @@ fn render_const_scalar(
             let Ok(layout) = f.db.layout_of_ty(ty.clone(), trait_env) else {
                 return f.write_str("<layout-error>");
             };
-            let size_one = layout.size.bytes_usize();
+            let size_one = layout.memrepr_size.bytes_usize();
             f.write_str("[")?;
             let mut first = true;
             for i in 0..len as usize {
@@ -995,7 +995,7 @@ fn render_variant_after_name(
                 let Ok(layout) = f.db.layout_of_ty(ty.clone(), trait_env.clone()) else {
                     return f.write_str("<layout-error>");
                 };
-                let size = layout.size.bytes_usize();
+                let size = layout.memrepr_size.bytes_usize();
                 render_const_scalar(f, &b[offset..offset + size], memory_map, &ty)
             };
             let mut it = data.fields().iter();

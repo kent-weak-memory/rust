@@ -194,7 +194,7 @@ pub fn layout_of_ty_query(
                     dl,
                     Primitive::Int(
                         match i {
-                            IntTy::Isize => dl.ptr_sized_integer(),
+                            IntTy::Isize => dl.ptr_data_sized_integer(),
                             IntTy::I8 => Integer::I8,
                             IntTy::I16 => Integer::I16,
                             IntTy::I32 => Integer::I32,
@@ -211,7 +211,7 @@ pub fn layout_of_ty_query(
                     dl,
                     Primitive::Int(
                         match i {
-                            UintTy::Usize => dl.ptr_sized_integer(),
+                            UintTy::Usize => dl.ptr_data_sized_integer(),
                             UintTy::U8 => Integer::I8,
                             UintTy::U16 => Integer::I16,
                             UintTy::U32 => Integer::I32,
@@ -282,7 +282,7 @@ pub fn layout_of_ty_query(
             unsized_part = normalize(db, trait_env, unsized_part);
             let metadata = match unsized_part.kind(Interner) {
                 TyKind::Slice(_) | TyKind::Str => {
-                    scalar_unit(dl, Primitive::Int(dl.ptr_sized_integer(), false))
+                    scalar_unit(dl, Primitive::Int(dl.ptr_data_sized_integer(), false))
                 }
                 TyKind::Dyn(..) => {
                     let mut vtable = scalar_unit(dl, Primitive::Pointer(AddressSpace::DATA));
@@ -408,7 +408,7 @@ fn field_ty(
 }
 
 fn scalar_unit(dl: &TargetDataLayout, value: Primitive) -> Scalar {
-    Scalar::Initialized { value, valid_range: WrappingRange::full(value.size(dl)) }
+    Scalar::Initialized { value, valid_range: WrappingRange::full(value.memrepr_size(dl)) }
 }
 
 #[cfg(test)]
