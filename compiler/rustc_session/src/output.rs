@@ -175,24 +175,6 @@ pub fn categorize_crate_type(s: Symbol) -> Option<CrateType> {
 }
 
 pub fn collect_crate_types(session: &Session, attrs: &[ast::Attribute]) -> Vec<CrateType> {
-    // If we're generating a test executable, then ignore all other output
-    // styles at all other locations
-    if session.opts.test {
-        if !session.target.executables {
-            session.dcx().emit_warn(errors::UnsupportedCrateTypeForTarget {
-                crate_type: CrateType::Executable,
-                target_triple: &session.opts.target_triple,
-            });
-            return Vec::new();
-        }
-        return vec![CrateType::Executable];
-    }
-
-    // Shadow `sdylib` crate type in interface build.
-    if session.opts.unstable_opts.build_sdylib_interface {
-        return vec![CrateType::Rlib];
-    }
-
     // Only check command line flags if present. If no types are specified by
     // command line, then reuse the empty `base` Vec to hold the types that
     // will be found in crate attributes.
@@ -229,6 +211,28 @@ pub fn collect_crate_types(session: &Session, attrs: &[ast::Attribute]) -> Vec<C
             true
         }
     });
+
+    // If we're generating a test executable, then ignore all other output
+    // styles at all other locations
+    if session.opts.test {
+        if !session.target.options.executables {
+            return base;
+        }
+
+        //if !session.target.executables {
+        //    session.dcx().emit_warn(errors::UnsupportedCrateTypeForTarget {
+        //        crate_type: CrateType::Executable,
+        //        target_triple: &session.opts.target_triple,
+        //    });
+        //    return Vec::new();
+        //}
+        return vec![CrateType::Executable];
+    }
+
+    // Shadow `sdylib` crate type in interface build.
+    if session.opts.unstable_opts.build_sdylib_interface {
+        return vec![CrateType::Rlib];
+    }
 
     base
 }

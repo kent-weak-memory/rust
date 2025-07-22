@@ -38,6 +38,7 @@ struct TestCtxt<'a> {
     test_cases: Vec<Test>,
     reexport_test_harness_main: Option<Symbol>,
     test_runner: Option<ast::Path>,
+    test_as_lib: bool,
 }
 
 /// Traverse the crate, collecting all the test functions, eliding any
@@ -251,6 +252,7 @@ fn generate_test_harness(
         test_cases: Vec::new(),
         reexport_test_harness_main,
         test_runner,
+        test_as_lib: !sess.target.options.executables,
     };
 
     TestHarnessGenerator { cx, tests: Vec::new() }.visit_crate(krate);
@@ -313,12 +315,28 @@ fn mk_main(cx: &mut TestCtxt<'_>) -> P<ast::Item> {
         ecx.item(sp, ast::AttrVec::new(), ast::ItemKind::ExternCrate(None, test_ident)),
     );
 
-    // #[rustc_main]
-    let main_attr = ecx.attr_word(sym::rustc_main, sp);
     // #[coverage(off)]
     let coverage_attr = ecx.attr_nested_word(sym::coverage, sym::off, sp);
     // #[doc(hidden)]
     let doc_hidden_attr = ecx.attr_nested_word(sym::doc, sym::hidden, sp);
+
+    let mut attrs = thin_vec![coverage_attr, doc_hidden_attr];
+    if cx.test_as_lib {
+        // #[no_mangle]
+        let g = &ecx.sess.psess.attr_id_generator;
+        let main_attr = attr::mk_attr_word(
+            g,
+            ast::AttrStyle::Outer,
+            ast::Safety::Unsafe(sp),
+            sym::no_mangle,
+            sp,
+        );
+        attrs.push(main_attr);
+    } else {
+        // #[rustc_main]
+        let main_attr = ecx.attr_word(sym::rustc_main, sp);
+        attrs.push(main_attr);
+    }
 
     // pub fn main() { ... }
     let main_ret_ty = ecx.ty(sp, ast::TyKind::Tup(ThinVec::new()));
@@ -331,13 +349,36 @@ fn mk_main(cx: &mut TestCtxt<'_>) -> P<ast::Item> {
     };
 
     let decl = ecx.fn_decl(ThinVec::new(), ast::FnRetTy::Ty(main_ret_ty));
-    let sig = ast::FnSig { decl, header: ast::FnHeader::default(), span: sp };
+    let mut header = ast::FnHeader::default();
+    if cx.test_as_lib {
+        header.ext = ast::Extern::Implicit(sp);
+    }
+    let sig = ast::FnSig { decl, header, span: sp };
     let defaultness = ast::Defaultness::Final;
 
     // Honor the reexport_test_harness_main attribute
     let main_ident = match cx.reexport_test_harness_main {
-        Some(sym) => Ident::new(sym, sp.with_ctxt(SyntaxContext::root())),
-        None => Ident::new(sym::main, sp),
+        Some(sym) => {
+            //if cx.test_as_lib {
+            //    // #[link_name = "<sym>"]
+            //    let unsafe_no_mangle_attr = ecx.attr_name_value_str(sym::link_name, sym, sp);
+            //    attrs.push(unsafe_no_mangle_attr)
+            //}
+
+            Ident::new(sym, sp.with_ctxt(SyntaxContext::root()))
+        }
+        None => {
+            if cx.test_as_lib {
+                //let fn_name = "__rust_test_main";
+                //let sym = Symbol::intern(fn_name);
+                //let unsafe_no_mangle_attr = ecx.attr_name_value_str(sym::link_name, sym, sp);
+                //attrs.push(unsafe_no_mangle_attr);
+
+                Ident::from_str_and_span("__rust_test_main", sp)
+            } else {
+                Ident::new(sym::main, sp)
+            }
+        }
     };
 
     let main = ast::ItemKind::Fn(Box::new(ast::Fn {
@@ -351,7 +392,7 @@ fn mk_main(cx: &mut TestCtxt<'_>) -> P<ast::Item> {
     }));
 
     let main = P(ast::Item {
-        attrs: thin_vec![main_attr, coverage_attr, doc_hidden_attr],
+        attrs,
         id: ast::DUMMY_NODE_ID,
         kind: main,
         vis: ast::Visibility { span: sp, kind: ast::VisibilityKind::Public, tokens: None },
