@@ -521,11 +521,12 @@ impl<'ll, 'tcx> IntrinsicCallBuilderMethods<'tcx> for Builder<'_, 'll, 'tcx> {
                 // For zero-sized types, the location pointed to by the result may be
                 // uninitialized. Do not "use" the result in this case; instead just clobber
                 // the memory.
-                let (constraint, inputs): (&str, &[_]) = if result.layout.is_zst() {
-                    ("~{memory}", &[])
-                } else {
-                    ("r,~{memory}", &result_val_span)
-                };
+                let (constraint, inputs): (&str, &[_]) =
+                    if result.layout.is_zst() || self.target_spec().is_like_cheri {
+                        ("~{memory}", &[])
+                    } else {
+                        ("r,~{memory}", &result_val_span)
+                    };
                 crate::asm::inline_asm_call(
                     self,
                     "",
@@ -545,6 +546,131 @@ impl<'ll, 'tcx> IntrinsicCallBuilderMethods<'tcx> for Builder<'_, 'll, 'tcx> {
 
                 // We have copied the value to `result` already.
                 return Ok(());
+            }
+            sym::cheri_address_get => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.address.get.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_address_set => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.address.set.i{width}"),
+                    &[args[0].immediate(), args[1].immediate()],
+                )
+            }
+            sym::cheri_offset_increment => {
+                unimplemented!()
+            }
+            sym::cheri_base_get => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.base.get.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_length_get => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.length.get.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_top_get => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.top.get.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_tag_get => {
+                self.call_intrinsic("llvm.cheri.cap.tag.get", &[args[0].immediate()])
+            }
+            sym::cheri_tag_clear => {
+                self.call_intrinsic("llvm.cheri.cap.tag.clear", &[args[0].immediate()])
+            }
+
+            sym::cheri_is_equal_exact => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.equal.exact.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_permissions_get => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.perms.get.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_permissions_and => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.perms.and.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_type_get => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.type.get.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_seal => self
+                .call_intrinsic("llvm.cheri.cap.seal", &[args[0].immediate(), args[1].immediate()]),
+
+            sym::cheri_unseal => self.call_intrinsic(
+                "llvm.cheri.cap.unseal",
+                &[args[0].immediate(), args[1].immediate()],
+            ),
+
+            sym::cheri_bounds_set => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.bounds.set.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_bounds_set_exact => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.cap.bounds.set.exact.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_subset_test => {
+                self.call_intrinsic("llvm.cheri.cap.subset.test", &[args[0].immediate()])
+            }
+            sym::cheri_representable_alignment_mask => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.representable.alignment.mask.i{width}"),
+                    &[args[0].immediate()],
+                )
+            }
+            sym::cheri_round_representable_length => {
+                let (size, _) = tcx.types.usize.int_size_and_signed(self.tcx);
+                let width = size.bits();
+                self.call_intrinsic(
+                    &format!("llvm.cheri.round.representable.length.i{width}"),
+                    &[args[0].immediate()],
+                )
             }
 
             _ if name.as_str().starts_with("simd_") => {

@@ -33,7 +33,7 @@ pub(crate) fn target() -> Target {
             emit_debug_gdb_scripts: false,
             eh_frame_header: false,
             is_like_cheri: true,
-            families: cvs!["cheri"],
+            families: cvs!["cheri", "cheriot"],
             os: "cheriotrtos".into(),
             executables: false,
             ..Default::default()

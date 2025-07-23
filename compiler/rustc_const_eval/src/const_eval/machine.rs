@@ -462,7 +462,7 @@ impl<'tcx> interpret::Machine<'tcx> for CompileTimeMachine<'tcx> {
             // (We know the value here in the machine of course, but this is the runtime of that code,
             // not the optimization stage.)
             sym::is_val_statically_known => ecx.write_scalar(Scalar::from_bool(false), dest)?,
-            sym::null_mut => ecx.write_pointer(Pointer::null(), dest)?,
+            sym::cheri_null_mut => ecx.write_pointer(Pointer::null(), dest)?,
             _ => {
                 // We haven't handled the intrinsic, let's see if we can use a fallback body.
                 if ecx.tcx.intrinsic(instance.def_id()).unwrap().must_be_overridden {

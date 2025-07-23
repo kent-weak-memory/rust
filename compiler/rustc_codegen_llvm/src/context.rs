@@ -1225,6 +1225,54 @@ impl<'ll> CodegenCx<'ll, '_> {
 
         ifn!("llvm.ptrmask", fn(ptr, t_isize) -> ptr);
 
+        /* CHERI */
+        ifn!("llvm.cheri.cap.address.get.i32", fn(ptr) -> t_i32);
+        ifn!("llvm.cheri.cap.address.get.i64", fn(ptr) -> t_i64);
+
+        ifn!("llvm.cheri.cap.address.set.i32", fn(ptr, t_i32) -> ptr);
+        ifn!("llvm.cheri.cap.address.set.i64", fn(ptr, t_i64) -> ptr);
+
+
+        ifn!("llvm.cheri.cap.base.get.i32", fn(ptr) -> t_i32);
+        ifn!("llvm.cheri.cap.base.get.i64", fn(ptr) -> t_i64);
+
+        ifn!("llvm.cheri.cap.length.get.i32", fn(ptr) -> t_i32);
+        ifn!("llvm.cheri.cap.length.get.i64", fn(ptr) -> t_i64);
+
+        ifn!("llvm.cheri.cap.top.get.i32", fn(ptr) -> t_i32);
+        ifn!("llvm.cheri.cap.top.get.i64", fn(ptr) -> t_i64);
+
+        ifn!("llvm.cheri.cap.tag.get", fn(ptr) -> i1);
+        ifn!("llvm.cheri.cap.tag.clear", fn(ptr) -> void);
+
+        ifn!("llvm.cheri.cap.equal.exact", fn(ptr, ptr) -> i1);
+        ifn!("llvm.cheri.cap.equal.exact", fn(ptr, ptr) -> i1);
+
+        ifn!("llvm.cheri.cap.perms.get.i32", fn(ptr) -> t_i32);
+        ifn!("llvm.cheri.cap.perms.get.i64", fn(ptr) -> t_i64);
+
+        ifn!("llvm.cheri.cap.perms.and.i32", fn(ptr, t_i32) -> ptr);
+        ifn!("llvm.cheri.cap.perms.and.i64", fn(ptr, t_i64) -> ptr);
+
+        ifn!("llvm.cheri.cap.type.get.i32", fn(ptr) -> t_i32);
+        ifn!("llvm.cheri.cap.type.get.i64", fn(ptr) -> t_i64);
+
+        ifn!("llvm.cheri.cap.seal", fn(ptr, ptr) -> ptr);
+        ifn!("llvm.cheri.cap.unseal", fn(ptr, ptr) -> ptr);
+
+        ifn!("llvm.cheri.cap.bounds.set.i32", fn(ptr, t_i32) -> ptr);
+        ifn!("llvm.cheri.cap.bounds.set.i64", fn(ptr, t_i64) -> ptr);
+
+        ifn!("llvm.cheri.cap.bounds.set.exact.i32", fn(ptr, t_i32) -> ptr);
+        ifn!("llvm.cheri.cap.bounds.set.exact.i64", fn(ptr, t_i64) -> ptr);
+
+        ifn!("llvm.cheri.cap.subset.test", fn(ptr, ptr) -> i1);
+        ifn!("llvm.cheri.representable.alignment.mask.32", fn(ptr, t_i32) -> t_i32);
+        ifn!("llvm.cheri.representable.alignment.mask.64", fn(ptr, t_i64) -> t_i64);
+
+        ifn!("llvm.cheri.round.representable.length.32", fn(ptr, t_i32) -> t_i32);
+        ifn!("llvm.cheri.round.representable.length.64", fn(ptr, t_i64) -> t_i64);
+
         None
     }
 

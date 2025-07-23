@@ -420,3 +420,12 @@ pub mod simd {
 }
 
 include!("primitive_docs.rs");
+
+#[cfg(not(bootstrap))]
+#[cfg(target_family = "cheri")]
+#[unstable(
+    feature = "cheri",
+    issue = "none",
+    reason = "support for CHERI has open design concerns"
+)]
+pub mod cheri;

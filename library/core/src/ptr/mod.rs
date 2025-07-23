@@ -561,7 +561,7 @@ pub const fn null<T: ?Sized + Thin>() -> *const T {
     {
         #[cfg(target_family = "cheri")]
         {
-            crate::intrinsics::null_mut()
+            crate::intrinsics::cheri::cheri_null_mut()
         }
         #[cfg(not(target_family = "cheri"))]
         {
@@ -601,7 +601,7 @@ pub const fn null_mut<T: ?Sized + Thin>() -> *mut T {
     {
         #[cfg(target_family = "cheri")]
         {
-            crate::intrinsics::null_mut()
+            crate::intrinsics::cheri::cheri_null_mut()
         }
         #[cfg(not(target_family = "cheri"))]
         {

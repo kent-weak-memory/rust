@@ -107,7 +107,6 @@ fn intrinsic_operation_unsafety(tcx: TyCtxt<'_>, intrinsic_id: LocalDefId) -> hi
         | sym::maxnumf32
         | sym::maxnumf64
         | sym::maxnumf128
-        | sym::null_mut
         | sym::rustc_peek
         | sym::type_name
         | sym::forget
@@ -130,7 +129,21 @@ fn intrinsic_operation_unsafety(tcx: TyCtxt<'_>, intrinsic_id: LocalDefId) -> hi
         | sym::round_ties_even_f32
         | sym::round_ties_even_f64
         | sym::round_ties_even_f128
-        | sym::const_eval_select => hir::Safety::Safe,
+        | sym::const_eval_select
+
+        /* CHERI intrinsics */
+        | sym::cheri_null_mut
+        | sym::cheri_address_get
+        | sym::cheri_base_get
+        | sym::cheri_length_get
+        | sym::cheri_top_get
+        | sym::cheri_tag_get
+        | sym::cheri_is_equal_exact
+        | sym::cheri_permissions_get
+        | sym::cheri_type_get
+        | sym::cheri_subset_test
+        | sym::cheri_representable_alignment_mask
+        | sym::cheri_round_representable_length => hir::Safety::Safe,
         _ => hir::Safety::Unsafe,
     };
 
@@ -162,7 +175,7 @@ pub(crate) fn check_intrinsic_type(
         {
             Ty::new_param(tcx, n, name)
         } else {
-            Ty::new_error_with_message(tcx, span, "expected param")
+            Ty::new_error_with_message(tcx, span, format!("expected param at {n} of {generics:?}"))
         }
     };
     let name_str = intrinsic_name.as_str();
@@ -247,7 +260,6 @@ pub(crate) fn check_intrinsic_type(
                 (1, 0, vec![Ty::new_imm_ptr(tcx, param(0)), tcx.types.i32], tcx.types.unit)
             }
             sym::needs_drop => (1, 0, vec![], tcx.types.bool),
-            sym::null_mut => (1, 0, vec![], Ty::new_mut_ptr(tcx, param(0))),
             sym::type_name => (1, 0, vec![], Ty::new_static_str(tcx)),
             sym::type_id => (1, 0, vec![], tcx.types.u128),
             sym::offset => (2, 0, vec![param(0), param(1)], param(0)),
@@ -676,6 +688,45 @@ pub(crate) fn check_intrinsic_type(
             | sym::simd_reduce_max => (2, 0, vec![param(0)], param(1)),
             sym::simd_shuffle => (3, 0, vec![param(0), param(0), param(1)], param(2)),
             sym::simd_shuffle_const_generic => (2, 1, vec![param(0), param(0)], param(1)),
+
+            /* CHERI intrinsics */
+            sym::cheri_null_mut => (1, 0, vec![], Ty::new_mut_ptr(tcx, param(0))),
+            sym::cheri_address_get => (1, 0, vec![param(0)], tcx.types.usize),
+            sym::cheri_address_set => (1, 0, vec![param(0), tcx.types.usize], param(0)),
+            sym::cheri_offset_increment => (1, 0, vec![param(0), tcx.types.usize], param(0)),
+            sym::cheri_base_get => (1, 0, vec![param(0)], tcx.types.usize),
+            sym::cheri_length_get => (1, 0, vec![param(0)], tcx.types.usize),
+            sym::cheri_top_get => (1, 0, vec![param(0)], tcx.types.usize),
+            sym::cheri_tag_clear => (1, 0, vec![param(0)], tcx.types.unit),
+            sym::cheri_tag_get => (1, 0, vec![param(0)], tcx.types.bool),
+            sym::cheri_is_equal_exact => (1, 0, vec![param(0), param(0)], tcx.types.bool),
+            sym::cheri_permissions_get => (1, 0, vec![param(0)], tcx.types.usize),
+            sym::cheri_permissions_and => (1, 0, vec![param(0), tcx.types.usize], param(0)),
+            sym::cheri_type_get => (1, 0, vec![param(0)], tcx.types.u32),
+            // from here
+            sym::cheri_seal => {
+                let did = tcx.require_lang_item(LangItem::SealedCapability, Some(span));
+                let sealed_cap_type = tcx
+                    .type_of(did)
+                    .instantiate(tcx, &[rustc_middle::ty::GenericArg::from(param(0))]);
+
+                (2, 0, vec![param(0), param(1)], sealed_cap_type)
+            }
+            sym::cheri_unseal => {
+                let did = tcx.require_lang_item(LangItem::SealedCapability, Some(span));
+                let sealed_cap_type = tcx
+                    .type_of(did)
+                    .instantiate(tcx, &[rustc_middle::ty::GenericArg::from(param(0))]);
+
+                (2, 0, vec![sealed_cap_type, param(1)], param(0))
+            }
+            sym::cheri_bounds_set => (1, 0, vec![param(0), tcx.types.usize], param(0)),
+            sym::cheri_bounds_set_exact => (1, 0, vec![param(0), tcx.types.usize], param(0)),
+            sym::cheri_subset_test => (1, 0, vec![param(0), param(0)], tcx.types.bool),
+            sym::cheri_representable_alignment_mask => {
+                (0, 0, vec![tcx.types.usize], tcx.types.usize)
+            }
+            sym::cheri_round_representable_length => (0, 0, vec![tcx.types.usize], tcx.types.usize),
 
             other => {
                 tcx.dcx().emit_err(UnrecognizedIntrinsicFunction { span, name: other });

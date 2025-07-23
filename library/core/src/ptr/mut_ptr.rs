@@ -154,7 +154,7 @@ impl<T: ?Sized> *mut T {
         {
             #[cfg(target_family = "cheri")]
             {
-                self as *mut () as usize
+                crate::cheri::Capability::addr(&(self as *const ()))
             }
 
             #[cfg(not(target_family = "cheri"))]

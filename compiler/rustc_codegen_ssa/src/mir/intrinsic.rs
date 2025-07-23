@@ -304,7 +304,6 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 }
             },
 
-            sym::null_mut => bx.inttoptr(bx.const_usize(0), llret_ty),
             sym::float_to_int_unchecked => {
                 if float_type_width(arg_tys[0]).is_none() {
                     bx.tcx().dcx().emit_err(InvalidMonomorphization::FloatToIntUnchecked {
@@ -527,7 +526,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 // This is a no-op. The intrinsic is just a hint to the optimizer.
                 return Ok(());
             }
-
+            sym::cheri_null_mut => bx.inttoptr(bx.const_usize(0), llret_ty),
             _ => {
                 // Need to use backend-specific things in the implementation.
                 return bx.codegen_intrinsic_call(instance, fn_abi, args, llresult, span);

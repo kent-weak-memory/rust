@@ -167,7 +167,7 @@ impl<T: ?Sized> *const T {
         {
             #[cfg(target_family = "cheri")]
             {
-                self as *const () as usize
+                crate::cheri::Capability::addr(&(self as *const ()))
             }
 
             #[cfg(not(target_family = "cheri"))]

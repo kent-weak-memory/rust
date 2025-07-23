@@ -71,11 +71,7 @@ pub mod simd;
 
 #[cfg(not(bootstrap))]
 #[cfg(target_family = "cheri")]
-/// Create a new *mut <T> pointer for any <T>.
-#[rustc_intrinsic]
-#[rustc_nounwind]
-#[rustc_allow_const_fn_unstable(core_intrinsics)]
-pub const fn null_mut<T: ?Sized + crate::ptr::Thin>() -> *mut T;
+pub mod cheri;
 
 // These imports are used for simplifying intra-doc links
 #[allow(unused_imports)]

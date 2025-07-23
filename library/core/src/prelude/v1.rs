@@ -119,3 +119,12 @@ pub use crate::macros::builtin::deref;
     reason = "`type_alias_impl_trait` has open design concerns"
 )]
 pub use crate::macros::builtin::define_opaque;
+
+#[cfg(not(bootstrap))]
+#[cfg(target_family = "cheri")]
+#[unstable(
+    feature = "cheri",
+    issue = "none",
+    reason = "support for CHERI has open design concerns"
+)]
+pub use crate::cheri::Capability;

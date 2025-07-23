@@ -436,6 +436,7 @@ language_item_table! {
     DefaultTrait1,           sym::default_trait1,      default_trait1_trait,       Target::Trait,          GenericRequirement::None;
 
     ContractCheckEnsures,     sym::contract_check_ensures,      contract_check_ensures_fn,      Target::Fn, GenericRequirement::None;
+    SealedCapability,          sym::cheri_sealed_capability,    cheri_sealed_capability, Target::Struct, GenericRequirement::Exact(1);
 }
 
 /// The requirement imposed on the generics of a lang item
