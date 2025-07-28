@@ -2535,10 +2535,12 @@ take_tests! {
 }
 
 #[cfg(not(miri))] // unused in Miri
+#[cfg(not(all(target_arch = "aarch64", target_abi = "purecap")))] // not used on Morello
 const EMPTY_MAX: &'static [()] = &[(); usize::MAX];
 
 // can't be a constant due to const mutability rules
 #[cfg(not(miri))] // unused in Miri
+#[cfg(not(all(target_arch = "aarch64", target_abi = "purecap")))] // not used on Morello
 macro_rules! empty_max_mut {
     () => {
         &mut [(); usize::MAX] as _
@@ -2546,6 +2548,8 @@ macro_rules! empty_max_mut {
 }
 
 #[cfg(not(miri))] // Comparing usize::MAX many elements takes forever in Miri (and in rustc without optimizations)
+// TODO(seharris): reenable if we fix relevant optimisation
+#[cfg(not(all(target_arch = "aarch64", target_abi = "purecap")))] // Disabled optimisations on Morello mean this takes forever
 take_tests! {
     slice: &[(); usize::MAX], method: take,
     (take_in_bounds_max_range_to, (..usize::MAX), Some(EMPTY_MAX), &[(); 0]),
@@ -2554,6 +2558,8 @@ take_tests! {
 }
 
 #[cfg(not(miri))] // Comparing usize::MAX many elements takes forever in Miri (and in rustc without optimizations)
+// TODO(seharris): reenable if we fix relevant optimisation
+#[cfg(not(all(target_arch = "aarch64", target_abi = "purecap")))] // Disabled optimisations on Morello mean this takes forever
 take_tests! {
     slice: &mut [(); usize::MAX], method: take_mut,
     (take_mut_in_bounds_max_range_to, (..usize::MAX), Some(empty_max_mut!()), &mut [(); 0]),
