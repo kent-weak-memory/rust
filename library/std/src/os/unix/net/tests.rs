@@ -646,8 +646,7 @@ fn test_send_vectored_fds_unix_stream() {
     }
 }
 
-// TODO(seharris): this is broken on CHERI BSD.
-#[cfg(any(target_os = "android", target_os = "linux", target_os = "freebsd"))]
+#[cfg(any(target_os = "android", target_os = "linux"))]
 #[test]
 fn test_send_vectored_with_ancillary_to_unix_datagram() {
     use crate::os::unix::net::{SocketCred, SocketAncillary};
