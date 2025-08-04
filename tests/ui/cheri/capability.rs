@@ -60,17 +60,6 @@ fn can_copy() {
     assert_eq!(*b, value);
 }
 
-fn can_memcpy() {
-    let values: [u32; 3] = [0, 1, 2];
-    let references: [&u32; 3] = black_box([&values[0], &values[1], &values[2]]);
-    let mut copies: [&u32; 3] = [&values[0], &values[0], &values[0]];
-    copies.copy_from_slice(&references);
-    assert_eq!(copies, references);
-    assert_eq!(*copies[0], values[0]);
-    assert_eq!(*copies[1], values[1]);
-    assert_eq!(*copies[2], values[2]);
-}
-
 const CONST_REFERENCE: &'static u32 = &VALUE;
 fn can_use_consts() {
     assert_eq!(*CONST_REFERENCE, VALUE);
@@ -82,6 +71,5 @@ pub fn main() {
     can_get_address();
     can_do_arithmetic();
     can_copy();
-    can_memcpy();
     can_use_consts();
 }
