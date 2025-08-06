@@ -1900,6 +1900,13 @@ unsafe extern "C" {
         AttrsLen: size_t,
     );
 
+    pub(crate) fn LLVMRustAddGlobalVariableAttributes<'a>(
+        vv: &'a Value,
+        index: c_uint,
+        Attrs: *const &'a Attribute,
+        AttrsLen: size_t,
+    );
+
     // Operations on call sites
     pub(crate) fn LLVMRustAddCallSiteAttributes<'a>(
         Instr: &'a Value,

@@ -37,7 +37,44 @@ pub(crate) struct AutoDiffAttr {
 pub(crate) struct CHERIoTCompartmentAttr {
     #[primary_span]
     #[label]
-    pub attr_span: Span,
+    pub span: Span,
+}
+
+#[derive(Diagnostic)]
+#[diag(passes_cheriot_mmio_attr)]
+pub(crate) struct CHERIoTMMIOAttr {
+    #[primary_span]
+    #[label]
+    pub span: Span,
+}
+
+#[derive(Diagnostic)]
+#[diag(passes_cheriot_mmio_attr)]
+pub(crate) struct CHERIoTSharedObjectAttr {
+    #[primary_span]
+    #[label]
+    pub span: Span,
+}
+
+#[derive(Diagnostic)]
+#[diag(passes_cheriot_cap_import_permissions_coherence)]
+pub(crate) struct CHERIoTCapImportPermissionsCoherence<'a> {
+    #[primary_span]
+    #[label]
+    pub span: Span,
+    pub suggestion: &'a str,
+    pub permissions: &'a str,
+    pub reason: &'a str,
+}
+
+#[derive(Diagnostic)]
+#[diag(passes_cheriot_cap_import_permissions_duplicate_symbol)]
+pub(crate) struct CHERIoTCapImportPermissionsDuplicateSymbol<'a> {
+    #[primary_span]
+    #[label]
+    pub span: Span,
+    pub duplicate_symbol: char,
+    pub permissions: &'a str,
 }
 
 #[derive(LintDiagnostic)]

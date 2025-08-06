@@ -351,7 +351,55 @@ impl<'ll> CodegenCx<'ll, '_> {
 
             g
         } else {
-            check_and_apply_linkage(self, fn_attrs, llty, sym, def_id)
+            let g = check_and_apply_linkage(self, fn_attrs, llty, sym, def_id);
+
+            let make_cap_import_attr = |domain: &str, ty: &str, perms: &str| {
+                let read = if perms.contains("R") { "R" } else { "-" };
+                let write = if perms.contains("W") { "W" } else { "-" };
+                let cap = if perms.contains("c") { "c" } else { "-" };
+                let muta = if perms.contains("m") { "m" } else { "-" };
+                format!("{domain},{ty},{read}{write}{cap}{muta}")
+            };
+
+            if self.tcx.has_attr(def_id, rustc_span::sym::cheriot_mmio) {
+                let Some(mmio) = self.tcx.get_attr(def_id, rustc_span::sym::cheriot_mmio) else {
+                    unreachable!()
+                };
+                let Some(attrs) = mmio.meta_item_list() else { unreachable!() };
+
+                let ty = attrs.get(0).unwrap().lit().unwrap().value_str().unwrap();
+                let perms = match attrs.get(1) {
+                    Some(c) => c.lit().unwrap().value_str().unwrap().to_string(),
+                    None => String::from("RWcm"),
+                };
+
+                let llattr = llvm::CreateAttrStringValue(
+                    &self.llcx,
+                    "cheriot_global_cap_import",
+                    &make_cap_import_attr("mem", ty.as_str(), perms.as_str()),
+                );
+                llvm::AddGlobalVariableAttributes(g, &[llattr]);
+            } else if self.tcx.has_attr(def_id, rustc_span::sym::cheriot_shared_object) {
+                let Some(mmio) = self.tcx.get_attr(def_id, rustc_span::sym::cheriot_shared_object)
+                else {
+                    unreachable!()
+                };
+                let Some(attrs) = mmio.meta_item_list() else { unreachable!() };
+
+                let ty = attrs.get(0).unwrap().lit().unwrap().value_str().unwrap();
+                let perms = match attrs.get(1) {
+                    Some(c) => c.lit().unwrap().value_str().unwrap().to_string(),
+                    None => String::from("RWcm"),
+                };
+
+                let llattr = llvm::CreateAttrStringValue(
+                    &self.llcx,
+                    "cheriot_global_cap_import",
+                    &make_cap_import_attr("cheriot_shared_object", ty.as_str(), perms.as_str()),
+                );
+                llvm::AddGlobalVariableAttributes(g, &[llattr]);
+            }
+            g
         };
 
         // Thread-local statics in some other crate need to *always* be linked

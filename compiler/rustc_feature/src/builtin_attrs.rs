@@ -625,6 +625,16 @@ pub static BUILTIN_ATTRIBUTES: &[BuiltinAttribute] = &[
         EncodeCrossCrate::No, experimental!(cheriot_compartment)
     ),
 
+    gated!(
+        cheriot_mmio, Normal, template!(List: "device_name = d, permissions = p"), ErrorFollowing,
+        EncodeCrossCrate::No, experimental!(cheriot_mmio)
+    ),
+
+    gated!(
+        cheriot_shared_object, Normal, template!(List: "object_name = d, permissions = p"), ErrorFollowing,
+        EncodeCrossCrate::No, experimental!(cheriot_shared_object)
+    ),
+
     // ==========================================================================
     // Internal attributes: Stability, deprecation, and unsafe:
     // ==========================================================================

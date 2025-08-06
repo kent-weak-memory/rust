@@ -41,6 +41,12 @@ pub(crate) fn AddFunctionAttributes<'ll>(
     }
 }
 
+pub(crate) fn AddGlobalVariableAttributes<'ll>(llglobal: &'ll Value, attrs: &[&'ll Attribute]) {
+    unsafe {
+        LLVMRustAddGlobalVariableAttributes(llglobal, 0, attrs.as_ptr(), attrs.len());
+    }
+}
+
 pub(crate) fn HasAttributeAtIndex<'ll>(
     llfn: &'ll Value,
     idx: AttributePlace,

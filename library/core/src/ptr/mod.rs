@@ -563,6 +563,7 @@ pub const fn null<T: ?Sized + Thin>() -> *const T {
         {
             crate::intrinsics::cheri::cheri_null_mut()
         }
+
         #[cfg(not(target_family = "cheri"))]
         {
             from_raw_parts(without_provenance::<()>(0), ())

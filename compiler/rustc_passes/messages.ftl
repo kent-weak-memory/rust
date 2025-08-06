@@ -91,6 +91,22 @@ passes_cheriot_compartment_attr =
     `#[cheriot_compartment = "..."]` can be used as a crate-level attribute or can be applied to foreign functions with the "C" ABI.
     .label = not a foreign function nor a crate-level attribute
 
+passes_cheriot_mmio_attr =
+    `#[cheriot_mmio(...)]` can be applied to foreign static values with the "'static" lifetime only.
+    .label = not a foreign static value with the "'static" lifetime
+
+passes_cheriot_shared_object_attr =
+    `#[cheriot_shared_object(...)]` can be applied to foreign static values with the "'static" lifetime only.
+    .label = not a foreign static value with the "'static" lifetime
+
+passes_cheriot_cap_import_permissions_coherence =
+    permissions `{$permissions}` are invalid {$reason}.
+    .label = {$suggestion}
+
+passes_cheriot_cap_import_permissions_duplicate_symbol =
+    duplicate symbol `{$duplicate_symbol}` in `{$permissions}`.
+    .label = remove `{$duplicate_symbol}`
+
 passes_cold =
     {passes_should_be_applied_to_fn}
     .warn = {-passes_previously_accepted}

@@ -463,6 +463,10 @@ declare_features! (
     (unstable, cheri, "1.88.0", Some(111889)),
     /// Allows CHERIoT compartment annotations.
     (unstable, cheriot_compartment, "1.88.0", Some(111889)),
+    /// Allows CHERIoT MMIO annotations.
+    (unstable, cheriot_mmio, "1.88.0", Some(111889)),
+    /// Allows CHERIoT shared object annotations.
+    (unstable, cheriot_shared_object, "1.88.0", Some(111889)),
     /// Allows declarative macros 2.0 (`macro`).
     (unstable, decl_macro, "1.17.0", Some(39412)),
     /// Allows the use of default values on struct definitions and the construction of struct

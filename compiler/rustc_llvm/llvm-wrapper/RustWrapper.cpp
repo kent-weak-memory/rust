@@ -376,11 +376,26 @@ static Attribute::AttrKind fromRust(LLVMRustAttributeKind Kind) {
 template <typename T>
 static inline void AddAttributes(T *t, unsigned Index, LLVMAttributeRef *Attrs,
                                  size_t AttrsLen) {
-  AttributeList PAL = t->getAttributes();
+  auto PAL = t->getAttributes();
   auto B = AttrBuilder(t->getContext());
   for (LLVMAttributeRef Attr : ArrayRef<LLVMAttributeRef>(Attrs, AttrsLen))
     B.addAttribute(unwrap(Attr));
-  AttributeList PALNew = PAL.addAttributesAtIndex(t->getContext(), Index, B);
+  auto PALNew = PAL.addAttributesAtIndex(t->getContext(), Index, B);
+  t->setAttributes(PALNew);
+}
+
+extern "C" void LLVMRustAddGlobalVariableAttributes(LLVMValueRef Gv,
+                                                    unsigned Index,
+                                                    LLVMAttributeRef *Attrs,
+                                                    size_t AttrsLen) {
+  GlobalVariable *t = unwrap<GlobalVariable>(Gv);
+
+  auto PAL = t->getAttributes();
+  auto B = AttrBuilder(t->getContext());
+  for (LLVMAttributeRef Attr : ArrayRef<LLVMAttributeRef>(Attrs, AttrsLen))
+    B.addAttribute(unwrap(Attr));
+  auto PALNew =
+      PAL.addAttributes(t->getContext(), AttributeSet::get(t->getContext(), B));
   t->setAttributes(PALNew);
 }
 

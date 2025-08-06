@@ -267,6 +267,8 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
                         [sym::linkage, ..] => self.check_linkage(attr, span, target),
                         [sym::rustc_pub_transparent, ..] => self.check_rustc_pub_transparent(attr.span(), span, attrs),
                         [sym::cheriot_compartment, ..] => self.check_cheriot_compartment(hir_id, attr, span, target),
+                        [sym::cheriot_mmio, ..] => self.check_cheriot_mmio(hir_id, attr, span, target),
+                        [sym::cheriot_shared_object, ..] => self.check_cheriot_shared_object(hir_id, attr, span, target),
                         [
                             // ok
                             sym::allow
@@ -2677,6 +2679,7 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
         span: Span,
         target: Target,
     ) {
+        let mut emit_error = false;
         match target {
             Target::Mod if hir_id == rustc_hir::CRATE_HIR_ID => {}
             Target::ForeignFn => {
@@ -2687,14 +2690,191 @@ impl<'tcx> CheckAttrVisitor<'tcx> {
                 };
 
                 if !matches!(sig.header.abi, ExternAbi::C { .. } | ExternAbi::Rust) {
-                    self.dcx().emit_err(errors::CHERIoTCompartmentAttr { attr_span: span });
+                    emit_error = true;
                 }
             }
             _ => {
-                self.dcx().emit_err(errors::CHERIoTCompartmentAttr { attr_span: span });
-                self.abort.set(true);
+                emit_error = true;
             }
         }
+
+        if emit_error {
+            self.dcx().emit_err(errors::CHERIoTCompartmentAttr { span });
+            self.abort.set(true);
+        }
+    }
+
+    fn check_cheriot_mmio(&self, hir_id: HirId, attr: &Attribute, span: Span, target: Target) {
+        let mut emit_error = false;
+        match target {
+            Target::ForeignStatic => {
+                let foreign_item = self.tcx.hir_node(hir_id).expect_foreign_item();
+
+                let rustc_hir::ForeignItemKind::Static(ty, _, _) = foreign_item.kind else {
+                    unreachable!()
+                };
+
+                if let rustc_hir::TyKind::Ref(lifetime, _) = ty.kind {
+                    if !matches!(lifetime.kind, rustc_hir::LifetimeKind::Static) {
+                        emit_error = true;
+                    }
+                } else {
+                    emit_error = true;
+                }
+            }
+            _ => {
+                emit_error = true;
+            }
+        }
+
+        if emit_error {
+            self.dcx().emit_err(errors::CHERIoTMMIOAttr { span });
+            self.abort.set(true);
+            return;
+        }
+
+        if let Some(x) = attr.meta_item_list() {
+            if let Some(x) = x.iter().nth(1) {
+                let x = x.lit().unwrap().value_str().unwrap();
+                return self.check_cheriot_cap_import_permission_coherence(attr.span(), x.as_str());
+            }
+        }
+    }
+
+    fn check_cheriot_shared_object(
+        &self,
+        hir_id: HirId,
+        attr: &Attribute,
+        span: Span,
+        target: Target,
+    ) {
+        let mut emit_error = false;
+        match target {
+            Target::ForeignStatic => {
+                let foreign_item = self.tcx.hir_node(hir_id).expect_foreign_item();
+
+                let rustc_hir::ForeignItemKind::Static(ty, _, _) = foreign_item.kind else {
+                    unreachable!()
+                };
+
+                if let rustc_hir::TyKind::Ref(lifetime, _) = ty.kind {
+                    if !matches!(lifetime.kind, rustc_hir::LifetimeKind::Static) {
+                        emit_error = true;
+                    }
+                } else {
+                    emit_error = true;
+                }
+            }
+            _ => {
+                emit_error = true;
+            }
+        }
+
+        if emit_error {
+            self.dcx().emit_err(errors::CHERIoTSharedObjectAttr { span });
+            self.abort.set(true);
+            return;
+        }
+
+        if let Some(x) = attr.meta_item_list() {
+            if let Some(x) = x.iter().nth(1) {
+                let x = x.lit().unwrap().value_str().unwrap();
+                return self.check_cheriot_cap_import_permission_coherence(attr.span(), x.as_str());
+            }
+        }
+    }
+
+    fn check_cheriot_cap_import_permission_coherence(&self, span: Span, permissions: &str) {
+        // Syntax check.
+        const READ_SYM: char = 'R';
+        const WRITE_SYM: char = 'W';
+        const CAP_SYM: char = 'c';
+        const MUT_SYM: char = 'm';
+        const VALID_SYMBOLS: [char; 4] = [READ_SYM, WRITE_SYM, CAP_SYM, MUT_SYM];
+        let chars = permissions.chars();
+        let mut unknown_symbols = vec![];
+        let mut counter: [usize; 4] = [0; 4];
+
+        for c in chars {
+            let mut duplicate = false;
+            if let Some(pos) = VALID_SYMBOLS.iter().position(|v| v == &c) {
+                counter[pos] += 1;
+                duplicate = counter[pos] > 1;
+            } else {
+                unknown_symbols.push(c);
+            }
+
+            if duplicate {
+                self.dcx().emit_warn(errors::CHERIoTCapImportPermissionsDuplicateSymbol {
+                    span,
+                    duplicate_symbol: c,
+                    permissions,
+                });
+            }
+        }
+
+        if !unknown_symbols.is_empty() {
+            let unknown_symbols =
+                unknown_symbols.iter().map(|v| format!("`{v}`")).collect::<Vec<_>>().join(",");
+            self.dcx().emit_err(errors::CHERIoTCapImportPermissionsCoherence {
+                span,
+                suggestion: &format!("remove {unknown_symbols}"),
+                permissions,
+                reason: &format!("as they contain unknown permissions symbols {unknown_symbols}"),
+            });
+        }
+
+        // Semantics.
+        let mask = [
+            permissions.contains(READ_SYM),
+            permissions.contains(WRITE_SYM),
+            permissions.contains(CAP_SYM),
+            permissions.contains(MUT_SYM),
+        ];
+        let has_read = mask[0];
+        let has_write = mask[1];
+        let has_cap = mask[2];
+        let has_mut = mask[3];
+
+        if !has_read && !has_write {
+            self.dcx().emit_err(errors::CHERIoTCapImportPermissionsCoherence {
+                span,
+                suggestion: &format!("add `{READ_SYM}` or `{WRITE_SYM}`"),
+                permissions,
+                reason: &format!(
+                    "as they don't contain either `{READ_SYM}` (read) or `{WRITE_SYM}` (write)"
+                ),
+            });
+        }
+
+        if has_mut && !has_read {
+            self.dcx().emit_err(errors::CHERIoTCapImportPermissionsCoherence {
+                span,
+                suggestion: &format!("add `{READ_SYM}`"),
+                permissions,
+                reason: &format!(
+                    "as they contain mut (`{MUT_SYM}`) but don't contain both read (`{READ_SYM}`) and cap (`{CAP_SYM}`)"
+                ),
+            });
+        }
+
+        if has_mut && !has_cap {
+            self.dcx().emit_err(errors::CHERIoTCapImportPermissionsCoherence {
+                span,
+                suggestion: &format!("add `{CAP_SYM}`"),
+                permissions,
+                reason: &format!(
+                    "as they contain mut (`{MUT_SYM}`) but don't contain both read (`{READ_SYM}`) and cap (`{CAP_SYM}`)"
+                ),
+            });
+        }
+
+        //VALID_SYMBOLS
+        //    .iter()
+        //    .enumerate()
+        //    .map(|(i, sym)| if mask[i] { sym.to_string() } else { String::from("-") })
+        //    .collect::<Vec<_>>()
+        //    .join("")
     }
 }
 
