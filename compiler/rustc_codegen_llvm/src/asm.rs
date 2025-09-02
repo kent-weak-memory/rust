@@ -573,7 +573,7 @@ fn a64_vreg_index(reg: InlineAsmReg) -> Option<u32> {
     }
 }
 
-/// If the register is an Morello integer register then return its index.
+/// If the register is a Morello integer register then return its index.
 fn morello_reg_index(reg: InlineAsmReg) -> Option<u32> {
     match reg {
         InlineAsmReg::Morello(MorelloInlineAsmReg::c0) => Some(0),
@@ -611,7 +611,7 @@ fn morello_reg_index(reg: InlineAsmReg) -> Option<u32> {
     }
 }
 
-/// If the register is an Morello vector register then return its index.
+/// If the register is a Morello vector register then return its index.
 fn morello_vreg_index(reg: InlineAsmReg) -> Option<u32> {
     match reg {
         InlineAsmReg::Morello(reg)
@@ -644,10 +644,6 @@ fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) ->
             } else if let Some(idx) = a64_reg_index(reg) {
                 let class = if let Some(layout) = layout {
                     match layout.memory_size.bytes() {
-                        // TODO(seharris): Review; I'm not at all sure this is right.
-                        //                 If nothing else, this probably causes capability registers to be accepted on AArch64 (without Morello) which is silly.
-                        //                 I'm also not clear whether this code is talking about template modifiers or names of registers.
-                        16 => 'c', // CHERI Morello only.
                         8 => 'x',
                         _ => 'w',
                     }
@@ -679,9 +675,7 @@ fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) ->
             } else if let Some(idx) = morello_reg_index(reg) {
                 let class = if let Some(layout) = layout {
                     match layout.memory_size.bytes() {
-                        // TODO(seharris): Review.
-                        //                 I'm not clear whether this code is talking about template modifiers or names of registers.
-                        16 => 'c',
+                        16 => 'C',
                         8 => 'x',
                         _ => 'w',
                     }
@@ -689,7 +683,7 @@ fn reg_to_llvm(reg: InlineAsmRegOrRegClass, layout: Option<&TyAndLayout<'_>>) ->
                     // We use i32 as the type for discarded outputs
                     'w'
                 };
-                if class == 'c' && reg == InlineAsmReg::Morello(MorelloInlineAsmReg::c30) {
+                if class == 'C' && reg == InlineAsmReg::Morello(MorelloInlineAsmReg::c30) {
                     // TODO(seharris): based on the comment in the next branch of this `if`, I'm guessing Morello LLVM also won't recognise c30, perhaps check whether it really doesn't.
                     "{clr}".to_string()
                 } else if class == 'x' && reg == InlineAsmReg::AArch64(AArch64InlineAsmReg::x30) {

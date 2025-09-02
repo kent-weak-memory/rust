@@ -1,6 +1,8 @@
 // only-aarch64-unknown-freebsd-purecap
 // compile-flags: -C target-feature=+neon
 
+// Check register notation on Morello (AArch64 CHERI).
+
 #![feature(asm_const)]
 
 use std::arch::asm;
@@ -8,7 +10,14 @@ use std::arch::asm;
 fn main() {
     let mut foo = 0;
     let mut bar = 0;
+    let pointer = std::ptr::null::<u32>();
     unsafe {
+        // Valid registers.
+
+        asm!("{:w}", in(reg) foo);
+        asm!("{:x}", in(reg) foo);
+        // asm!("{:C}", in(reg) foo); TODO(seharris): re-enable when LLVM supports `{:C}`.
+
         // Bad register/register class
 
         asm!("{}", in(foo) foo);
@@ -44,6 +53,15 @@ fn main() {
         asm!("{}", out(preg) _);
         //~^ ERROR register class `preg` can only be used as a clobber, not as an input or output
 
+        asm!("", in("c29") foo);
+        //~^ ERROR invalid register `c29`: the frame pointer cannot be used as an operand
+        asm!("", in("csp") foo);
+        //~^ ERROR invalid register `csp`: the stack pointer cannot be used as an operand
+        asm!("", in("czr") foo);
+        //~^ ERROR invalid register `czr`: the zero register cannot be used as an operand
+        asm!("", in("c19") foo);
+        //~^ ERROR invalid register `c19`: c19 is used internally by LLVM and cannot be used as an operand for inline asm
+
         // Explicit register conflicts
         // (except in/lateout which don't conflict)
 
@@ -57,5 +75,13 @@ fn main() {
         asm!("", in("v0") foo, out("q0") bar);
         //~^ ERROR register `v0` conflicts with register `v0`
         asm!("", in("v0") foo, lateout("q0") bar);
+
+        asm!("", in("c0") foo, in("w0") bar);
+        //~^ ERROR register `c0` conflicts with register `c0`
+        asm!("", in("c0") foo, in("x0") bar);
+        //~^ ERROR register `c0` conflicts with register `c0`
+        asm!("", in("c0") foo, out("c0") bar);
+        //~^ ERROR register `c0` conflicts with register `c0`
+        asm!("", in("c0") foo, lateout("c0") bar);
     }
 }

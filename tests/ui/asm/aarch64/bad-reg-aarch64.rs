@@ -2,6 +2,8 @@
 // ignore-aarch64-unknown-freebsd-purecap
 // compile-flags: -C target-feature=+neon
 
+// Check register notation on non-CHERI AArch64.
+
 #![feature(asm_const)]
 
 use std::arch::asm;
@@ -58,5 +60,19 @@ fn main() {
         asm!("", in("v0") foo, out("q0") bar);
         //~^ ERROR register `v0` conflicts with register `v0`
         asm!("", in("v0") foo, lateout("q0") bar);
+
+        // Don't allow Morello registers on non-Morello targets.
+
+        asm!("", in("c0") foo);
+        //~^ ERROR invalid register `c0`: unknown register
+        asm!("{:x} {:w}", in(reg) foo, in(reg) bar);
+        asm!("{:C}", in(reg) foo);
+        //~^ ERROR invalid asm template modifier for this register class
+        asm!("", in("csp") foo);
+        //~^ ERROR invalid register `csp`: unknown register
+        asm!("", in("clr") foo);
+        //~^ ERROR invalid register `clr`: unknown register
+        asm!("", in("czr") foo);
+        //~^ ERROR invalid register `czr`: unknown register
     }
 }

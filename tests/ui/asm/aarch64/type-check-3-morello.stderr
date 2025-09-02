@@ -1,5 +1,5 @@
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:51:15
+  --> $DIR/type-check-3-morello.rs:53:15
    |
 LL |         asm!("{}", in(reg) 0u8);
    |               ^^           --- for this argument
@@ -9,7 +9,7 @@ LL |         asm!("{}", in(reg) 0u8);
    = note: `#[warn(asm_sub_register)]` on by default
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:53:15
+  --> $DIR/type-check-3-morello.rs:55:15
    |
 LL |         asm!("{}", in(reg) 0u16);
    |               ^^           ---- for this argument
@@ -18,7 +18,7 @@ LL |         asm!("{}", in(reg) 0u16);
    = help: or use `{0:x}` to keep the default formatting of `x0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:55:15
+  --> $DIR/type-check-3-morello.rs:57:15
    |
 LL |         asm!("{}", in(reg) 0i32);
    |               ^^           ---- for this argument
@@ -27,7 +27,7 @@ LL |         asm!("{}", in(reg) 0i32);
    = help: or use `{0:x}` to keep the default formatting of `x0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:57:15
+  --> $DIR/type-check-3-morello.rs:59:15
    |
 LL |         asm!("{}", in(reg) 0f32);
    |               ^^           ---- for this argument
@@ -36,7 +36,7 @@ LL |         asm!("{}", in(reg) 0f32);
    = help: or use `{0:x}` to keep the default formatting of `x0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:60:15
+  --> $DIR/type-check-3-morello.rs:62:15
    |
 LL |         asm!("{}", in(vreg) 0i16);
    |               ^^            ---- for this argument
@@ -45,7 +45,7 @@ LL |         asm!("{}", in(vreg) 0i16);
    = help: or use `{0:v}` to keep the default formatting of `v0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:62:15
+  --> $DIR/type-check-3-morello.rs:64:15
    |
 LL |         asm!("{}", in(vreg) 0f32);
    |               ^^            ---- for this argument
@@ -54,7 +54,7 @@ LL |         asm!("{}", in(vreg) 0f32);
    = help: or use `{0:v}` to keep the default formatting of `v0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:64:15
+  --> $DIR/type-check-3-morello.rs:66:15
    |
 LL |         asm!("{}", in(vreg) 0f64);
    |               ^^            ---- for this argument
@@ -63,7 +63,7 @@ LL |         asm!("{}", in(vreg) 0f64);
    = help: or use `{0:v}` to keep the default formatting of `v0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:66:15
+  --> $DIR/type-check-3-morello.rs:68:15
    |
 LL |         asm!("{}", in(vreg_low16) 0f64);
    |               ^^                  ---- for this argument
@@ -72,7 +72,7 @@ LL |         asm!("{}", in(vreg_low16) 0f64);
    = help: or use `{0:v}` to keep the default formatting of `v0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:69:15
+  --> $DIR/type-check-3-morello.rs:71:15
    |
 LL |         asm!("{0} {0}", in(reg) 0i16);
    |               ^^^ ^^^           ---- for this argument
@@ -81,7 +81,7 @@ LL |         asm!("{0} {0}", in(reg) 0i16);
    = help: or use `{0:x}` to keep the default formatting of `x0`
 
 warning: formatting may not be suitable for sub-register argument
-  --> $DIR/type-check-3-morello.rs:71:15
+  --> $DIR/type-check-3-morello.rs:73:15
    |
 LL |         asm!("{0} {0:x}", in(reg) 0i16);
    |               ^^^                 ---- for this argument
@@ -90,7 +90,7 @@ LL |         asm!("{0} {0:x}", in(reg) 0i16);
    = help: or use `{0:x}` to keep the default formatting of `x0`
 
 error: type `float64x2_t` cannot be used with this register class
-  --> $DIR/type-check-3-morello.rs:76:28
+  --> $DIR/type-check-3-morello.rs:78:28
    |
 LL |         asm!("{}", in(reg) f64x2);
    |                            ^^^^^
@@ -98,7 +98,7 @@ LL |         asm!("{}", in(reg) f64x2);
    = note: register class `reg` supports these types: i8, i16, i32, i64, i128, f32, f64
 
 error: type `Simd256bit` cannot be used with this register class
-  --> $DIR/type-check-3-morello.rs:78:29
+  --> $DIR/type-check-3-morello.rs:80:29
    |
 LL |         asm!("{}", in(vreg) f64x4);
    |                             ^^^^^
@@ -106,7 +106,7 @@ LL |         asm!("{}", in(vreg) f64x4);
    = note: register class `vreg` supports these types: i8, i16, i32, i64, f32, f64, i8x8, i16x4, i32x2, i64x1, f32x2, f64x1, i8x16, i16x8, i32x4, i64x2, f32x4, f64x2
 
 error: incompatible types for asm inout argument
-  --> $DIR/type-check-3-morello.rs:90:33
+  --> $DIR/type-check-3-morello.rs:92:33
    |
 LL |         asm!("{:x}", inout(reg) 0u32 => val_f32);
    |                                 ^^^^    ^^^^^^^ type `f32`
@@ -116,7 +116,7 @@ LL |         asm!("{:x}", inout(reg) 0u32 => val_f32);
    = note: asm inout arguments must have the same type, unless they are both pointers or integers of the same size
 
 error: incompatible types for asm inout argument
-  --> $DIR/type-check-3-morello.rs:92:33
+  --> $DIR/type-check-3-morello.rs:94:33
    |
 LL |         asm!("{:x}", inout(reg) 0u32 => val_ptr);
    |                                 ^^^^    ^^^^^^^ type `*mut u8`
@@ -126,7 +126,7 @@ LL |         asm!("{:x}", inout(reg) 0u32 => val_ptr);
    = note: asm inout arguments must have the same type, unless they are both pointers or integers of the same size
 
 error: incompatible types for asm inout argument
-  --> $DIR/type-check-3-morello.rs:94:33
+  --> $DIR/type-check-3-morello.rs:96:33
    |
 LL |         asm!("{:x}", inout(reg) main => val_u32);
    |                                 ^^^^    ^^^^^^^ type `u32`
@@ -136,7 +136,7 @@ LL |         asm!("{:x}", inout(reg) main => val_u32);
    = note: asm inout arguments must have the same type, unless they are both pointers or integers of the same size
 
 error: incompatible types for asm inout argument
-  --> $DIR/type-check-3-morello.rs:96:33
+  --> $DIR/type-check-3-morello.rs:98:33
    |
 LL |         asm!("{:x}", inout(reg) 0u64 => val_ptr);
    |                                 ^^^^    ^^^^^^^ type `*mut u8`
@@ -146,7 +146,7 @@ LL |         asm!("{:x}", inout(reg) 0u64 => val_ptr);
    = note: asm inout arguments must have the same type, unless they are both pointers or integers of the same size
 
 error: incompatible types for asm inout argument
-  --> $DIR/type-check-3-morello.rs:98:33
+  --> $DIR/type-check-3-morello.rs:100:33
    |
 LL |         asm!("{:x}", inout(reg) main => val_u64);
    |                                 ^^^^    ^^^^^^^ type `u64`

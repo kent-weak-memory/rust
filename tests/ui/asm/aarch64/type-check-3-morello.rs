@@ -22,10 +22,12 @@ fn main() {
         asm!("{:w}", in(reg) 0u16);
         asm!("{:w}", in(reg) 0u32);
         asm!("{:w}", in(reg) 0f32);
+        asm!("{:x}", in(reg) 0i64);
+        asm!("{:x}", in(reg) 0f64);
         asm!("{}", in(reg) 0i64);
         asm!("{}", in(reg) 0f64);
-        asm!("{:c}", in(reg) 0i64);
-        asm!("{:c}", in(reg) 0f64);
+        // asm!("{:C}", in(reg) 0i64); TODO(seharris): re-enable when LLVM supports `{:C}`.
+        // asm!("{:C}", in(reg) 0f64); TODO(seharris): re-enable when LLVM supports `{:C}`.
 
         asm!("{:b}", in(vreg) 0u8);
         asm!("{:h}", in(vreg) 0u16);
@@ -42,7 +44,7 @@ fn main() {
         // Template modifiers of a different size to the argument are fine
         asm!("{:w}", in(reg) 0u64);
         asm!("{:x}", in(reg) 0u32);
-        asm!("{:c}", in(reg) 0u32);
+        // asm!("{:C}", in(reg) 0u32); TODO(seharris): re-enable when LLVM supports `{:C}`.
         asm!("{:b}", in(vreg) 0u64);
         asm!("{:d}", in(vreg_low16) f64x2);
 

@@ -1553,8 +1553,8 @@ pub struct Target {
     /// Target triple to pass to LLVM.
     pub llvm_target: StaticCow<str>,
     /// Number of bits in a pointer. Influences the `target_pointer_data_size` `cfg` variable.
-    /// Number of bits in a pointer. Influences the `target_pointer_memory_size` `cfg` variable.
     pub pointer_data_size: u32,
+    /// Number of bits in a pointer. Influences the `target_pointer_memory_size` `cfg` variable.
     pub pointer_memory_size: u32,
     /// Architecture to use for ABI considerations. Valid options include: "x86",
     /// "x86_64", "arm", "aarch64", "mips", "powerpc", "powerpc64", and others.

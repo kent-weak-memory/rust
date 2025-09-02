@@ -1,5 +1,5 @@
 error: invalid `sym` operand
-  --> $DIR/type-check-2-morello.rs:75:19
+  --> $DIR/type-check-2-morello.rs:83:19
    |
 LL | global_asm!("{}", sym C);
    |                   ^^^^^ is an `i32`
@@ -22,8 +22,36 @@ LL |         asm!("{:v}", in(vreg) SimdNonCopy(0.0, 0.0, 0.0, 0.0));
    |
    = note: `SimdNonCopy` does not implement the Copy trait
 
-error: cannot use value of type `[closure@$DIR/type-check-2-morello.rs:41:28: 41:36]` for inline assembly
-  --> $DIR/type-check-2-morello.rs:41:28
+warning: formatting may not be suitable for sub-register argument
+  --> $DIR/type-check-2-morello.rs:38:15
+   |
+LL |         asm!("{}", in(reg) 0 as *const u8);
+   |               ^^           -------------- for this argument
+   |
+   = help: use `{0:C}` to have the register formatted as `c0`
+   = help: or use `{0:x}` to keep the default formatting of `x0`
+   = note: `#[warn(asm_sub_register)]` on by default
+
+warning: formatting may not be suitable for sub-register argument
+  --> $DIR/type-check-2-morello.rs:40:15
+   |
+LL |         asm!("{}", in(reg) 0 as *mut u8);
+   |               ^^           ------------ for this argument
+   |
+   = help: use `{0:C}` to have the register formatted as `c0`
+   = help: or use `{0:x}` to keep the default formatting of `x0`
+
+warning: formatting may not be suitable for sub-register argument
+  --> $DIR/type-check-2-morello.rs:42:15
+   |
+LL |         asm!("{}", in(reg) main as fn());
+   |               ^^           ------------ for this argument
+   |
+   = help: use `{0:C}` to have the register formatted as `c0`
+   = help: or use `{0:x}` to keep the default formatting of `x0`
+
+error: cannot use value of type `[closure@$DIR/type-check-2-morello.rs:47:28: 47:36]` for inline assembly
+  --> $DIR/type-check-2-morello.rs:47:28
    |
 LL |         asm!("{}", in(reg) |x: i32| x);
    |                            ^^^^^^^^^^
@@ -31,7 +59,7 @@ LL |         asm!("{}", in(reg) |x: i32| x);
    = note: only integers, floats, SIMD vectors, pointers and function pointers can be used as arguments for inline assembly
 
 error: cannot use value of type `Vec<i32>` for inline assembly
-  --> $DIR/type-check-2-morello.rs:43:28
+  --> $DIR/type-check-2-morello.rs:49:28
    |
 LL |         asm!("{}", in(reg) vec![0]);
    |                            ^^^^^^^
@@ -40,7 +68,7 @@ LL |         asm!("{}", in(reg) vec![0]);
    = note: this error originates in the macro `vec` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error: cannot use value of type `(i32, i32, i32)` for inline assembly
-  --> $DIR/type-check-2-morello.rs:45:28
+  --> $DIR/type-check-2-morello.rs:51:28
    |
 LL |         asm!("{}", in(reg) (1, 2, 3));
    |                            ^^^^^^^^^
@@ -48,28 +76,46 @@ LL |         asm!("{}", in(reg) (1, 2, 3));
    = note: only integers, floats, SIMD vectors, pointers and function pointers can be used as arguments for inline assembly
 
 error: cannot use value of type `[i32; 3]` for inline assembly
-  --> $DIR/type-check-2-morello.rs:47:28
+  --> $DIR/type-check-2-morello.rs:53:28
    |
 LL |         asm!("{}", in(reg) [1, 2, 3]);
    |                            ^^^^^^^^^
    |
    = note: only integers, floats, SIMD vectors, pointers and function pointers can be used as arguments for inline assembly
 
+warning: formatting may not be suitable for sub-register argument
+  --> $DIR/type-check-2-morello.rs:60:15
+   |
+LL |         asm!("{}", in(reg) f);
+   |               ^^           - for this argument
+   |
+   = help: use `{0:C}` to have the register formatted as `c0`
+   = help: or use `{0:x}` to keep the default formatting of `x0`
+
 error: cannot use value of type `fn() {main}` for inline assembly
-  --> $DIR/type-check-2-morello.rs:55:31
+  --> $DIR/type-check-2-morello.rs:62:31
    |
 LL |         asm!("{}", inout(reg) f);
    |                               ^
    |
    = note: only integers, floats, SIMD vectors, pointers and function pointers can be used as arguments for inline assembly
 
+warning: formatting may not be suitable for sub-register argument
+  --> $DIR/type-check-2-morello.rs:64:15
+   |
+LL |         asm!("{}", in(reg) r);
+   |               ^^           - for this argument
+   |
+   = help: use `{0:C}` to have the register formatted as `c0`
+   = help: or use `{0:x}` to keep the default formatting of `x0`
+
 error: cannot use value of type `&mut i32` for inline assembly
-  --> $DIR/type-check-2-morello.rs:58:31
+  --> $DIR/type-check-2-morello.rs:66:31
    |
 LL |         asm!("{}", inout(reg) r);
    |                               ^
    |
    = note: only integers, floats, SIMD vectors, pointers and function pointers can be used as arguments for inline assembly
 
-error: aborting due to 9 previous errors
+error: aborting due to 9 previous errors; 5 warnings emitted
 

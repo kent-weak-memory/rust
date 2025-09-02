@@ -21,7 +21,7 @@ def_reg_class! {
 impl MorelloInlineAsmRegClass {
     pub fn valid_modifiers(self, _arch: super::InlineAsmArch) -> &'static [char] {
         match self {
-            Self::reg => &['w', 'x', 'c'],
+            Self::reg => &['w', 'x', 'C'],
             Self::vreg | Self::vreg_low16 => &['b', 'h', 's', 'd', 'q', 'v'],
             Self::preg => &[],
         }
@@ -38,7 +38,7 @@ impl MorelloInlineAsmRegClass {
     ) -> Option<(char, &'static str)> {
         match self {
             Self::reg => match ty.size().bits() {
-                128 => Some(('c', "c0")),
+                128 => Some(('C', "c0")),
                 64 => None,
                 _ => Some(('w', "w0")),
             },

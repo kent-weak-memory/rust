@@ -1,27 +1,27 @@
 error: invalid register class `foo`: unknown register class
-  --> $DIR/bad-reg-morello.rs:14:20
+  --> $DIR/bad-reg-morello.rs:23:20
    |
 LL |         asm!("{}", in(foo) foo);
    |                    ^^^^^^^^^^^
 
 error: invalid register `foo`: unknown register
-  --> $DIR/bad-reg-morello.rs:16:18
+  --> $DIR/bad-reg-morello.rs:25:18
    |
 LL |         asm!("", in("foo") foo);
    |                  ^^^^^^^^^^^^^
 
 error: invalid asm template modifier for this register class
-  --> $DIR/bad-reg-morello.rs:18:15
+  --> $DIR/bad-reg-morello.rs:27:15
    |
 LL |         asm!("{:z}", in(reg) foo);
    |               ^^^^   ----------- argument
    |               |
    |               template modifier
    |
-   = note: the `reg` register class supports the following template modifiers: `w`, `x`, `c`
+   = note: the `reg` register class supports the following template modifiers: `w`, `x`, `C`
 
 error: invalid asm template modifier for this register class
-  --> $DIR/bad-reg-morello.rs:20:15
+  --> $DIR/bad-reg-morello.rs:29:15
    |
 LL |         asm!("{:r}", in(vreg) foo);
    |               ^^^^   ------------ argument
@@ -31,7 +31,7 @@ LL |         asm!("{:r}", in(vreg) foo);
    = note: the `vreg` register class supports the following template modifiers: `b`, `h`, `s`, `d`, `q`, `v`
 
 error: invalid asm template modifier for this register class
-  --> $DIR/bad-reg-morello.rs:22:15
+  --> $DIR/bad-reg-morello.rs:31:15
    |
 LL |         asm!("{:r}", in(vreg_low16) foo);
    |               ^^^^   ------------------ argument
@@ -41,7 +41,7 @@ LL |         asm!("{:r}", in(vreg_low16) foo);
    = note: the `vreg_low16` register class supports the following template modifiers: `b`, `h`, `s`, `d`, `q`, `v`
 
 error: asm template modifiers are not allowed for `const` arguments
-  --> $DIR/bad-reg-morello.rs:24:15
+  --> $DIR/bad-reg-morello.rs:33:15
    |
 LL |         asm!("{:a}", const 0);
    |               ^^^^   ------- argument
@@ -49,7 +49,7 @@ LL |         asm!("{:a}", const 0);
    |               template modifier
 
 error: asm template modifiers are not allowed for `sym` arguments
-  --> $DIR/bad-reg-morello.rs:26:15
+  --> $DIR/bad-reg-morello.rs:35:15
    |
 LL |         asm!("{:a}", sym main);
    |               ^^^^   -------- argument
@@ -57,49 +57,73 @@ LL |         asm!("{:a}", sym main);
    |               template modifier
 
 error: invalid register `x29`: the frame pointer cannot be used as an operand for inline asm
-  --> $DIR/bad-reg-morello.rs:28:18
+  --> $DIR/bad-reg-morello.rs:37:18
    |
 LL |         asm!("", in("x29") foo);
    |                  ^^^^^^^^^^^^^
 
 error: invalid register `sp`: the stack pointer cannot be used as an operand for inline asm
-  --> $DIR/bad-reg-morello.rs:30:18
+  --> $DIR/bad-reg-morello.rs:39:18
    |
 LL |         asm!("", in("sp") foo);
    |                  ^^^^^^^^^^^^
 
 error: invalid register `xzr`: the zero register cannot be used as an operand for inline asm
-  --> $DIR/bad-reg-morello.rs:32:18
+  --> $DIR/bad-reg-morello.rs:41:18
    |
 LL |         asm!("", in("xzr") foo);
    |                  ^^^^^^^^^^^^^
 
 error: invalid register `x19`: c19 is used internally by LLVM and cannot be used as an operand for inline asm
-  --> $DIR/bad-reg-morello.rs:34:18
+  --> $DIR/bad-reg-morello.rs:43:18
    |
 LL |         asm!("", in("x19") foo);
    |                  ^^^^^^^^^^^^^
 
 error: register class `preg` can only be used as a clobber, not as an input or output
-  --> $DIR/bad-reg-morello.rs:37:18
+  --> $DIR/bad-reg-morello.rs:46:18
    |
 LL |         asm!("", in("p0") foo);
    |                  ^^^^^^^^^^^^
 
 error: register class `preg` can only be used as a clobber, not as an input or output
-  --> $DIR/bad-reg-morello.rs:41:20
+  --> $DIR/bad-reg-morello.rs:50:20
    |
 LL |         asm!("{}", in(preg) foo);
    |                    ^^^^^^^^^^^^
 
 error: register class `preg` can only be used as a clobber, not as an input or output
-  --> $DIR/bad-reg-morello.rs:44:20
+  --> $DIR/bad-reg-morello.rs:53:20
    |
 LL |         asm!("{}", out(preg) _);
    |                    ^^^^^^^^^^^
 
+error: invalid register `c29`: the frame pointer cannot be used as an operand for inline asm
+  --> $DIR/bad-reg-morello.rs:56:18
+   |
+LL |         asm!("", in("c29") foo);
+   |                  ^^^^^^^^^^^^^
+
+error: invalid register `csp`: the stack pointer cannot be used as an operand for inline asm
+  --> $DIR/bad-reg-morello.rs:58:18
+   |
+LL |         asm!("", in("csp") foo);
+   |                  ^^^^^^^^^^^^^
+
+error: invalid register `czr`: the zero register cannot be used as an operand for inline asm
+  --> $DIR/bad-reg-morello.rs:60:18
+   |
+LL |         asm!("", in("czr") foo);
+   |                  ^^^^^^^^^^^^^
+
+error: invalid register `c19`: c19 is used internally by LLVM and cannot be used as an operand for inline asm
+  --> $DIR/bad-reg-morello.rs:62:18
+   |
+LL |         asm!("", in("c19") foo);
+   |                  ^^^^^^^^^^^^^
+
 error: register `c0` conflicts with register `c0`
-  --> $DIR/bad-reg-morello.rs:50:32
+  --> $DIR/bad-reg-morello.rs:68:32
    |
 LL |         asm!("", in("x0") foo, in("w0") bar);
    |                  ------------  ^^^^^^^^^^^^ register `c0`
@@ -107,7 +131,7 @@ LL |         asm!("", in("x0") foo, in("w0") bar);
    |                  register `c0`
 
 error: register `c0` conflicts with register `c0`
-  --> $DIR/bad-reg-morello.rs:52:32
+  --> $DIR/bad-reg-morello.rs:70:32
    |
 LL |         asm!("", in("x0") foo, out("x0") bar);
    |                  ------------  ^^^^^^^^^^^^^ register `c0`
@@ -115,13 +139,13 @@ LL |         asm!("", in("x0") foo, out("x0") bar);
    |                  register `c0`
    |
 help: use `lateout` instead of `out` to avoid conflict
-  --> $DIR/bad-reg-morello.rs:52:18
+  --> $DIR/bad-reg-morello.rs:70:18
    |
 LL |         asm!("", in("x0") foo, out("x0") bar);
    |                  ^^^^^^^^^^^^
 
 error: register `v0` conflicts with register `v0`
-  --> $DIR/bad-reg-morello.rs:55:32
+  --> $DIR/bad-reg-morello.rs:73:32
    |
 LL |         asm!("", in("v0") foo, in("q0") bar);
    |                  ------------  ^^^^^^^^^^^^ register `v0`
@@ -129,7 +153,7 @@ LL |         asm!("", in("v0") foo, in("q0") bar);
    |                  register `v0`
 
 error: register `v0` conflicts with register `v0`
-  --> $DIR/bad-reg-morello.rs:57:32
+  --> $DIR/bad-reg-morello.rs:75:32
    |
 LL |         asm!("", in("v0") foo, out("q0") bar);
    |                  ------------  ^^^^^^^^^^^^^ register `v0`
@@ -137,13 +161,43 @@ LL |         asm!("", in("v0") foo, out("q0") bar);
    |                  register `v0`
    |
 help: use `lateout` instead of `out` to avoid conflict
-  --> $DIR/bad-reg-morello.rs:57:18
+  --> $DIR/bad-reg-morello.rs:75:18
    |
 LL |         asm!("", in("v0") foo, out("q0") bar);
    |                  ^^^^^^^^^^^^
 
+error: register `c0` conflicts with register `c0`
+  --> $DIR/bad-reg-morello.rs:79:32
+   |
+LL |         asm!("", in("c0") foo, in("w0") bar);
+   |                  ------------  ^^^^^^^^^^^^ register `c0`
+   |                  |
+   |                  register `c0`
+
+error: register `c0` conflicts with register `c0`
+  --> $DIR/bad-reg-morello.rs:81:32
+   |
+LL |         asm!("", in("c0") foo, in("x0") bar);
+   |                  ------------  ^^^^^^^^^^^^ register `c0`
+   |                  |
+   |                  register `c0`
+
+error: register `c0` conflicts with register `c0`
+  --> $DIR/bad-reg-morello.rs:83:32
+   |
+LL |         asm!("", in("c0") foo, out("c0") bar);
+   |                  ------------  ^^^^^^^^^^^^^ register `c0`
+   |                  |
+   |                  register `c0`
+   |
+help: use `lateout` instead of `out` to avoid conflict
+  --> $DIR/bad-reg-morello.rs:83:18
+   |
+LL |         asm!("", in("c0") foo, out("c0") bar);
+   |                  ^^^^^^^^^^^^
+
 error: type `i32` cannot be used with this register class
-  --> $DIR/bad-reg-morello.rs:37:27
+  --> $DIR/bad-reg-morello.rs:46:27
    |
 LL |         asm!("", in("p0") foo);
    |                           ^^^
@@ -151,12 +205,12 @@ LL |         asm!("", in("p0") foo);
    = note: register class `preg` supports these types: 
 
 error: type `i32` cannot be used with this register class
-  --> $DIR/bad-reg-morello.rs:41:29
+  --> $DIR/bad-reg-morello.rs:50:29
    |
 LL |         asm!("{}", in(preg) foo);
    |                             ^^^
    |
    = note: register class `preg` supports these types: 
 
-error: aborting due to 20 previous errors
+error: aborting due to 27 previous errors
 

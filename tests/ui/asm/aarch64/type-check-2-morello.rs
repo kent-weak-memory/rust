@@ -35,9 +35,15 @@ fn main() {
         asm!("{}", in(reg) 0i64);
         asm!("{}", in(reg) 0f64);
         asm!("{:v}", in(vreg) SimdType(0.0, 0.0, 0.0, 0.0));
-        asm!("{:c}", in(reg) 0 as *const u8);
-        asm!("{:c}", in(reg) 0 as *mut u8);
-        asm!("{:c}", in(reg) main as fn());
+        asm!("{}", in(reg) 0 as *const u8);
+        //~^ WARNING formatting may not be suitable for sub-register argument
+        asm!("{}", in(reg) 0 as *mut u8);
+        //~^ WARNING formatting may not be suitable for sub-register argument
+        asm!("{}", in(reg) main as fn());
+        //~^ WARNING formatting may not be suitable for sub-register argument
+        // asm!("{:C}", in(reg) 0 as *const u8); TODO(seharris): re-enable when LLVM supports `{:C}`.
+        // asm!("{:C}", in(reg) 0 as *mut u8); TODO(seharris): re-enable when LLVM supports `{:C}`.
+        // asm!("{:C}", in(reg) main as fn()); TODO(seharris): re-enable when LLVM supports `{:C}`.
         asm!("{}", in(reg) |x: i32| x);
         //~^ ERROR cannot use value of type
         asm!("{}", in(reg) vec![0]);
@@ -51,10 +57,12 @@ fn main() {
 
         let mut f = main;
         let mut r = &mut 0;
-        asm!("{:c}", in(reg) f);
+        asm!("{}", in(reg) f);
+        //~^ WARNING formatting may not be suitable for sub-register argument
         asm!("{}", inout(reg) f);
         //~^ ERROR cannot use value of type `fn() {main}` for inline assembly
-        asm!("{:c}", in(reg) r);
+        asm!("{}", in(reg) r);
+        //~^ WARNING formatting may not be suitable for sub-register argument
         asm!("{}", inout(reg) r);
         //~^ ERROR cannot use value of type `&mut i32` for inline assembly
         let _ = (f, r);

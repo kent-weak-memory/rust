@@ -217,12 +217,12 @@ cfg_if::cfg_if! {
                             exception_object as uintptr_t,
                         );
                         uw::_Unwind_SetGR(context, UNWIND_DATA_REG.1, crate::ptr::null());
-                        // TODO(seharris) consider removing it.
+                        // TODO(seharris) consider removing this.
                         #[cfg(not(bootstrap))] // bootstrap compiler doesn't understand purecap
                         #[cfg(all(target_arch = "aarch64", target_abi = "purecap"))]
                         {
                             let is_valid: u64;
-                            // TODO(seharris):  check this still works with x template modifier
+                            // TODO(seharris): using `{:x}` for the second argument doesn't make sense, but current version of LLVM doesn't support `{:C}` and we have to use *something*.
                             crate::arch::asm!("gctag {:x}, {:x}", out(reg) is_valid, in(reg) lpad);
                             assert!(is_valid == 1);
                         }
