@@ -1,6 +1,7 @@
 // run-pass
 // ignore-emscripten no processes
 // ignore-sgx no processes
+// ignore-purecap This gets stuck on CHERI BSD, both using a plain AArch64 or Morello binaries
 
 use std::env;
 use std::io::prelude::*;
