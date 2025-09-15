@@ -111,16 +111,29 @@ Cheribuild is required to compile Morello LLVM and CHERI BSD.
 
 Clone it from `https://github.com/CTSRD-CHERI/cheribuild` and follow their setup instructions for your platform.
 
-### CHERI BSD (and Morello LLVM)
+### Morello LLVM
 
-Building libraries and programs requires a build of Morello LLVM as a compiler backend, and a build of CHERI BSD to compile against.
-Cheribuild will automatically compile Morello LLVM as a dependency for building CHERI BSD, so we can do both in one go:
+The compiler uses Morello LLVM as a backend, and we need a specific version.
+Clone it manually to get the right version:
+```
+cd /path/to/cheribuild-working-directory
+git clone --revision 671d6dbe2b74525702368edfa086e68f5afadc24 --depth 1 https://git.morello-project.org/morello/llvm-project.git morello-llvm-project
+```
+
+Then use Cheribuild to compile it:
+```
+cd /path/to/cheribuild
+./cheribuild.py morello-llvm-native --skip-update
+```
+
+### CHERI BSD
+
+Building libraries and programs requires a build of CHERI BSD to compile against.
+Use Cheribuild to clone and compile CHERI BSD, this will use the version of Morello LLVM we just compiled:
 ```
 cd /path/to/cheribuild
 ./cheribuild.py -d cheribsd-morello-purecap
 ```
-
-Note that this process will download large amounts of source code from the internet.
 
 ### Clone Compiler Repository
 
@@ -134,12 +147,9 @@ git clone --depth=1 https://github.com/kent-weak-memory/rust.git
 ### Patch and Rebuild Morello LLVM
 
 Our compiler requires minor changes to Morello LLVM to function properly.
-
-Checkout a known working version of Morello LLVM and apply patches:
+Apply the included patches to Morello LLVM:
 ```
 cd /path/to/cheribuild-working-directory/morello-llvm-project
-git fetch --unshallow
-git checkout 671d6dbe2b74525702368edfa086e68f5afadc24
 git apply /path/to/rust-repository/llvm.patch
 ```
 
