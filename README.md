@@ -4,8 +4,7 @@ This is a fork of [Rust](https://www.rust-lang.org) which adds experimental supp
 Morello is an experimental processor architecture that adds [CHERI](https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/) protections to ARM (AArch64).
 This repository contains the compiler, standard library, and documentation.
 
-As of time of writing (2024-01-12), this compiler should be fully functional, but has bugs and contains some dirty hacks we haven't fixed yet.
-Expect things to break.
+As of 2025-09-15 the compiler has been tested and should be fully functional, but it's still somewhat experimental and may well still have bugs and design flaws.
 
 This fork is not built or maintained by the Rust project proper, please don't complain to them if you have issues with it, they will not be able to help.
 We can be contacted via email or GitHub issues but don't really have the capacity to offer much support.
