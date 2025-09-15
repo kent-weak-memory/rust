@@ -617,7 +617,6 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 let lhs_bits = Operand::const_from_scalar(
                     self.tcx,
                     unsigned_ty,
-                    // TODO(seharris): this is likely the wrong memory size.
                     Scalar::from_uint(lhs_size.bits(), rhs_size, rhs_size),
                     span,
                 );

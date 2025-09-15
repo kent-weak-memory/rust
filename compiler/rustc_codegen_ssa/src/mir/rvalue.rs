@@ -241,7 +241,6 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let OperandValueKind::Immediate(in_scalar) = operand_kind else {
                     bug!("Found {operand_kind:?} for operand {operand:?}");
                 };
-                // TODO(seharris) should we check `data_size` is the same?
                 if let OperandValueKind::Immediate(out_scalar) = cast_kind
                     && in_scalar.memory_size(self.cx) == out_scalar.memory_size(self.cx)
                         {
@@ -263,7 +262,6 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 let OperandValueKind::Pair(in_a, in_b) = operand_kind else {
                     bug!("Found {operand_kind:?} for operand {operand:?}");
                 };
-                // TODO(seharris) should we check `data_size` is the same?
                 if let OperandValueKind::Pair(out_a, out_b) = cast_kind
                     && in_a.memory_size(self.cx) == out_a.memory_size(self.cx)
                     && in_b.memory_size(self.cx) == out_b.memory_size(self.cx)
@@ -998,7 +996,6 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     // Need to generate an `alloc` to get a pointer from an immediate
                     (OperandValueKind::Immediate(..) | OperandValueKind::Pair(..), OperandValueKind::Ref) => false,
 
-                    // TODO(seharris) should test `data_size` is the same?
                     // When we have scalar immediates, we can only convert things
                     // where the sizes match, to avoid endianness questions.
                     (OperandValueKind::Immediate(a), OperandValueKind::Immediate(b)) =>

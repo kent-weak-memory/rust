@@ -12,12 +12,12 @@ We can be contacted via email or GitHub issues but don't really have the capacit
 
 ## Known Issues
 * compiler prints a lot of LLVM warnings (`cheri-bound-allocas: Don't know how to handle intrinsic.`), this is normal
-* the compiler must be built with a specific, moderately old version of Morello LLVM, which may also restrict which version of CHERI BSD compiled programs will run on
+* the compiler must be built with a specific, moderately old version of Morello LLVM, and CHERI BSD must be built with the same version to avoid ABI issues
 * backtraces cause an error message to be printed by libunwind (`libunwind: evaluated out-of-bounds/invalid CFA expression for pc <address>: 0xc0`), but otherwise work correctly
 * allocating large zeroed values can overflow the stack if the stack size is small, `Box::new(std::mem::zeroed::<[u8; STACK_SIZE*2]>()` will fail, `Box::new([0 as u8; STACK_SIZE*2])` and `vec![0 as u8; STACK_SIZE*2]` should work (see `tests/ui/codegen/issue-28950.rs`)
 * unaligned references and pointers cannot be used to access data due to the limitations of capabilities, but trying to do so does not cause an error at compile time
 * stack overflow detection can fail to detect overflows when stack size is limited to a small value using `limits`
-* the compatible version of Morello LLVM does not support the `C` register class specifier, but Rust's assembly semantics require specifiers on Morello, as a workaround it seems `x` can be used instead (`asm!("gctag {:x} {:C}", out(reg) valid, in(reg) pointer)`)
+* the compatible version of Morello LLVM does not support the `C` register class specifier, but Rust's assembly semantics require specifiers on Morello, as a workaround it seems `x` can be used instead (`asm!("gctag {:x} {:x}", out(reg) valid, in(reg) pointer)`)
 
 ## Setup
 
@@ -101,6 +101,7 @@ To build for the architecture of the local machine:
 At a high level the steps to build from source are:
 * compile Morello LLVM
 * compile CheriBSD
+* apply patches to Morello LLVM
 * compile Rust compiler and libraries
 * compile additional Rust tools
 

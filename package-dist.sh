@@ -14,7 +14,7 @@ fi
 RUST_PATH="$1"
 CHERIBUILD_PATH="$2"
 
-VERSION='1.56.0'
+VERSION='1.72.1'
 HOST='x86_64-unknown-linux-gnu'
 PACKAGES="
 	rustc-$VERSION-dev-$HOST/rustc

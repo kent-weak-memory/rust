@@ -238,23 +238,6 @@ pub fn alloc_range(start: Size, data_size: Option<Size>, memory_size: Size) -> A
     AllocRange { start, data_size, memory_size }
 }
 
-/*
-TODO(seharris): check where this is used and possibly get rid of it.
-impl From<Range<Size>> for AllocRange {
-    #[inline]
-    fn from(r: Range<Size>) -> Self {
-        alloc_range(r.start, r.end - r.start) // `Size` subtraction (overflow-checked)
-    }
-}
-
-impl From<Range<usize>> for AllocRange {
-    #[inline]
-    fn from(r: Range<usize>) -> Self {
-        AllocRange::from(Size::from_bytes(r.start)..Size::from_bytes(r.end))
-    }
-}
-*/
-
 impl AllocRange {
     #[inline(always)]
     pub fn end_data_or_memory(self) -> Size {
